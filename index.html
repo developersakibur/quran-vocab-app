@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Quran Vocabulary</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e6e5c">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div>
+      <span class="eyebrow">Learn Arabic through the Quran</span>
+      <h1>কুরআন ভোকাবুলারি</h1>
+      <p class="overall-progress" id="overall-progress"></p>
+    </div>
+    <div class="topbar-actions">
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="থিম পরিবর্তন করুন">
+        <span id="theme-icon">🌙</span>
+      </button>
+      <button class="theme-toggle" id="menu-btn" aria-label="মেনু">☰</button>
+    </div>
+  </header>
+
+  <!-- Hamburger dropdown menu -->
+  <div class="menu-dropdown" id="menu-dropdown">
+    <button class="menu-item" id="menu-download-btn">⬇️ অডিও ডাউনলোড</button>
+    <button class="menu-item" id="menu-cache-data-btn">📦 সব ডেটা অফলাইনে সংরক্ষণ করুন</button>
+  </div>
+
+  <div class="search-box-wrap">
+    <input type="text" class="search-box" id="search-box" placeholder="সূরা খুঁজুন (নাম লিখুন)…">
+  </div>
+
+  <!-- Loading state -->
+  <main class="quiz-stage" id="loading-stage">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">লোড হচ্ছে…</p>
+  </main>
+
+  <ul class="surah-list" id="surah-list" style="display:none"></ul>
+  <p class="no-results" id="no-results" style="display:none">কোনো সূরা পাওয়া যায়নি।</p>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ============================================================
+       DOWNLOAD MANAGER OVERLAY
+       ============================================================ -->
+  <div class="dl-overlay" id="dl-overlay">
+    <div class="dl-panel">
+      <div class="dl-header">
+        <h2>অডিও ডাউনলোড</h2>
+        <button class="dl-close" id="dl-close" aria-label="বন্ধ করো">✕</button>
+      </div>
+
+      <div class="dl-tabs">
+        <button class="dl-tab active" data-tab="ayah">আয়াত</button>
+        <button class="dl-tab" data-tab="word">ওয়ার্ড</button>
+      </div>
+
+      <div class="dl-tab-panel" id="dl-panel-ayah">
+        <button class="download-all-btn" id="dl-all-ayah">⬇️ সব আয়াতের অডিও ডাউনলোড করো</button>
+        <div class="dl-overall-status" id="dl-ayah-overall-status"></div>
+        <ul class="dl-surah-list" id="dl-list-ayah"></ul>
+      </div>
+
+      <div class="dl-tab-panel" id="dl-panel-word" style="display:none">
+        <button class="download-all-btn" id="dl-all-word">⬇️ সব শব্দের অডিও ডাউনলোড করো</button>
+        <div class="dl-overall-status" id="dl-word-overall-status"></div>
+        <ul class="dl-surah-list" id="dl-list-word"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/theme.js"></script>
+  <script src="js/storage/storage-manager.js"></script>
+  <script src="js/data/word-repository.js"></script>
+  <script src="js/progress-manager.js"></script>
+  <script>
+    let allSurahs = [];
+    const WORD_AUDIO_BASE = 'https://audio.qurancdn.com/wbw';
+    const AYAH_AUDIO_BASE = 'https://everyayah.com/data/Alafasy_128kbps';
+    const AUDIO_CACHE_NAME = 'quran-audio-v1';
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove('visible'), 2500);
+    }
+
+    function progressBadgeHtml(surahNum) {
+      const p = ProgressManager.getSurahProgress(surahNum);
+      if (p.passed) return `<span class="surah-progress-badge passed">✓ পাস — ${p.bestPercent}%</span>`;
+      if (p.attempts > 0) return `<span class="surah-progress-badge attempted">সেরা স্কোর ${p.bestPercent}%</span>`;
+      return '';
+    }
+
+    function renderList(surahs) {
+      const list = document.getElementById('surah-list');
+      const noResults = document.getElementById('no-results');
+      list.innerHTML = '';
+      if (surahs.length === 0) {
+        list.style.display = 'none';
+        noResults.style.display = 'block';
+        return;
+      }
+      list.style.display = 'block';
+      noResults.style.display = 'none';
+      surahs.forEach(s => {
+        const li = document.createElement('li');
+        li.className = 'surah-row';
+        li.onclick = () => { window.location.href = `quiz.html?surah=${s.surah}`; };
+        li.innerHTML = `
+          <div class="surah-number">${String(s.surah).padStart(2, '0')}</div>
+          <div class="surah-info">
+            <p class="surah-name-main">${s.name_bn_script || s.name_transliteration || ''}</p>
+            <p class="surah-name-meaning">${s.name_bn ? 'অর্থ: ' + s.name_bn : ''}</p>
+            ${progressBadgeHtml(s.surah)}
+          </div>
+          <div class="surah-meta">
+            <span class="count">${s.total_words} শব্দ</span>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function updateOverallProgress() {
+      const stats = ProgressManager.overallStats(allSurahs.length);
+      document.getElementById('overall-progress').textContent =
+        `সম্পন্ন: ${stats.completed} / ${stats.total} সূরা`;
+    }
+
+    document.getElementById('search-box').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) { renderList(allSurahs); return; }
+      const filtered = allSurahs.filter(s =>
+        (s.name_bn_script || '').toLowerCase().includes(q) ||
+        (s.name_transliteration || '').toLowerCase().includes(q) ||
+        (s.name_bn || '').toLowerCase().includes(q) ||
+        String(s.surah) === q
+      );
+      renderList(filtered);
+    });
+
+    async function loadSurahs() {
+      try {
+        allSurahs = await WordRepository.getSurahsMeta();
+        document.getElementById('loading-stage').style.display = 'none';
+        renderList(allSurahs);
+        updateOverallProgress();
+      } catch (err) {
+        document.getElementById('loading-stage').innerHTML = `
+          <p style="font-family:var(--font-bangla); color:var(--color-danger); text-align:center;">
+            ⚠️ সূরা তালিকা লোড করতে সমস্যা হয়েছে: ${err.message}
+          </p>`;
+        console.error(err);
+      }
+    }
+    loadSurahs();
+
+    /* ---- Service worker registration ---- */
+    let swReady = false;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => { swReady = true; })
+        .catch(err => console.error('Service worker registration failed:', err));
+    }
+
+    /* ---- Hamburger menu ---- */
+    const menuBtn = document.getElementById('menu-btn');
+    const menuDropdown = document.getElementById('menu-dropdown');
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      menuDropdown.classList.toggle('visible');
+    };
+    document.addEventListener('click', () => menuDropdown.classList.remove('visible'));
+
+    /* ============================================================
+       DOWNLOAD MANAGER
+       ============================================================ */
+    const dlOverlay = document.getElementById('dl-overlay');
+    document.getElementById('menu-download-btn').onclick = () => {
+      menuDropdown.classList.remove('visible');
+      dlOverlay.classList.add('visible');
+      refreshDownloadPanels();
+    };
+    document.getElementById('dl-close').onclick = () => dlOverlay.classList.remove('visible');
+
+    /* ---- Cache all surah data (JSON) for offline use ---- */
+    document.getElementById('menu-cache-data-btn').onclick = async () => {
+      menuDropdown.classList.remove('visible');
+      showToast('ডেটা সংরক্ষণ শুরু হচ্ছে…');
+      let done = 0;
+      const total = allSurahs.length;
+      for (const s of allSurahs) {
+        try {
+          await WordRepository.getSurahContent(s.surah);
+        } catch (e) { /* skip this one, continue with the rest */ }
+        done++;
+        if (done % 10 === 0 || done === total) {
+          showToast(`ডেটা সংরক্ষণ হচ্ছে… ${done}/${total} সূরা`);
+        }
+      }
+      showToast(`✅ সব সূরার ডেটা অফলাইনে সংরক্ষণ সম্পন্ন (${total}/${total})`);
+    };
+
+    document.querySelectorAll('.dl-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.dl-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('dl-panel-ayah').style.display = tab.dataset.tab === 'ayah' ? 'block' : 'none';
+        document.getElementById('dl-panel-word').style.display = tab.dataset.tab === 'word' ? 'block' : 'none';
+      };
+    });
+
+    // Cache inspection: single pass over all cached audio URLs, building
+    // per-surah counts, so we never need to fetch every surah's JSON
+    // just to show "downloaded X / Y" progress.
+    async function getCachedCounts() {
+      const wordCounts = {};   // {surahNum: count}
+      const ayahCounts = {};   // {surahNum: count}
+      if (!('caches' in window)) return { wordCounts, ayahCounts };
+      try {
+        const cache = await caches.open(AUDIO_CACHE_NAME);
+        const requests = await cache.keys();
+        requests.forEach(req => {
+          const url = req.url;
+          const wordMatch = url.match(/\/wbw\/(\d{3})_/);
+          if (wordMatch) {
+            const s = parseInt(wordMatch[1], 10);
+            wordCounts[s] = (wordCounts[s] || 0) + 1;
+            return;
+          }
+          const ayahMatch = url.match(/Alafasy_128kbps\/(\d{3})\d{3}\.mp3$/);
+          if (ayahMatch) {
+            const s = parseInt(ayahMatch[1], 10);
+            ayahCounts[s] = (ayahCounts[s] || 0) + 1;
+          }
+        });
+      } catch (e) { /* caches unavailable — show 0/total everywhere */ }
+      return { wordCounts, ayahCounts };
+    }
+
+    let isDownloading = false;
+
+    function waitForSwMessage(handler) {
+      navigator.serviceWorker.onmessage = handler;
+    }
+
+    function downloadUrls(urls, onProgress, onComplete) {
+      if (!navigator.serviceWorker.controller) {
+        showToast('একটু অপেক্ষা করে আবার চেষ্টা করো — সার্ভিস ওয়ার্কার এখনো প্রস্তুত হচ্ছে');
+        return;
+      }
+      if (isDownloading) {
+        showToast('একটি ডাউনলোড ইতিমধ্যে চলছে, শেষ হওয়া পর্যন্ত অপেক্ষা করো');
+        return;
+      }
+      isDownloading = true;
+      waitForSwMessage((event) => {
+        const msg = event.data;
+        if (msg.type === 'DOWNLOAD_PROGRESS') {
+          onProgress(msg.done, msg.total);
+        } else if (msg.type === 'DOWNLOAD_COMPLETE') {
+          isDownloading = false;
+          onComplete(msg.total);
+        }
+      });
+      navigator.serviceWorker.controller.postMessage({ type: 'DOWNLOAD_AUDIO_BATCH', urls });
+    }
+
+    function ayahUrlsForSurah(s) {
+      const sPad = String(s.surah).padStart(3, '0');
+      const urls = [];
+      for (let a = 1; a <= s.total_ayahs; a++) {
+        urls.push(`${AYAH_AUDIO_BASE}/${sPad}${String(a).padStart(3, '0')}.mp3`);
+      }
+      return urls;
+    }
+
+    async function wordUrlsForSurah(s) {
+      const content = await WordRepository.getSurahContent(s.surah);
+      const urls = [];
+      content.ayahs.forEach(ayah => {
+        ayah.words.forEach(w => {
+          const [ws, wa, wp] = w.key.split(':').map(n => String(n).padStart(3, '0'));
+          urls.push(`${WORD_AUDIO_BASE}/${ws}_${wa}_${wp}.mp3`);
+        });
+      });
+      return urls;
+    }
+
+    async function renderDownloadList(type) {
+      const listEl = document.getElementById(type === 'ayah' ? 'dl-list-ayah' : 'dl-list-word');
+      const { wordCounts, ayahCounts } = await getCachedCounts();
+      const counts = type === 'ayah' ? ayahCounts : wordCounts;
+
+      listEl.innerHTML = '';
+      let totalDone = 0, totalAll = 0;
+
+      allSurahs.forEach(s => {
+        const total = type === 'ayah' ? s.total_ayahs : s.total_words;
+        const done = Math.min(counts[s.surah] || 0, total);
+        totalDone += done;
+        totalAll += total;
+        const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        const li = document.createElement('li');
+        li.className = 'dl-surah-row';
+        li.innerHTML = `
+          <div class="dl-surah-name">
+            <span>${String(s.surah).padStart(2, '0')}. ${s.name_bn_script || s.name_transliteration}</span>
+            <span class="dl-surah-count">${done} / ${total}</span>
+          </div>
+          <div class="dl-row-progress-track">
+            <div class="dl-row-progress-fill" style="width:${percent}%"></div>
+          </div>
+        `;
+        li.onclick = async () => {
+          if (done >= total) { showToast('এই সূরার সব অডিও আগেই ডাউনলোড করা আছে'); return; }
+          li.querySelector('.dl-surah-count').textContent = 'প্রস্তুত হচ্ছে…';
+          const urls = type === 'ayah' ? ayahUrlsForSurah(s) : await wordUrlsForSurah(s);
+          downloadUrls(
+            urls,
+            (d, t) => {
+              li.querySelector('.dl-surah-count').textContent = `${d} / ${t}`;
+              li.querySelector('.dl-row-progress-fill').style.width = `${Math.round((d / t) * 100)}%`;
+            },
+            () => {
+              showToast(`সূরা ${s.name_bn_script || s.surah}-এর অডিও ডাউনলোড সম্পন্ন`);
+              renderDownloadList(type);
+            }
+          );
+        };
+        listEl.appendChild(li);
+      });
+
+      const statusEl = document.getElementById(type === 'ayah' ? 'dl-ayah-overall-status' : 'dl-word-overall-status');
+      statusEl.textContent = `মোট ${totalDone} / ${totalAll} ফাইল ডাউনলোড হয়েছে`;
+    }
+
+    function refreshDownloadPanels() {
+      renderDownloadList('ayah');
+      renderDownloadList('word');
+    }
+
+    document.getElementById('dl-all-ayah').onclick = () => {
+      const btn = document.getElementById('dl-all-ayah');
+      let urls = [];
+      allSurahs.forEach(s => { urls = urls.concat(ayahUrlsForSurah(s)); });
+      btn.disabled = true;
+      btn.textContent = 'ডাউনলোড শুরু হচ্ছে…';
+      downloadUrls(
+        urls,
+        (d, t) => { btn.textContent = `ডাউনলোড হচ্ছে… ${d}/${t}`; },
+        (t) => {
+          btn.disabled = false;
+          btn.textContent = '⬇️ সব আয়াতের অডিও ডাউনলোড করো';
+          showToast(`সব আয়াতের অডিও (${t}টা) ডাউনলোড সম্পন্ন`);
+          renderDownloadList('ayah');
+        }
+      );
+    };
+
+    document.getElementById('dl-all-word').onclick = async () => {
+      const btn = document.getElementById('dl-all-word');
+      btn.disabled = true;
+      btn.textContent = 'সূরার তালিকা প্রস্তুত হচ্ছে…';
+      let urls = [];
+      for (let i = 0; i < allSurahs.length; i++) {
+        const s = allSurahs[i];
+        const surahUrls = await wordUrlsForSurah(s);
+        urls = urls.concat(surahUrls);
+        btn.textContent = `সূরার তালিকা প্রস্তুত হচ্ছে… (${i + 1}/${allSurahs.length})`;
+      }
+      btn.textContent = 'ডাউনলোড শুরু হচ্ছে…';
+      downloadUrls(
+        urls,
+        (d, t) => { btn.textContent = `ডাউনলোড হচ্ছে… ${d}/${t}`; },
+        (t) => {
+          btn.disabled = false;
+          btn.textContent = '⬇️ সব শব্দের অডিও ডাউনলোড করো';
+          showToast(`সব শব্দের অডিও (${t}টা) ডাউনলোড সম্পন্ন`);
+          renderDownloadList('word');
+        }
+      );
+    };
+  </script>
+</body>
+</html>

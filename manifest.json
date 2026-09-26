@@ -1,0 +1,25 @@
+{
+  "name": "কুরআন ভোকাবুলারি",
+  "short_name": "Quran Vocab",
+  "description": "কুরআনের আরবি শব্দভাণ্ডার শেখার অ্যাপ",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf7f0",
+  "theme_color": "#0e6e5c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

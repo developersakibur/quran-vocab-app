@@ -1,0 +1,109 @@
+/* ============================================================
+   THEME TOKENS
+   Change colors here only — every screen reads from these vars.
+   Toggle data-theme="dark" on <html> to switch modes instantly.
+   ============================================================ */
+
+:root {
+  /* ---- Brand colors (swap these to re-skin the whole app) ---- */
+  --color-primary-h: 168;              /* emerald-teal hue */
+  --color-primary-s: 62%;
+  --color-primary-l: 26%;
+  --color-primary: hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l));
+  --color-primary-strong: hsl(var(--color-primary-h) var(--color-primary-s) 18%);
+  --color-primary-soft: hsl(var(--color-primary-h) 45% 92%);
+
+  --color-accent-h: 42;                /* warm gold hue */
+  --color-accent-s: 55%;
+  --color-accent-l: 52%;
+  --color-accent: hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l));
+  --color-accent-soft: hsl(var(--color-accent-h) 60% 90%);
+
+  --color-success: hsl(150 55% 34%);
+  --color-success-soft: hsl(150 55% 92%);
+  --color-danger: hsl(4 68% 47%);
+  --color-danger-soft: hsl(4 68% 93%);
+
+  /* ---- Light mode surface / text (default) ---- */
+  --bg-canvas: hsl(42 32% 96%);
+  --bg-surface: hsl(0 0% 100%);
+  --bg-surface-raised: hsl(0 0% 100%);
+  --bg-muted: hsl(42 20% 91%);
+
+  --text-primary: hsl(200 18% 14%);
+  --text-secondary: hsl(200 10% 38%);
+  --text-on-primary: hsl(0 0% 100%);
+  --text-on-accent: hsl(200 18% 14%);
+
+  --border-subtle: hsl(42 20% 86%);
+  --border-strong: hsl(42 15% 72%);
+
+  --shadow-soft: 0 1px 2px hsl(200 20% 10% / 0.06), 0 4px 14px hsl(200 20% 10% / 0.06);
+  --shadow-raised: 0 8px 24px hsl(200 20% 10% / 0.12);
+
+  /* ---- Layout tokens ---- */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* ---- Typography tokens ---- */
+  --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
+  --font-bangla: 'Noto Sans Bengali', 'Hind Siliguri', sans-serif;
+  --font-ui: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif;
+
+  --transition-fast: 150ms ease;
+  --transition-med: 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---- Dark mode overrides ---- */
+[data-theme='dark'] {
+  --color-primary-l: 46%;
+  --color-primary-soft: hsl(var(--color-primary-h) 35% 16%);
+  --color-accent-soft: hsl(var(--color-accent-h) 40% 18%);
+  --color-success-soft: hsl(150 40% 16%);
+  --color-danger-soft: hsl(4 45% 20%);
+
+  --bg-canvas: hsl(200 18% 9%);
+  --bg-surface: hsl(200 16% 13%);
+  --bg-surface-raised: hsl(200 15% 16%);
+  --bg-muted: hsl(200 14% 18%);
+
+  --text-primary: hsl(42 15% 94%);
+  --text-secondary: hsl(42 8% 68%);
+  --text-on-accent: hsl(200 18% 10%);
+
+  --border-subtle: hsl(200 12% 22%);
+  --border-strong: hsl(200 10% 30%);
+
+  --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.3), 0 4px 14px hsl(0 0% 0% / 0.3);
+  --shadow-raised: 0 8px 28px hsl(0 0% 0% / 0.45);
+}
+
+/* Optional: follow system preference automatically when no explicit choice saved */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='auto'] {
+    --color-primary-l: 46%;
+    --color-primary-soft: hsl(var(--color-primary-h) 35% 16%);
+    --color-accent-soft: hsl(var(--color-accent-h) 40% 18%);
+    --color-success-soft: hsl(150 40% 16%);
+    --color-danger-soft: hsl(4 45% 20%);
+    --bg-canvas: hsl(200 18% 9%);
+    --bg-surface: hsl(200 16% 13%);
+    --bg-surface-raised: hsl(200 15% 16%);
+    --bg-muted: hsl(200 14% 18%);
+    --text-primary: hsl(42 15% 94%);
+    --text-secondary: hsl(42 8% 68%);
+    --text-on-accent: hsl(200 18% 10%);
+    --border-subtle: hsl(200 12% 22%);
+    --border-strong: hsl(200 10% 30%);
+  }
+}

@@ -1,0 +1,614 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  transition: background var(--transition-med), color var(--transition-med);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  max-width: 480px;
+  margin-inline: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; }
+
+/* ---------- Top bar ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.topbar h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.topbar .eyebrow {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.theme-toggle:active { transform: scale(0.92); }
+
+/* ---------- Surah list ---------- */
+.surah-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-7);
+  flex: 1;
+}
+
+.surah-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin-bottom: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.surah-row:active { transform: scale(0.98); }
+.surah-row:hover { border-color: var(--color-primary); box-shadow: var(--shadow-soft); }
+
+.surah-number {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong, var(--color-primary));
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+[data-theme='dark'] .surah-number { color: var(--color-primary); }
+
+.surah-info { flex: 1; min-width: 0; }
+.surah-name-main {
+  font-family: var(--font-bangla);
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin: 0 0 2px;
+  color: var(--text-primary);
+}
+.surah-name-meaning {
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.surah-meta {
+  text-align: end;
+  flex-shrink: 0;
+}
+.surah-meta .count {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
+.progress-ring {
+  width: 30px; height: 30px;
+  margin-inline-start: auto;
+}
+
+/* ---------- Quiz screen ---------- */
+.quiz-header {
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+.quiz-progress-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+  margin-top: var(--space-2);
+}
+.quiz-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+  transition: width var(--transition-med);
+}
+.quiz-progress-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
+
+.quiz-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-5);
+  gap: var(--space-5);
+}
+
+.arabic-card {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-7) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-soft);
+}
+
+.arabic-word {
+  font-family: var(--font-arabic);
+  font-size: 3rem;
+  line-height: 1.3;
+  direction: rtl;
+  color: var(--text-primary);
+}
+
+.audio-btn-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.audio-btn {
+  height: 46px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+  font-size: 0.95rem;
+}
+.audio-btn-label {
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+}
+.audio-btn:active { transform: scale(0.94); }
+
+.options {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.option-btn {
+  font-family: var(--font-bangla);
+  font-size: 1rem;
+  text-align: start;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+  min-height: 48px;
+}
+.option-btn:active { transform: scale(0.98); }
+.option-btn:disabled { cursor: default; }
+
+.option-btn.correct {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  font-weight: 600;
+}
+.option-btn.wrong {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.next-btn {
+  width: 100%;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--transition-med), transform var(--transition-med);
+}
+.next-btn.visible { opacity: 1; transform: translateY(0); }
+
+/* ---------- Result screen ---------- */
+.result-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+}
+.result-score {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.result-percent { font-size: 1.2rem; color: var(--text-secondary); font-family: var(--font-bangla); }
+.result-badge {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-bangla);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.result-badge.pass { background: var(--color-success-soft); color: var(--color-success); }
+.result-badge.fail { background: var(--color-danger-soft); color: var(--color-danger); }
+
+.result-actions {
+  display: flex;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-4);
+}
+.btn-secondary, .btn-primary {
+  flex: 1;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-bangla);
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary { background: var(--color-primary); color: var(--text-on-primary); }
+.btn-secondary { background: var(--bg-muted); color: var(--text-primary); }
+
+/* ---------- Loading state ---------- */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-family: var(--font-bangla);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-bangla);
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-raised);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-med), transform var(--transition-med);
+  z-index: 50;
+  max-width: 90%;
+  text-align: center;
+}
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- Exit-confirm modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: hsl(0 0% 0% / 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: var(--space-5);
+}
+.modal-overlay.visible { display: flex; }
+.modal-box {
+  background: var(--bg-surface-raised);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  max-width: 360px;
+  width: 100%;
+  box-shadow: var(--shadow-raised);
+}
+.modal-text {
+  font-family: var(--font-bangla);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 var(--space-4);
+}
+.modal-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ---------- Surah progress badge (home list) ---------- */
+.surah-progress-badge {
+  font-family: var(--font-bangla);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  margin-top: 4px;
+  display: inline-block;
+}
+.surah-progress-badge.passed { background: var(--color-success-soft); color: var(--color-success); }
+.surah-progress-badge.attempted { background: var(--color-accent-soft); color: var(--color-accent); }
+
+/* ---------- Home search box ---------- */
+.search-box-wrap {
+  padding: var(--space-3) var(--space-4) 0;
+}
+.search-box {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+.search-box:focus { border-color: var(--color-primary); }
+.no-results {
+  text-align: center;
+  padding: var(--space-6);
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+}
+
+/* ---------- Overall progress summary (home header) ---------- */
+.overall-progress {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  margin-top: 2px;
+}
+
+/* ---------- Download All (offline audio) ---------- */
+.download-all-wrap {
+  padding: var(--space-3) var(--space-4);
+}
+.download-all-btn {
+  width: 100%;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong, var(--color-primary));
+  font-family: var(--font-bangla);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+[data-theme='dark'] .download-all-btn { color: var(--color-primary); }
+.download-all-btn:disabled { opacity: 0.7; cursor: default; }
+
+.download-progress-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+  margin-top: var(--space-3);
+}
+.download-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+  transition: width 200ms ease;
+}
+.download-status {
+  font-family: var(--font-bangla);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: var(--space-2) 0 0;
+  text-align: center;
+}
+
+/* ---------- Topbar actions + hamburger menu ---------- */
+.topbar-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.menu-dropdown {
+  position: fixed;
+  top: 62px;
+  right: var(--space-4);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  padding: var(--space-2);
+  display: none;
+  flex-direction: column;
+  min-width: 180px;
+  z-index: 40;
+}
+.menu-dropdown.visible { display: flex; }
+.menu-item {
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+  text-align: start;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.menu-item:active { background: var(--bg-muted); }
+
+/* ---------- Download Manager overlay ---------- */
+.dl-overlay {
+  position: fixed;
+  inset: 0;
+  background: hsl(0 0% 0% / 0.5);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 70;
+}
+.dl-overlay.visible { display: flex; }
+.dl-panel {
+  background: var(--bg-canvas);
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dl-header h2 {
+  font-family: var(--font-bangla);
+  font-size: 1.05rem;
+  margin: 0;
+}
+.dl-close {
+  border: none;
+  background: var(--bg-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.dl-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dl-tab {
+  flex: 1;
+  padding: var(--space-3);
+  border: none;
+  background: transparent;
+  font-family: var(--font-bangla);
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.dl-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
+}
+.dl-tab-panel {
+  padding: var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+.dl-overall-status {
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: var(--space-3) 0;
+}
+.dl-surah-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dl-surah-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+.dl-surah-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-bangla);
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.dl-surah-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.dl-row-progress-track {
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.dl-row-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+  transition: width 200ms ease;
+}
