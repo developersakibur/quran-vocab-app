@@ -1,0 +1,1142 @@
+[
+ {
+  "surah": 1,
+  "name_arabic": "الفاتحة",
+  "name_transliteration": "Al-Fatihah",
+  "name_bn": "সূচনা",
+  "type": "meccan",
+  "total_ayahs": 7,
+  "total_words": 29,
+  "name_bn_script": "আল-ফাতিহা"
+ },
+ {
+  "surah": 2,
+  "name_arabic": "البقرة",
+  "name_transliteration": "Al-Baqarah",
+  "name_bn": "বকনা-বাছুর",
+  "type": "medinan",
+  "total_ayahs": 286,
+  "total_words": 6117,
+  "name_bn_script": "আল-বাকারা"
+ },
+ {
+  "surah": 3,
+  "name_arabic": "آل عمران",
+  "name_transliteration": "Ali 'Imran",
+  "name_bn": "ইমরানের পরিবার",
+  "type": "medinan",
+  "total_ayahs": 200,
+  "total_words": 3481,
+  "name_bn_script": "আলে ইমরান"
+ },
+ {
+  "surah": 4,
+  "name_arabic": "النساء",
+  "name_transliteration": "An-Nisa",
+  "name_bn": "নারী",
+  "type": "medinan",
+  "total_ayahs": 176,
+  "total_words": 3747,
+  "name_bn_script": "আন-নিসা"
+ },
+ {
+  "surah": 5,
+  "name_arabic": "المائدة",
+  "name_transliteration": "Al-Ma'idah",
+  "name_bn": "খাদ্য পরিবেশিত টেবিল",
+  "type": "medinan",
+  "total_ayahs": 120,
+  "total_words": 2804,
+  "name_bn_script": "আল-মায়িদা"
+ },
+ {
+  "surah": 6,
+  "name_arabic": "الأنعام",
+  "name_transliteration": "Al-An'am",
+  "name_bn": "গৃহপালিত পশু",
+  "type": "meccan",
+  "total_ayahs": 165,
+  "total_words": 3050,
+  "name_bn_script": "আল-আনআম"
+ },
+ {
+  "surah": 7,
+  "name_arabic": "الأعراف",
+  "name_transliteration": "Al-A'raf",
+  "name_bn": "উচু স্থান",
+  "type": "meccan",
+  "total_ayahs": 206,
+  "total_words": 3320,
+  "name_bn_script": "আল-আরাফ"
+ },
+ {
+  "surah": 8,
+  "name_arabic": "الأنفال",
+  "name_transliteration": "Al-Anfal",
+  "name_bn": "যুদ্ধ-লব্ধ ধনসম্পদ",
+  "type": "medinan",
+  "total_ayahs": 75,
+  "total_words": 1234,
+  "name_bn_script": "আল-আনফাল"
+ },
+ {
+  "surah": 9,
+  "name_arabic": "التوبة",
+  "name_transliteration": "At-Tawbah",
+  "name_bn": "অনুশোচনা",
+  "type": "medinan",
+  "total_ayahs": 129,
+  "total_words": 2498,
+  "name_bn_script": "আত-তাওবা"
+ },
+ {
+  "surah": 10,
+  "name_arabic": "يونس",
+  "name_transliteration": "Yunus",
+  "name_bn": "নবী ইউনুস",
+  "type": "meccan",
+  "total_ayahs": 109,
+  "total_words": 1833,
+  "name_bn_script": "ইউনুস"
+ },
+ {
+  "surah": 11,
+  "name_arabic": "هود",
+  "name_transliteration": "Hud",
+  "name_bn": "নবী হুদ",
+  "type": "meccan",
+  "total_ayahs": 123,
+  "total_words": 1917,
+  "name_bn_script": "হুদ"
+ },
+ {
+  "surah": 12,
+  "name_arabic": "يوسف",
+  "name_transliteration": "Yusuf",
+  "name_bn": "নবী ইউসুফ",
+  "type": "meccan",
+  "total_ayahs": 111,
+  "total_words": 1777,
+  "name_bn_script": "ইউসুফ"
+ },
+ {
+  "surah": 13,
+  "name_arabic": "الرعد",
+  "name_transliteration": "Ar-Ra'd",
+  "name_bn": "বজ্রপাত",
+  "type": "medinan",
+  "total_ayahs": 43,
+  "total_words": 854,
+  "name_bn_script": "আর-রাদ"
+ },
+ {
+  "surah": 14,
+  "name_arabic": "ابراهيم",
+  "name_transliteration": "Ibrahim",
+  "name_bn": "নবী ইবরাহীম",
+  "type": "meccan",
+  "total_ayahs": 52,
+  "total_words": 830,
+  "name_bn_script": "ইবরাহীম"
+ },
+ {
+  "surah": 15,
+  "name_arabic": "الحجر",
+  "name_transliteration": "Al-Hijr",
+  "name_bn": "পাথুরে পাহাড়",
+  "type": "meccan",
+  "total_ayahs": 99,
+  "total_words": 655,
+  "name_bn_script": "আল-হিজর"
+ },
+ {
+  "surah": 16,
+  "name_arabic": "النحل",
+  "name_transliteration": "An-Nahl",
+  "name_bn": "মৌমাছি",
+  "type": "meccan",
+  "total_ayahs": 128,
+  "total_words": 1844,
+  "name_bn_script": "আন-নাহল"
+ },
+ {
+  "surah": 17,
+  "name_arabic": "الإسراء",
+  "name_transliteration": "Al-Isra",
+  "name_bn": "ইহুদি জাতি",
+  "type": "meccan",
+  "total_ayahs": 111,
+  "total_words": 1556,
+  "name_bn_script": "আল-ইসরা"
+ },
+ {
+  "surah": 18,
+  "name_arabic": "الكهف",
+  "name_transliteration": "Al-Kahf",
+  "name_bn": "গুহা",
+  "type": "meccan",
+  "total_ayahs": 110,
+  "total_words": 1579,
+  "name_bn_script": "আল-কাহফ"
+ },
+ {
+  "surah": 19,
+  "name_arabic": "مريم",
+  "name_transliteration": "Maryam",
+  "name_bn": "মারইয়াম (ঈসা নবীর মা)",
+  "type": "meccan",
+  "total_ayahs": 98,
+  "total_words": 961,
+  "name_bn_script": "মারইয়াম"
+ },
+ {
+  "surah": 20,
+  "name_arabic": "طه",
+  "name_transliteration": "Taha",
+  "name_bn": "ত়া হা",
+  "type": "meccan",
+  "total_ayahs": 135,
+  "total_words": 1335,
+  "name_bn_script": "ত্বা-হা"
+ },
+ {
+  "surah": 21,
+  "name_arabic": "الأنبياء",
+  "name_transliteration": "Al-Anbya",
+  "name_bn": "নবীগণ",
+  "type": "meccan",
+  "total_ayahs": 112,
+  "total_words": 1169,
+  "name_bn_script": "আল-আম্বিয়া"
+ },
+ {
+  "surah": 22,
+  "name_arabic": "الحج",
+  "name_transliteration": "Al-Hajj",
+  "name_bn": "হ়াজ্জ",
+  "type": "medinan",
+  "total_ayahs": 78,
+  "total_words": 1274,
+  "name_bn_script": "আল-হাজ্জ"
+ },
+ {
+  "surah": 23,
+  "name_arabic": "المؤمنون",
+  "name_transliteration": "Al-Mu'minun",
+  "name_bn": "বিশ্বাসী",
+  "type": "meccan",
+  "total_ayahs": 118,
+  "total_words": 1050,
+  "name_bn_script": "আল-মুমিনূন"
+ },
+ {
+  "surah": 24,
+  "name_arabic": "النور",
+  "name_transliteration": "An-Nur",
+  "name_bn": "আলো",
+  "type": "medinan",
+  "total_ayahs": 64,
+  "total_words": 1316,
+  "name_bn_script": "আন-নূর"
+ },
+ {
+  "surah": 25,
+  "name_arabic": "الفرقان",
+  "name_transliteration": "Al-Furqan",
+  "name_bn": "মানদণ্ড",
+  "type": "meccan",
+  "total_ayahs": 77,
+  "total_words": 893,
+  "name_bn_script": "আল-ফুরকান"
+ },
+ {
+  "surah": 26,
+  "name_arabic": "الشعراء",
+  "name_transliteration": "Ash-Shu'ara",
+  "name_bn": "কবি",
+  "type": "meccan",
+  "total_ayahs": 227,
+  "total_words": 1318,
+  "name_bn_script": "আশ-শুআরা"
+ },
+ {
+  "surah": 27,
+  "name_arabic": "النمل",
+  "name_transliteration": "An-Naml",
+  "name_bn": "পিঁপড়া",
+  "type": "meccan",
+  "total_ayahs": 93,
+  "total_words": 1151,
+  "name_bn_script": "আন-নামল"
+ },
+ {
+  "surah": 28,
+  "name_arabic": "القصص",
+  "name_transliteration": "Al-Qasas",
+  "name_bn": "কাহিনি",
+  "type": "meccan",
+  "total_ayahs": 88,
+  "total_words": 1430,
+  "name_bn_script": "আল-কাসাস"
+ },
+ {
+  "surah": 29,
+  "name_arabic": "العنكبوت",
+  "name_transliteration": "Al-'Ankabut",
+  "name_bn": "মাকড়শা",
+  "type": "meccan",
+  "total_ayahs": 69,
+  "total_words": 976,
+  "name_bn_script": "আল-আনকাবুত"
+ },
+ {
+  "surah": 30,
+  "name_arabic": "الروم",
+  "name_transliteration": "Ar-Rum",
+  "name_bn": "রোমান জাতি",
+  "type": "meccan",
+  "total_ayahs": 60,
+  "total_words": 817,
+  "name_bn_script": "আর-রূম"
+ },
+ {
+  "surah": 31,
+  "name_arabic": "لقمان",
+  "name_transliteration": "Luqman",
+  "name_bn": "এক জ্ঞানী ব্যাক্তি",
+  "type": "meccan",
+  "total_ayahs": 34,
+  "total_words": 546,
+  "name_bn_script": "লুকমান"
+ },
+ {
+  "surah": 32,
+  "name_arabic": "السجدة",
+  "name_transliteration": "As-Sajdah",
+  "name_bn": "সিজদা",
+  "type": "meccan",
+  "total_ayahs": 30,
+  "total_words": 372,
+  "name_bn_script": "আস-সাজদাহ"
+ },
+ {
+  "surah": 33,
+  "name_arabic": "الأحزاب",
+  "name_transliteration": "Al-Ahzab",
+  "name_bn": "জোট",
+  "type": "medinan",
+  "total_ayahs": 73,
+  "total_words": 1287,
+  "name_bn_script": "আল-আহযাব"
+ },
+ {
+  "surah": 34,
+  "name_arabic": "سبإ",
+  "name_transliteration": "Saba",
+  "name_bn": "রানী সাবা/শেবা",
+  "type": "meccan",
+  "total_ayahs": 54,
+  "total_words": 883,
+  "name_bn_script": "সাবা"
+ },
+ {
+  "surah": 35,
+  "name_arabic": "فاطر",
+  "name_transliteration": "Fatir",
+  "name_bn": "আদি স্রষ্টা",
+  "type": "meccan",
+  "total_ayahs": 45,
+  "total_words": 775,
+  "name_bn_script": "ফাতির"
+ },
+ {
+  "surah": 36,
+  "name_arabic": "يس",
+  "name_transliteration": "Ya-Sin",
+  "name_bn": "ইয়াসীন",
+  "type": "meccan",
+  "total_ayahs": 83,
+  "total_words": 725,
+  "name_bn_script": "ইয়াসীন"
+ },
+ {
+  "surah": 37,
+  "name_arabic": "الصافات",
+  "name_transliteration": "As-Saffat",
+  "name_bn": "সারিবদ্ধভাবে দাঁড়ানো",
+  "type": "meccan",
+  "total_ayahs": 182,
+  "total_words": 861,
+  "name_bn_script": "আস-সাফফাত"
+ },
+ {
+  "surah": 38,
+  "name_arabic": "ص",
+  "name_transliteration": "Sad",
+  "name_bn": "আরবি বর্ণ সাদ",
+  "type": "meccan",
+  "total_ayahs": 88,
+  "total_words": 733,
+  "name_bn_script": "সোয়াদ"
+ },
+ {
+  "surah": 39,
+  "name_arabic": "الزمر",
+  "name_transliteration": "Az-Zumar",
+  "name_bn": "দলবদ্ধ জনতা",
+  "type": "meccan",
+  "total_ayahs": 75,
+  "total_words": 1172,
+  "name_bn_script": "আয-যুমার"
+ },
+ {
+  "surah": 40,
+  "name_arabic": "غافر",
+  "name_transliteration": "Ghafir",
+  "name_bn": "ক্ষমাকারী",
+  "type": "meccan",
+  "total_ayahs": 85,
+  "total_words": 1219,
+  "name_bn_script": "গাফির"
+ },
+ {
+  "surah": 41,
+  "name_arabic": "فصلت",
+  "name_transliteration": "Fussilat",
+  "name_bn": "সুস্পষ্ট বিবরণ",
+  "type": "meccan",
+  "total_ayahs": 54,
+  "total_words": 794,
+  "name_bn_script": "ফুসসিলাত"
+ },
+ {
+  "surah": 42,
+  "name_arabic": "الشورى",
+  "name_transliteration": "Ash-Shuraa",
+  "name_bn": "পরামর্শ",
+  "type": "meccan",
+  "total_ayahs": 53,
+  "total_words": 860,
+  "name_bn_script": "আশ-শূরা"
+ },
+ {
+  "surah": 43,
+  "name_arabic": "الزخرف",
+  "name_transliteration": "Az-Zukhruf",
+  "name_bn": "সোনাদানা",
+  "type": "meccan",
+  "total_ayahs": 89,
+  "total_words": 830,
+  "name_bn_script": "আয-যুখরুফ"
+ },
+ {
+  "surah": 44,
+  "name_arabic": "الدخان",
+  "name_transliteration": "Ad-Dukhan",
+  "name_bn": "ধোঁয়া",
+  "type": "meccan",
+  "total_ayahs": 59,
+  "total_words": 346,
+  "name_bn_script": "আদ-দুখান"
+ },
+ {
+  "surah": 45,
+  "name_arabic": "الجاثية",
+  "name_transliteration": "Al-Jathiyah",
+  "name_bn": "নতজানু",
+  "type": "meccan",
+  "total_ayahs": 37,
+  "total_words": 488,
+  "name_bn_script": "আল-জাসিয়া"
+ },
+ {
+  "surah": 46,
+  "name_arabic": "الأحقاف",
+  "name_transliteration": "Al-Ahqaf",
+  "name_bn": "বালুর পাহাড়",
+  "type": "meccan",
+  "total_ayahs": 35,
+  "total_words": 643,
+  "name_bn_script": "আল-আহকাফ"
+ },
+ {
+  "surah": 47,
+  "name_arabic": "محمد",
+  "name_transliteration": "Muhammad",
+  "name_bn": "নবী মুহাম্মদ",
+  "type": "medinan",
+  "total_ayahs": 38,
+  "total_words": 539,
+  "name_bn_script": "মুহাম্মাদ"
+ },
+ {
+  "surah": 48,
+  "name_arabic": "الفتح",
+  "name_transliteration": "Al-Fath",
+  "name_bn": "বিজয়",
+  "type": "medinan",
+  "total_ayahs": 29,
+  "total_words": 560,
+  "name_bn_script": "আল-ফাতহ"
+ },
+ {
+  "surah": 49,
+  "name_arabic": "الحجرات",
+  "name_transliteration": "Al-Hujurat",
+  "name_bn": "আবাস",
+  "type": "medinan",
+  "total_ayahs": 18,
+  "total_words": 347,
+  "name_bn_script": "আল-হুজুরাত"
+ },
+ {
+  "surah": 50,
+  "name_arabic": "ق",
+  "name_transliteration": "Qaf",
+  "name_bn": "কাফ",
+  "type": "meccan",
+  "total_ayahs": 45,
+  "total_words": 373,
+  "name_bn_script": "ক্বাফ"
+ },
+ {
+  "surah": 51,
+  "name_arabic": "الذاريات",
+  "name_transliteration": "Adh-Dhariyat",
+  "name_bn": "বিক্ষেপকারী বাতাস",
+  "type": "meccan",
+  "total_ayahs": 60,
+  "total_words": 360,
+  "name_bn_script": "আয-যারিয়াত"
+ },
+ {
+  "surah": 52,
+  "name_arabic": "الطور",
+  "name_transliteration": "At-Tur",
+  "name_bn": "পাহাড়",
+  "type": "meccan",
+  "total_ayahs": 49,
+  "total_words": 312,
+  "name_bn_script": "আত-তূর"
+ },
+ {
+  "surah": 53,
+  "name_arabic": "النجم",
+  "name_transliteration": "An-Najm",
+  "name_bn": "তারা",
+  "type": "meccan",
+  "total_ayahs": 62,
+  "total_words": 360,
+  "name_bn_script": "আন-নাজম"
+ },
+ {
+  "surah": 54,
+  "name_arabic": "القمر",
+  "name_transliteration": "Al-Qamar",
+  "name_bn": "চাঁদ",
+  "type": "meccan",
+  "total_ayahs": 55,
+  "total_words": 342,
+  "name_bn_script": "আল-ক্বামার"
+ },
+ {
+  "surah": 55,
+  "name_arabic": "الرحمن",
+  "name_transliteration": "Ar-Rahman",
+  "name_bn": "পরম করুণাময়",
+  "type": "medinan",
+  "total_ayahs": 78,
+  "total_words": 351,
+  "name_bn_script": "আর-রাহমান"
+ },
+ {
+  "surah": 56,
+  "name_arabic": "الواقعة",
+  "name_transliteration": "Al-Waqi'ah",
+  "name_bn": "নিশ্চিত ঘটনা",
+  "type": "meccan",
+  "total_ayahs": 96,
+  "total_words": 379,
+  "name_bn_script": "আল-ওয়াকিয়া"
+ },
+ {
+  "surah": 57,
+  "name_arabic": "الحديد",
+  "name_transliteration": "Al-Hadid",
+  "name_bn": "লোহা",
+  "type": "medinan",
+  "total_ayahs": 29,
+  "total_words": 574,
+  "name_bn_script": "আল-হাদীদ"
+ },
+ {
+  "surah": 58,
+  "name_arabic": "المجادلة",
+  "name_transliteration": "Al-Mujadila",
+  "name_bn": "অনুযোগকারিণী",
+  "type": "medinan",
+  "total_ayahs": 22,
+  "total_words": 472,
+  "name_bn_script": "আল-মুজাদালা"
+ },
+ {
+  "surah": 59,
+  "name_arabic": "الحشر",
+  "name_transliteration": "Al-Hashr",
+  "name_bn": "সমাবেশ",
+  "type": "medinan",
+  "total_ayahs": 24,
+  "total_words": 445,
+  "name_bn_script": "আল-হাশর"
+ },
+ {
+  "surah": 60,
+  "name_arabic": "الممتحنة",
+  "name_transliteration": "Al-Mumtahanah",
+  "name_bn": "নারী, যাকে পরীক্ষা করা হবে",
+  "type": "medinan",
+  "total_ayahs": 13,
+  "total_words": 348,
+  "name_bn_script": "আল-মুমতাহিনা"
+ },
+ {
+  "surah": 61,
+  "name_arabic": "الصف",
+  "name_transliteration": "As-Saf",
+  "name_bn": "সারিবদ্ধ সৈন্যদল",
+  "type": "medinan",
+  "total_ayahs": 14,
+  "total_words": 221,
+  "name_bn_script": "আস-সাফ"
+ },
+ {
+  "surah": 62,
+  "name_arabic": "الجمعة",
+  "name_transliteration": "Al-Jumu'ah",
+  "name_bn": "সম্মেলন/শুক্রবার",
+  "type": "medinan",
+  "total_ayahs": 11,
+  "total_words": 175,
+  "name_bn_script": "আল-জুমুআ"
+ },
+ {
+  "surah": 63,
+  "name_arabic": "المنافقون",
+  "name_transliteration": "Al-Munafiqun",
+  "name_bn": "ভণ্ড বিশ্বাসী",
+  "type": "medinan",
+  "total_ayahs": 11,
+  "total_words": 180,
+  "name_bn_script": "আল-মুনাফিকূন"
+ },
+ {
+  "surah": 64,
+  "name_arabic": "التغابن",
+  "name_transliteration": "At-Taghabun",
+  "name_bn": "মোহ অপসারণ",
+  "type": "medinan",
+  "total_ayahs": 18,
+  "total_words": 241,
+  "name_bn_script": "আত-তাগাবুন"
+ },
+ {
+  "surah": 65,
+  "name_arabic": "الطلاق",
+  "name_transliteration": "At-Talaq",
+  "name_bn": "তালাক",
+  "type": "medinan",
+  "total_ayahs": 12,
+  "total_words": 287,
+  "name_bn_script": "আত-তালাক"
+ },
+ {
+  "surah": 66,
+  "name_arabic": "التحريم",
+  "name_transliteration": "At-Tahrim",
+  "name_bn": "নিষিদ্ধকরণ",
+  "type": "medinan",
+  "total_ayahs": 12,
+  "total_words": 249,
+  "name_bn_script": "আত-তাহরীম"
+ },
+ {
+  "surah": 67,
+  "name_arabic": "الملك",
+  "name_transliteration": "Al-Mulk",
+  "name_bn": "সার্বভৌম কর্তৃত্ব",
+  "type": "meccan",
+  "total_ayahs": 30,
+  "total_words": 333,
+  "name_bn_script": "আল-মুলক"
+ },
+ {
+  "surah": 68,
+  "name_arabic": "القلم",
+  "name_transliteration": "Al-Qalam",
+  "name_bn": "কলম",
+  "type": "meccan",
+  "total_ayahs": 52,
+  "total_words": 300,
+  "name_bn_script": "আল-কলম"
+ },
+ {
+  "surah": 69,
+  "name_arabic": "الحاقة",
+  "name_transliteration": "Al-Haqqah",
+  "name_bn": "নিশ্চিত সত্য",
+  "type": "meccan",
+  "total_ayahs": 52,
+  "total_words": 258,
+  "name_bn_script": "আল-হাক্কাহ"
+ },
+ {
+  "surah": 70,
+  "name_arabic": "المعارج",
+  "name_transliteration": "Al-Ma'arij",
+  "name_bn": "উন্নয়নের সোপান",
+  "type": "meccan",
+  "total_ayahs": 44,
+  "total_words": 217,
+  "name_bn_script": "আল-মাআরিজ"
+ },
+ {
+  "surah": 71,
+  "name_arabic": "نوح",
+  "name_transliteration": "Nuh",
+  "name_bn": "নবী নূহ",
+  "type": "meccan",
+  "total_ayahs": 28,
+  "total_words": 226,
+  "name_bn_script": "নূহ"
+ },
+ {
+  "surah": 72,
+  "name_arabic": "الجن",
+  "name_transliteration": "Al-Jinn",
+  "name_bn": "জিন সম্প্রদায়",
+  "type": "meccan",
+  "total_ayahs": 28,
+  "total_words": 285,
+  "name_bn_script": "আল-জিন"
+ },
+ {
+  "surah": 73,
+  "name_arabic": "المزمل",
+  "name_transliteration": "Al-Muzzammil",
+  "name_bn": "বস্ত্রাচ্ছাদনকারী",
+  "type": "meccan",
+  "total_ayahs": 20,
+  "total_words": 199,
+  "name_bn_script": "আল-মুযযাম্মিল"
+ },
+ {
+  "surah": 74,
+  "name_arabic": "المدثر",
+  "name_transliteration": "Al-Muddaththir",
+  "name_bn": "পোশাক পরিহিত",
+  "type": "meccan",
+  "total_ayahs": 56,
+  "total_words": 255,
+  "name_bn_script": "আল-মুদ্দাসসির"
+ },
+ {
+  "surah": 75,
+  "name_arabic": "القيامة",
+  "name_transliteration": "Al-Qiyamah",
+  "name_bn": "পুনরুত্থান",
+  "type": "meccan",
+  "total_ayahs": 40,
+  "total_words": 164,
+  "name_bn_script": "আল-কিয়ামাহ"
+ },
+ {
+  "surah": 76,
+  "name_arabic": "الانسان",
+  "name_transliteration": "Al-Insan",
+  "name_bn": "মানবজাতি",
+  "type": "medinan",
+  "total_ayahs": 31,
+  "total_words": 243,
+  "name_bn_script": "আল-ইনসান"
+ },
+ {
+  "surah": 77,
+  "name_arabic": "المرسلات",
+  "name_transliteration": "Al-Mursalat",
+  "name_bn": "প্রেরিত পুরুষ",
+  "type": "meccan",
+  "total_ayahs": 50,
+  "total_words": 181,
+  "name_bn_script": "আল-মুরসালাত"
+ },
+ {
+  "surah": 78,
+  "name_arabic": "النبإ",
+  "name_transliteration": "An-Naba",
+  "name_bn": "মহাসংবাদ",
+  "type": "meccan",
+  "total_ayahs": 40,
+  "total_words": 173,
+  "name_bn_script": "আন-নাবা"
+ },
+ {
+  "surah": 79,
+  "name_arabic": "النازعات",
+  "name_transliteration": "An-Nazi'at",
+  "name_bn": "প্রচেষ্টাকারী",
+  "type": "meccan",
+  "total_ayahs": 46,
+  "total_words": 179,
+  "name_bn_script": "আন-নাযিয়াত"
+ },
+ {
+  "surah": 80,
+  "name_arabic": "عبس",
+  "name_transliteration": "'Abasa",
+  "name_bn": "সে ভ্রু কুঁচকালো",
+  "type": "meccan",
+  "total_ayahs": 42,
+  "total_words": 133,
+  "name_bn_script": "আবাসা"
+ },
+ {
+  "surah": 81,
+  "name_arabic": "التكوير",
+  "name_transliteration": "At-Takwir",
+  "name_bn": "অন্ধকারাচ্ছন্ন",
+  "type": "meccan",
+  "total_ayahs": 29,
+  "total_words": 104,
+  "name_bn_script": "আত-তাকভীর"
+ },
+ {
+  "surah": 82,
+  "name_arabic": "الإنفطار",
+  "name_transliteration": "Al-Infitar",
+  "name_bn": "বিদীর্ণ করা",
+  "type": "meccan",
+  "total_ayahs": 19,
+  "total_words": 80,
+  "name_bn_script": "আল-ইনফিতার"
+ },
+ {
+  "surah": 83,
+  "name_arabic": "المطففين",
+  "name_transliteration": "Al-Mutaffifin",
+  "name_bn": "প্রতারণা করা",
+  "type": "meccan",
+  "total_ayahs": 36,
+  "total_words": 169,
+  "name_bn_script": "আল-মুতাফফিফীন"
+ },
+ {
+  "surah": 84,
+  "name_arabic": "الإنشقاق",
+  "name_transliteration": "Al-Inshiqaq",
+  "name_bn": "খণ্ড-বিখণ্ডকরণ",
+  "type": "meccan",
+  "total_ayahs": 25,
+  "total_words": 107,
+  "name_bn_script": "আল-ইনশিকাক"
+ },
+ {
+  "surah": 85,
+  "name_arabic": "البروج",
+  "name_transliteration": "Al-Buruj",
+  "name_bn": "নক্ষত্রপুঞ্জ",
+  "type": "meccan",
+  "total_ayahs": 22,
+  "total_words": 109,
+  "name_bn_script": "আল-বুরূজ"
+ },
+ {
+  "surah": 86,
+  "name_arabic": "الطارق",
+  "name_transliteration": "At-Tariq",
+  "name_bn": "রাতের আগন্তুক",
+  "type": "meccan",
+  "total_ayahs": 17,
+  "total_words": 61,
+  "name_bn_script": "আত-তারিক"
+ },
+ {
+  "surah": 87,
+  "name_arabic": "الأعلى",
+  "name_transliteration": "Al-A'la",
+  "name_bn": "সর্বোন্নত",
+  "type": "meccan",
+  "total_ayahs": 19,
+  "total_words": 72,
+  "name_bn_script": "আল-আলা"
+ },
+ {
+  "surah": 88,
+  "name_arabic": "الغاشية",
+  "name_transliteration": "Al-Ghashiyah",
+  "name_bn": "বিহ্বলকর ঘটনা",
+  "type": "meccan",
+  "total_ayahs": 26,
+  "total_words": 92,
+  "name_bn_script": "আল-গাশিয়া"
+ },
+ {
+  "surah": 89,
+  "name_arabic": "الفجر",
+  "name_transliteration": "Al-Fajr",
+  "name_bn": "ভোরবেলা",
+  "type": "meccan",
+  "total_ayahs": 30,
+  "total_words": 137,
+  "name_bn_script": "আল-ফজর"
+ },
+ {
+  "surah": 90,
+  "name_arabic": "البلد",
+  "name_transliteration": "Al-Balad",
+  "name_bn": "নগর",
+  "type": "meccan",
+  "total_ayahs": 20,
+  "total_words": 82,
+  "name_bn_script": "আল-বালাদ"
+ },
+ {
+  "surah": 91,
+  "name_arabic": "الشمس",
+  "name_transliteration": "Ash-Shams",
+  "name_bn": "সূর্য",
+  "type": "meccan",
+  "total_ayahs": 15,
+  "total_words": 54,
+  "name_bn_script": "আশ-শামস"
+ },
+ {
+  "surah": 92,
+  "name_arabic": "الليل",
+  "name_transliteration": "Al-Layl",
+  "name_bn": "রাত",
+  "type": "meccan",
+  "total_ayahs": 21,
+  "total_words": 71,
+  "name_bn_script": "আল-লাইল"
+ },
+ {
+  "surah": 93,
+  "name_arabic": "الضحى",
+  "name_transliteration": "Ad-Duhaa",
+  "name_bn": "পূর্বাহ্নের সুর্যকিরণ",
+  "type": "meccan",
+  "total_ayahs": 11,
+  "total_words": 40,
+  "name_bn_script": "আদ-দুহা"
+ },
+ {
+  "surah": 94,
+  "name_arabic": "الشرح",
+  "name_transliteration": "Ash-Sharh",
+  "name_bn": "বক্ষ প্রশস্তকরণ",
+  "type": "meccan",
+  "total_ayahs": 8,
+  "total_words": 27,
+  "name_bn_script": "আশ-শারহ"
+ },
+ {
+  "surah": 95,
+  "name_arabic": "التين",
+  "name_transliteration": "At-Tin",
+  "name_bn": "ডুমুর",
+  "type": "meccan",
+  "total_ayahs": 8,
+  "total_words": 34,
+  "name_bn_script": "আত-তীন"
+ },
+ {
+  "surah": 96,
+  "name_arabic": "العلق",
+  "name_transliteration": "Al-'Alaq",
+  "name_bn": "রক্তপিণ্ড",
+  "type": "meccan",
+  "total_ayahs": 19,
+  "total_words": 72,
+  "name_bn_script": "আল-আলাক"
+ },
+ {
+  "surah": 97,
+  "name_arabic": "القدر",
+  "name_transliteration": "Al-Qadr",
+  "name_bn": "মহিমান্বিত",
+  "type": "meccan",
+  "total_ayahs": 5,
+  "total_words": 30,
+  "name_bn_script": "আল-কদর"
+ },
+ {
+  "surah": 98,
+  "name_arabic": "البينة",
+  "name_transliteration": "Al-Bayyinah",
+  "name_bn": "প্রমাণ",
+  "type": "medinan",
+  "total_ayahs": 8,
+  "total_words": 94,
+  "name_bn_script": "আল-বাইয়্যিনাহ"
+ },
+ {
+  "surah": 99,
+  "name_arabic": "الزلزلة",
+  "name_transliteration": "Az-Zalzalah",
+  "name_bn": "ভূমিকম্প",
+  "type": "medinan",
+  "total_ayahs": 8,
+  "total_words": 36,
+  "name_bn_script": "আয-যিলযাল"
+ },
+ {
+  "surah": 100,
+  "name_arabic": "العاديات",
+  "name_transliteration": "Al-'Adiyat",
+  "name_bn": "অভিযানকারী",
+  "type": "meccan",
+  "total_ayahs": 11,
+  "total_words": 40,
+  "name_bn_script": "আল-আদিয়াত"
+ },
+ {
+  "surah": 101,
+  "name_arabic": "القارعة",
+  "name_transliteration": "Al-Qari'ah",
+  "name_bn": "মহাসংকট",
+  "type": "meccan",
+  "total_ayahs": 11,
+  "total_words": 36,
+  "name_bn_script": "আল-কারিআ"
+ },
+ {
+  "surah": 102,
+  "name_arabic": "التكاثر",
+  "name_transliteration": "At-Takathur",
+  "name_bn": "প্রাচুর্যের প্রতিযোগিতা",
+  "type": "meccan",
+  "total_ayahs": 8,
+  "total_words": 28,
+  "name_bn_script": "আত-তাকাসুর"
+ },
+ {
+  "surah": 103,
+  "name_arabic": "العصر",
+  "name_transliteration": "Al-'Asr",
+  "name_bn": "সময়",
+  "type": "meccan",
+  "total_ayahs": 3,
+  "total_words": 14,
+  "name_bn_script": "আল-আসর"
+ },
+ {
+  "surah": 104,
+  "name_arabic": "الهمزة",
+  "name_transliteration": "Al-Humazah",
+  "name_bn": "পরনিন্দাকারী",
+  "type": "meccan",
+  "total_ayahs": 9,
+  "total_words": 33,
+  "name_bn_script": "আল-হুমাযাহ"
+ },
+ {
+  "surah": 105,
+  "name_arabic": "الفيل",
+  "name_transliteration": "Al-Fil",
+  "name_bn": "হাতি",
+  "type": "meccan",
+  "total_ayahs": 5,
+  "total_words": 23,
+  "name_bn_script": "আল-ফীল"
+ },
+ {
+  "surah": 106,
+  "name_arabic": "قريش",
+  "name_transliteration": "Quraysh",
+  "name_bn": "কুরাইশ গোত্র",
+  "type": "meccan",
+  "total_ayahs": 4,
+  "total_words": 17,
+  "name_bn_script": "কুরাইশ"
+ },
+ {
+  "surah": 107,
+  "name_arabic": "الماعون",
+  "name_transliteration": "Al-Ma'un",
+  "name_bn": "সাহায্য সহায়তা",
+  "type": "meccan",
+  "total_ayahs": 7,
+  "total_words": 25,
+  "name_bn_script": "আল-মাউন"
+ },
+ {
+  "surah": 108,
+  "name_arabic": "الكوثر",
+  "name_transliteration": "Al-Kawthar",
+  "name_bn": "কাউসার/প্রাচুর্য",
+  "type": "meccan",
+  "total_ayahs": 3,
+  "total_words": 10,
+  "name_bn_script": "আল-কাউসার"
+ },
+ {
+  "surah": 109,
+  "name_arabic": "الكافرون",
+  "name_transliteration": "Al-Kafirun",
+  "name_bn": "অবিশ্বাসী",
+  "type": "meccan",
+  "total_ayahs": 6,
+  "total_words": 26,
+  "name_bn_script": "আল-কাফিরূন"
+ },
+ {
+  "surah": 110,
+  "name_arabic": "النصر",
+  "name_transliteration": "An-Nasr",
+  "name_bn": "সাহায্য",
+  "type": "medinan",
+  "total_ayahs": 3,
+  "total_words": 19,
+  "name_bn_script": "আন-নাসর"
+ },
+ {
+  "surah": 111,
+  "name_arabic": "المسد",
+  "name_transliteration": "Al-Masad",
+  "name_bn": "খেজুরের পাকানো (রশি)",
+  "type": "meccan",
+  "total_ayahs": 5,
+  "total_words": 23,
+  "name_bn_script": "আল-লাহাব"
+ },
+ {
+  "surah": 112,
+  "name_arabic": "الإخلاص",
+  "name_transliteration": "Al-Ikhlas",
+  "name_bn": "আন্তরিকতা",
+  "type": "meccan",
+  "total_ayahs": 4,
+  "total_words": 15,
+  "name_bn_script": "আল-ইখলাস"
+ },
+ {
+  "surah": 113,
+  "name_arabic": "الفلق",
+  "name_transliteration": "Al-Falaq",
+  "name_bn": "নিশিভোর",
+  "type": "meccan",
+  "total_ayahs": 5,
+  "total_words": 23,
+  "name_bn_script": "আল-ফালাক"
+ },
+ {
+  "surah": 114,
+  "name_arabic": "الناس",
+  "name_transliteration": "An-Nas",
+  "name_bn": "মানুষ জাতি",
+  "type": "meccan",
+  "total_ayahs": 6,
+  "total_words": 20,
+  "name_bn_script": "আন-নাস"
+ }
+]

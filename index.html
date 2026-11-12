@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Quran Vocabulary App</title>
+  <meta name="description" content="Comprehensive Quranic Arabic-to-Bengali vocabulary, grammar morphology, quiz, and spaced-repetition learning platform.">
+  <meta property="og:title" content="Quran Vocabulary App">
+  <meta property="og:description" content="Comprehensive Quranic Arabic-to-Bengali vocabulary, grammar morphology, quiz, and spaced-repetition learning platform.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0D5C3A">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/style.css?v=8">
+</head>
+<body>
+
+  <!-- Top Sticky Bar -->
+  <header class="topbar">
+    <div class="topbar-nav">
+      <button class="topbar-btn" id="topbar-back-btn" style="display:none" aria-label="পূর্ববর্তী পৃষ্ঠায় ফিরে যান">
+        <span class="icon" id="icon-back"></span>
+      </button>
+      <div class="topbar-title-wrap">
+        <span class="eyebrow" id="topbar-eyebrow">Learn Arabic through the Quran</span>
+        <h1 id="topbar-title">কুরআন ভোকাবুলারি</h1>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="topbar-btn" id="topbar-bookmark-btn" style="display:none" aria-label="বুকমার্ক করুন">
+        <span class="icon" id="icon-top-star"></span>
+      </button>
+      <button class="theme-toggle" id="auth-btn" aria-label="একাউন্ট ও ক্লাউড সিঙ্ক">
+        <span class="icon" id="auth-icon"></span>
+      </button>
+      <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" aria-label="থিম পরিবর্তন করুন">
+        <span class="icon" id="theme-icon"></span>
+      </button>
+      <button class="theme-toggle" id="menu-btn" aria-label="মেনু">
+        <span class="icon" id="menu-icon"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Hamburger Dropdown Menu -->
+  <div class="menu-dropdown" id="menu-dropdown">
+    <button class="menu-item" id="menu-auth-btn">
+      <span class="icon" id="icon-user-menu"></span> ক্লাউড ব্যাকআপ ও একাউন্ট
+    </button>
+    <button class="menu-item" id="menu-download-btn">
+      <span class="icon" id="icon-download-menu"></span> অডিও ডাউনলোড ম্যানেজার
+    </button>
+  </div>
+
+  <!-- ============================================================
+       VIEW 1: LEVEL 1 - SURAH DIRECTORY (সূরা তালিকা)
+       ============================================================ -->
+  <main class="app-view active" id="view-surahs">
+    <!-- Search Bar with Search Icon and Clear Button -->
+    <div class="search-box-wrap">
+      <div class="search-box-inner">
+        <span class="search-box-icon" id="search-icon-slot"></span>
+        <input type="text" class="search-box" id="search-box" placeholder="সূরা খুঁজুন (বাংলা, আরবী বা নম্বর)…" autocomplete="off" aria-label="সূরা খুঁজুন">
+        <button type="button" class="search-clear-btn" id="search-clear-btn" style="display:none" aria-label="অনুসন্ধান মুছুন">
+          <span class="icon">&times;</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Surah Directory Summary Stats Bar -->
+    <div class="surah-summary-bar">
+      <div class="surah-summary-counts">
+        <span>১১৪টি সূরা</span>
+        <span>•</span>
+        <span>৮৬ মাক্কী</span>
+        <span>•</span>
+        <span>২৮ মাদানী</span>
+      </div>
+      <div class="surah-streak-badge" id="overall-progress">
+        <span>শেখা হয়েছে: ০ শব্দ • স্ট্রিক: ০ দিন 🔥</span>
+      </div>
+    </div>
+
+    <!-- Surah Filter Chips Bar -->
+    <div class="surah-filter-bar" id="surah-filter-bar">
+      <button type="button" class="filter-chip active" data-filter="all">
+        <span>সব</span>
+        <span class="filter-chip-count">১১৪</span>
+      </button>
+      <button type="button" class="filter-chip" data-filter="makki">
+        <span class="filter-icon" id="icon-filter-makki"></span>
+        <span>মাক্কী</span>
+        <span class="filter-chip-count">৮৬</span>
+      </button>
+      <button type="button" class="filter-chip" data-filter="madani">
+        <span class="filter-icon" id="icon-filter-madani"></span>
+        <span>মাদানী</span>
+        <span class="filter-chip-count">২৮</span>
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div class="quiz-stage" id="loading-stage" style="display:flex">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">সূরা তালিকা লোড হচ্ছে…</p>
+    </div>
+
+    <!-- Surah List Container -->
+    <ul class="surah-list" id="surah-list" style="display:none"></ul>
+
+    <!-- Empty Search State -->
+    <div class="surah-empty-state" id="no-results" style="display:none">
+      <div class="empty-state-icon" id="empty-search-icon"></div>
+      <h3 class="empty-state-title">কোনো সূরা পাওয়া যায়নি</h3>
+      <p class="empty-state-text">আপনার সার্চ শব্দের সাথে মিল রেখে কোনো সূরা পাওয়া যায়নি। অন্য বানান বা নম্বর দিয়ে চেষ্টা করুন।</p>
+      <button type="button" class="empty-reset-btn" id="empty-reset-btn">সব সূরা দেখুন</button>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       VIEW 2: LEVEL 2 - AYAH CONTEXT & INTERACTIVE WORD VIEW
+       ============================================================ -->
+  <main class="app-view" id="view-ayahs">
+    <div class="surah-hero-banner" id="surah-hero-banner"></div>
+    <div class="ayahs-container" id="ayahs-container"></div>
+  </main>
+
+  <!-- ============================================================
+       VIEW 3: LEVEL 3 - DEDICATED WORD DETAIL VIEW (শব্দ বিস্তারিত পেজ)
+       ============================================================ -->
+  <main class="app-view" id="view-word">
+    <div class="word-detail-container" id="word-detail-container"></div>
+  </main>
+
+  <!-- ============================================================
+       VIEW 4: PRACTICE HUB & ACTIVE DRILLS (অনুশীলন মোড)
+       ============================================================ -->
+  <main class="app-view" id="view-practice">
+    <div class="practice-container" id="practice-hub-container"></div>
+    <div id="practice-drill-stage" style="display:none;flex-direction:column;flex:1"></div>
+  </main>
+
+  <!-- ============================================================
+       VIEW 5: BOOKMARKS & SAVED WORDS (সংরক্ষিত শব্দসমূহ)
+       ============================================================ -->
+  <main class="app-view" id="view-bookmarks">
+    <div class="practice-container">
+      <div id="bookmarks-list"></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       PERSISTENT BOTTOM NAVIGATION BAR
+       ============================================================ -->
+  <nav class="bottom-nav">
+    <button class="bottom-tab active" data-tab="learn">
+      <span class="icon" id="icon-tab-learn"></span>
+      <span class="tab-label">শিখুন</span>
+    </button>
+    <button class="bottom-tab" data-tab="practice">
+      <span class="icon" id="icon-tab-practice"></span>
+      <span class="tab-label">অনুশীলন</span>
+    </button>
+    <button class="bottom-tab" data-tab="bookmarks">
+      <span class="icon" id="icon-tab-bookmarks"></span>
+      <span class="tab-label">সংরক্ষিত</span>
+    </button>
+  </nav>
+
+  <!-- Global Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ============================================================
+       AUDIO DOWNLOAD MANAGER OVERLAY
+       ============================================================ -->
+  <div class="dl-overlay" id="dl-overlay">
+    <div class="dl-panel">
+      <div class="dl-header">
+        <h2>অডিও ডাউনলোড ম্যানেজার</h2>
+        <button class="dl-close" id="dl-close" aria-label="বন্ধ করুন">
+          <span class="icon" id="icon-close-dl"></span>
+        </button>
+      </div>
+
+      <!-- Storage Persistence Guard Banner -->
+      <div class="dl-storage-protection-banner" id="dl-storage-protection-banner">
+        <div class="storage-shield-icon">🛡️</div>
+        <div class="storage-shield-text">
+          <div class="storage-shield-title" id="storage-persist-title">মেমোরি সুরক্ষা (Persistent Storage)</div>
+          <div class="storage-shield-desc" id="storage-persist-desc">অ্যান্ড্রয়েড ক্যাশ ক্লিয়ারের হাত থেকে অডিও সুরক্ষিত রাখতে স্থায়ী সংরক্ষণ নিশ্চিত করুন।</div>
+        </div>
+        <button type="button" class="storage-persist-btn" id="storage-persist-btn">সুরক্ষা চালু করুন</button>
+      </div>
+
+      <div class="dl-tabs">
+        <button class="dl-tab active" data-tab="ayah">আয়াত</button>
+        <button class="dl-tab" data-tab="word">শব্দ</button>
+      </div>
+
+      <div class="dl-tab-panel" id="dl-panel-ayah">
+        <button class="download-all-btn" id="dl-all-ayah">
+          <span class="icon" id="icon-dl-ayah"></span> সব আয়াতের অডিও ডাউনলোড করুন
+        </button>
+        <div class="dl-overall-status" id="dl-ayah-overall-status"></div>
+        <ul class="dl-surah-list" id="dl-list-ayah"></ul>
+      </div>
+
+      <div class="dl-tab-panel" id="dl-panel-word" style="display:none">
+        <button class="download-all-btn" id="dl-all-word">
+          <span class="icon" id="icon-dl-word"></span> সব শব্দের অডিও ডাউনলোড করুন
+        </button>
+        <div class="dl-overall-status" id="dl-word-overall-status"></div>
+        <ul class="dl-surah-list" id="dl-list-word"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SUPABASE AUTH & CLOUD SYNC MODAL
+       ============================================================ -->
+  <div class="modal-overlay" id="auth-modal" style="display:none">
+    <div class="modal-box auth-box">
+      <div class="auth-modal-header">
+        <h3 id="auth-modal-title">ক্লাউড একাউন্ট ও সিঙ্ক</h3>
+        <button class="modal-close-btn" id="auth-close-btn" aria-label="বন্ধ করুন">&times;</button>
+      </div>
+
+      <!-- Logged-in state view -->
+      <div id="auth-logged-in-view" style="display:none">
+        <div class="auth-user-badge">
+          <div class="auth-user-avatar" id="auth-user-avatar"></div>
+          <div class="auth-user-details">
+            <span class="auth-user-name" id="auth-user-name"></span>
+            <span class="auth-user-email" id="auth-user-email">user@example.com</span>
+            <span class="auth-sync-status" id="auth-sync-status">ক্লাউড ব্যাকআপ সক্রিয় ✅</span>
+          </div>
+        </div>
+        <div class="auth-actions-row">
+          <button type="button" class="btn-primary" id="btn-manual-sync">
+            <span class="icon" id="icon-manual-sync"></span> এখনই সিঙ্ক করুন
+          </button>
+          <button type="button" class="btn-secondary" id="btn-signout">লগআউট</button>
+        </div>
+      </div>
+
+      <!-- Auth Form Container (Sign In / Register / Verify) -->
+      <div id="auth-form-view">
+        <!-- Auth Tabs: Sign In vs Sign Up -->
+        <div class="auth-tabs" id="auth-tabs">
+          <button type="button" class="auth-tab-btn active" id="tab-signin-btn">লগইন</button>
+          <button type="button" class="auth-tab-btn" id="tab-signup-btn">নতুন একাউন্ট</button>
+        </div>
+
+        <!-- 1. Sign In Form -->
+        <div id="auth-panel-signin">
+          <p class="auth-modal-desc">
+            আপনার সংরক্ষিত শব্দ, বুকমার্ক ও পড়ার অগ্রগতি সব ডিভাইসে নিরাপদে ব্যাকআপ রাখতে লগইন করুন।
+          </p>
+          <form id="signin-form" method="post" action="#" autocomplete="on" onsubmit="return false;">
+            <div class="auth-input-group">
+              <label for="signin-email">ইমেইল ঠিকানা</label>
+              <input type="email" id="signin-email" name="email" placeholder="name@example.com" required autocomplete="username email">
+            </div>
+            <div class="auth-input-group">
+              <label for="signin-password">পাসওয়ার্ড</label>
+              <input type="password" id="signin-password" name="password" placeholder="আপনার পাসওয়ার্ড" required autocomplete="current-password">
+            </div>
+            <div class="auth-error-msg" id="signin-error-msg" style="display:none"></div>
+            <div class="auth-submit-buttons">
+              <button type="submit" class="btn-primary" id="btn-signin">লগইন করুন</button>
+            </div>
+            <div class="auth-switch-prompt">
+              নতুন ব্যবহারকারী? <button type="button" class="link-btn" id="link-goto-signup">নতুন একাউন্ট তৈরি করুন</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- 2. Sign Up Form -->
+        <div id="auth-panel-signup" style="display:none">
+          <p class="auth-modal-desc">
+            নতুন একাউন্ট তৈরি করুন। পরবর্তীতে আপনার ইমেইলে পাঠানো লিঙ্ক ভেরিফাই করে লগইন করতে পারবেন।
+          </p>
+          <form id="signup-form" method="post" action="#" autocomplete="on" onsubmit="return false;">
+            <div class="auth-input-group">
+              <label for="signup-name">ইউজারের নাম / পুরো নাম</label>
+              <input type="text" id="signup-name" name="name" placeholder="যেমন: সাকিবুর রহমান" required autocomplete="name">
+            </div>
+            <div class="auth-input-group">
+              <label for="signup-email">ইমেইল ঠিকানা</label>
+              <input type="email" id="signup-email" name="email" placeholder="name@example.com" required autocomplete="username email">
+            </div>
+            <div class="auth-input-group">
+              <label for="signup-password">নতুন পাসওয়ার্ড</label>
+              <input type="password" id="signup-password" name="new-password" placeholder="কমপক্ষে ৬ অক্ষর" minlength="6" required autocomplete="new-password">
+            </div>
+            <div class="auth-input-group">
+              <label for="signup-confirm-password">পাসওয়ার্ড নিশ্চিত করুন</label>
+              <input type="password" id="signup-confirm-password" name="confirm-password" placeholder="পাসওয়ার্ডটি পুনরায় লিখুন" minlength="6" required autocomplete="new-password">
+            </div>
+            <div class="auth-error-msg" id="signup-error-msg" style="display:none"></div>
+            <div class="auth-submit-buttons">
+              <button type="submit" class="btn-primary" id="btn-signup">একাউন্ট তৈরি করুন</button>
+            </div>
+            <div class="auth-switch-prompt">
+              ইতিমধ্যে একাউন্ট আছে? <button type="button" class="link-btn" id="link-goto-signin">লগইন করুন</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- 3. Email Verification Prompt Screen -->
+        <div id="auth-panel-verify" style="display:none">
+          <div class="auth-verify-box">
+            <span class="auth-verify-icon">📩</span>
+            <h4>ইমেইল ভেরিফাই করুন</h4>
+            <p>
+              আপনার একাউন্ট তৈরি সফল হয়েছে! আমরা একটি ভেরিফিকেশন লিঙ্ক পাঠিয়েছি:
+              <br>
+              <span class="auth-verify-email-badge" id="verify-target-email">user@example.com</span>
+              <br><br>
+              <strong>অবশ্যই আপনার ইনবক্স (অথবা স্প্যাম ফোল্ডার) চেক করে লিঙ্কটিতে ক্লিক করে ইমেইল ভেরিফাই করুন, তারপর লগইন করুন।</strong>
+            </p>
+            <div class="auth-submit-buttons">
+              <button type="button" class="btn-primary" id="btn-verify-proceed-login">ভেরিফাই করেছি, লগইন করুন</button>
+              <button type="button" class="btn-secondary" id="btn-resend-verification" style="font-size:0.85rem;">
+                ভেরিফিকেশন লিঙ্ক পুনরায় পাঠান
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/icons.js?v=8"></script>
+  <script src="js/lib/d3.min.js?v=8"></script>
+  <script src="js/lib/supabase-bundle.js?v=8"></script>
+  <script src="js/supabase-config.js?v=8"></script>
+  <script src="js/supabase-sync.js?v=8"></script>
+  <script src="js/ui/overlay-manager.js?v=8"></script>
+  <script src="js/theme.js?v=8"></script>
+  <script src="js/config.js?v=8"></script>
+  <script src="js/data/surahs-meta-data.js?v=8"></script>
+  <script src="js/db/quran-db.js?v=8"></script>
+  <script src="js/storage/storage-manager.js?v=8"></script>
+  <script src="js/progress-chart.js?v=8"></script>
+  <script src="js/app.js?v=8"></script>
+
+  <script>
+    // Initialize UI Icons safely
+    function setIcon(id, iconSvg) {
+      const el = document.getElementById(id);
+      if (el && iconSvg) el.innerHTML = iconSvg;
+    }
+
+    setIcon('icon-back', Icons.arrowLeft);
+    setIcon('menu-icon', Icons.menu);
+    setIcon('icon-top-star', Icons.star);
+    setIcon('icon-download-menu', Icons.download);
+    setIcon('icon-close-dl', Icons.close);
+    setIcon('icon-dl-ayah', Icons.download);
+    setIcon('icon-dl-word', Icons.download);
+    setIcon('icon-tab-learn', Icons.book);
+    setIcon('icon-tab-practice', Icons.target);
+    setIcon('icon-tab-bookmarks', Icons.star);
+
+    // Auth Icons & Setup
+    const authBtn = document.getElementById('auth-btn');
+    const authIcon = document.getElementById('auth-icon');
+    if (authIcon) authIcon.innerHTML = Icons.user;
+    const iconUserMenu = document.getElementById('icon-user-menu');
+    if (iconUserMenu) iconUserMenu.innerHTML = Icons.user;
+    const authUserAvatar = document.getElementById('auth-user-avatar');
+    if (authUserAvatar) authUserAvatar.innerHTML = Icons.user;
+    const iconManualSync = document.getElementById('icon-manual-sync');
+    if (iconManualSync) iconManualSync.innerHTML = Icons.repeat;
+
+    // Auth Modal Controls & State
+    const authModal = document.getElementById('auth-modal');
+    const authCloseBtn = document.getElementById('auth-close-btn');
+    const authFormView = document.getElementById('auth-form-view');
+    const authLoggedInView = document.getElementById('auth-logged-in-view');
+    const authUserName = document.getElementById('auth-user-name');
+    const authUserEmail = document.getElementById('auth-user-email');
+
+    // Panels & Tabs
+    const tabSignInBtn = document.getElementById('tab-signin-btn');
+    const tabSignUpBtn = document.getElementById('tab-signup-btn');
+    const panelSignIn = document.getElementById('auth-panel-signin');
+    const panelSignUp = document.getElementById('auth-panel-signup');
+    const panelVerify = document.getElementById('auth-panel-verify');
+    const linkGotoSignUp = document.getElementById('link-goto-signup');
+    const linkGotoSignIn = document.getElementById('link-goto-signin');
+
+    // Sign In Inputs
+    const signinForm = document.getElementById('signin-form');
+    const signinEmailInput = document.getElementById('signin-email');
+    const signinPassInput = document.getElementById('signin-password');
+    const signinErrorMsg = document.getElementById('signin-error-msg');
+    const btnSignIn = document.getElementById('btn-signin');
+
+    // Sign Up Inputs
+    const signupForm = document.getElementById('signup-form');
+    const signupNameInput = document.getElementById('signup-name');
+    const signupEmailInput = document.getElementById('signup-email');
+    const signupPassInput = document.getElementById('signup-password');
+    const signupConfirmPassInput = document.getElementById('signup-confirm-password');
+    const signupErrorMsg = document.getElementById('signup-error-msg');
+    const btnSignUp = document.getElementById('btn-signup');
+
+    // Verification View Elements
+    const verifyTargetEmail = document.getElementById('verify-target-email');
+    const btnVerifyProceedLogin = document.getElementById('btn-verify-proceed-login');
+    const btnResendVerification = document.getElementById('btn-resend-verification');
+
+    const btnSignOut = document.getElementById('btn-signout');
+    const btnManualSync = document.getElementById('btn-manual-sync');
+
+    let lastRegisteredEmail = '';
+
+    function switchAuthTab(tab) {
+      if (signinErrorMsg) signinErrorMsg.style.display = 'none';
+      if (signupErrorMsg) signupErrorMsg.style.display = 'none';
+
+      if (tab === 'signin') {
+        tabSignInBtn.classList.add('active');
+        tabSignUpBtn.classList.remove('active');
+        panelSignIn.style.display = 'block';
+        panelSignUp.style.display = 'none';
+        panelVerify.style.display = 'none';
+        document.getElementById('auth-tabs').style.display = 'flex';
+      } else if (tab === 'signup') {
+        tabSignUpBtn.classList.add('active');
+        tabSignInBtn.classList.remove('active');
+        panelSignUp.style.display = 'block';
+        panelSignIn.style.display = 'none';
+        panelVerify.style.display = 'none';
+        document.getElementById('auth-tabs').style.display = 'flex';
+      } else if (tab === 'verify') {
+        panelVerify.style.display = 'block';
+        panelSignIn.style.display = 'none';
+        panelSignUp.style.display = 'none';
+        document.getElementById('auth-tabs').style.display = 'none';
+      }
+    }
+
+    if (tabSignInBtn) tabSignInBtn.onclick = () => switchAuthTab('signin');
+    if (tabSignUpBtn) tabSignUpBtn.onclick = () => switchAuthTab('signup');
+    if (linkGotoSignUp) linkGotoSignUp.onclick = () => switchAuthTab('signup');
+    if (linkGotoSignIn) linkGotoSignIn.onclick = () => switchAuthTab('signin');
+
+    function openAuthModal(defaultTab = 'signin') {
+      authModal.style.display = 'flex';
+      authModal.classList.add('visible');
+      if (signinErrorMsg) signinErrorMsg.style.display = 'none';
+      if (signupErrorMsg) signupErrorMsg.style.display = 'none';
+      updateAuthModalUI();
+      if (!window.SupabaseSync || !window.SupabaseSync.getUser()) {
+        switchAuthTab(defaultTab);
+      }
+    }
+
+    function closeAuthModal() {
+      authModal.style.display = 'none';
+      authModal.classList.remove('visible');
+    }
+
+    function updateAuthModalUI() {
+      const user = window.SupabaseSync ? window.SupabaseSync.getUser() : null;
+      if (user) {
+        authFormView.style.display = 'none';
+        authLoggedInView.style.display = 'block';
+        const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || '';
+        if (authUserName) {
+          authUserName.textContent = name ? `${name}` : '';
+          authUserName.style.display = name ? 'block' : 'none';
+        }
+        if (authUserEmail) {
+          authUserEmail.textContent = user.email || 'লগইনকৃত ব্যবহারকারী';
+        }
+        if (authIcon) authIcon.style.color = 'var(--color-primary)';
+      } else {
+        authFormView.style.display = 'block';
+        authLoggedInView.style.display = 'none';
+        if (authIcon) authIcon.style.color = '';
+      }
+    }
+
+    if (authBtn) authBtn.onclick = () => openAuthModal('signin');
+    const menuAuthBtn = document.getElementById('menu-auth-btn');
+    if (menuAuthBtn) {
+      menuAuthBtn.onclick = () => {
+        menuDropdown.classList.remove('open', 'visible');
+        openAuthModal('signin');
+      };
+    }
+    if (authCloseBtn) authCloseBtn.onclick = closeAuthModal;
+    authModal.onclick = (e) => {
+      if (e.target === authModal) closeAuthModal();
+    };
+
+    // --- Sign In Handler ---
+    if (signinForm) {
+      signinForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = signinEmailInput.value.trim();
+        const pass = signinPassInput.value;
+
+        if (!email || !pass) {
+          signinErrorMsg.textContent = 'ইমেইল ও পাসওয়ার্ড প্রদান করুন।';
+          signinErrorMsg.style.display = 'block';
+          return;
+        }
+
+        btnSignIn.disabled = true;
+        btnSignIn.textContent = 'লগইন হচ্ছে…';
+        signinErrorMsg.style.display = 'none';
+
+        try {
+          const res = await window.SupabaseSync.signIn(email, pass);
+          btnSignIn.disabled = false;
+          btnSignIn.textContent = 'লগইন করুন';
+
+          // Check if email confirmed
+          if (res && res.user && res.user.confirmed_at === null) {
+            signinErrorMsg.innerHTML = `
+              আপনার ইমেইল এখনও নিশ্চিত (verify) করা হয়নি।
+              <br>অনুগ্রহ করে আপনার ইনবক্স চেক করে লিঙ্কটিতে ক্লিক করুন।
+              <br><button type="button" class="link-btn" id="btn-resend-from-error" style="margin-top:6px">পুনরায় লিঙ্ক পাঠান</button>
+            `;
+            signinErrorMsg.style.display = 'block';
+            const resendBtn = signinErrorMsg.querySelector('#btn-resend-from-error');
+            if (resendBtn) {
+              resendBtn.onclick = async () => {
+                await window.SupabaseSync.resendVerification(email);
+                UIOverlay.toast({ message: 'ভেরিফিকেশন লিঙ্ক পুনরায় পাঠানো হয়েছে 📩', type: 'info' });
+              };
+            }
+            return;
+          }
+
+          UIOverlay.toast({ message: 'সফলভাবে লগইন হয়েছে! ক্লাউড ডেটা সিঙ্ক হচ্ছে…', type: 'success' });
+          updateAuthModalUI();
+        } catch (err) {
+          btnSignIn.disabled = false;
+          btnSignIn.textContent = 'লগইন করুন';
+          const errMsg = err.message || '';
+          if (errMsg.toLowerCase().includes('email not confirmed')) {
+            signinErrorMsg.innerHTML = `
+              আপনার ইমেইল এখনও ভেরিফাই করা হয়নি!
+              <br>লগইন করতে ইনবক্সের লিঙ্কটিতে ক্লিক করে ভেরিফিকেশন সম্পন্ন করুন।
+              <br><button type="button" class="link-btn" id="btn-resend-from-error" style="margin-top:6px">ভেরিফিকেশন লিঙ্ক পুনরায় পাঠান</button>
+            `;
+            const resendBtn = signinErrorMsg.querySelector('#btn-resend-from-error');
+            if (resendBtn) {
+              resendBtn.onclick = async () => {
+                await window.SupabaseSync.resendVerification(email);
+                UIOverlay.toast({ message: 'ভেরিফিকেশন লিঙ্ক পুনরায় পাঠানো হয়েছে 📩', type: 'info' });
+              };
+            }
+          } else if (errMsg.toLowerCase().includes('invalid login credentials')) {
+            signinErrorMsg.textContent = 'ভুল ইমেইল বা পাসওয়ার্ড। তথ্য যাচাই করে পুনরায় চেষ্টা করুন।';
+          } else {
+            signinErrorMsg.textContent = err.message || 'লগইন ব্যর্থ হয়েছে। তথ্য যাচাই করুন।';
+          }
+          signinErrorMsg.style.display = 'block';
+        }
+      };
+    }
+
+    // --- Sign Up Handler ---
+    if (signupForm) {
+      signupForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const name = signupNameInput.value.trim();
+        const email = signupEmailInput.value.trim();
+        const pass = signupPassInput.value;
+        const confirmPass = signupConfirmPassInput.value;
+
+        if (!name) {
+          signupErrorMsg.textContent = 'আপনার নাম প্রদান করুন।';
+          signupErrorMsg.style.display = 'block';
+          signupNameInput.focus();
+          return;
+        }
+
+        if (!email || !pass) {
+          signupErrorMsg.textContent = 'ইমেইল ও পাসওয়ার্ড প্রদান করুন।';
+          signupErrorMsg.style.display = 'block';
+          return;
+        }
+
+        if (pass.length < 6) {
+          signupErrorMsg.textContent = 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।';
+          signupErrorMsg.style.display = 'block';
+          signupPassInput.focus();
+          return;
+        }
+
+        if (pass !== confirmPass) {
+          signupErrorMsg.textContent = 'পাসওয়ার্ড ও নিশ্চিত পাসওয়ার্ড হুবহু মিলতে হবে।';
+          signupErrorMsg.style.display = 'block';
+          signupConfirmPassInput.focus();
+          return;
+        }
+
+        btnSignUp.disabled = true;
+        btnSignUp.textContent = 'একাউন্ট তৈরি হচ্ছে…';
+        signupErrorMsg.style.display = 'none';
+
+        try {
+          await window.SupabaseSync.signUp(email, pass, name);
+          btnSignUp.disabled = false;
+          btnSignUp.textContent = 'একাউন্ট তৈরি করুন';
+
+          lastRegisteredEmail = email;
+          if (verifyTargetEmail) verifyTargetEmail.textContent = email;
+          if (signinEmailInput) signinEmailInput.value = email;
+
+          // Switch to Verification Notice Screen!
+          switchAuthTab('verify');
+        } catch (err) {
+          btnSignUp.disabled = false;
+          btnSignUp.textContent = 'একাউন্ট তৈরি করুন';
+          const errMsg = err.message || '';
+          if (errMsg.toLowerCase().includes('already registered')) {
+            signupErrorMsg.textContent = 'এই ইমেইল দিয়ে ইতিপূর্বেই একাউন্ট তৈরি করা হয়েছে। লগইন করুন।';
+          } else {
+            signupErrorMsg.textContent = err.message || 'একাউন্ট তৈরিতে সমস্যা হয়েছে।';
+          }
+          signupErrorMsg.style.display = 'block';
+        }
+      };
+    }
+
+    // --- Verification Screen Actions ---
+    if (btnVerifyProceedLogin) {
+      btnVerifyProceedLogin.onclick = () => {
+        switchAuthTab('signin');
+        if (signinPassInput) signinPassInput.focus();
+      };
+    }
+
+    if (btnResendVerification) {
+      btnResendVerification.onclick = async () => {
+        const email = lastRegisteredEmail || (signupEmailInput ? signupEmailInput.value.trim() : '');
+        if (!email) {
+          UIOverlay.toast({ message: 'ইমেইল ঠিকানা পাওয়া যায়নি।', type: 'error' });
+          return;
+        }
+        btnResendVerification.disabled = true;
+        btnResendVerification.textContent = 'পাঠানো হচ্ছে…';
+        try {
+          await window.SupabaseSync.resendVerification(email);
+          btnResendVerification.disabled = false;
+          btnResendVerification.textContent = 'ভেরিফিকেশন লিঙ্ক পুনরায় পাঠান';
+          UIOverlay.toast({ message: 'ভেরিফিকেশন লিঙ্ক পুনরায় পাঠানো হয়েছে 📩', type: 'success' });
+        } catch (e) {
+          btnResendVerification.disabled = false;
+          btnResendVerification.textContent = 'ভেরিফিকেশন লিঙ্ক পুনরায় পাঠান';
+          UIOverlay.toast({ message: 'লিঙ্ক পাঠাতে সমস্যা হয়েছে। একটু পরে চেষ্টা করুন।', type: 'error' });
+        }
+      };
+    }
+
+    if (btnSignOut) {
+      btnSignOut.onclick = async () => {
+        try {
+          await window.SupabaseSync.signOut();
+          updateAuthModalUI();
+          UIOverlay.toast({ message: 'লগআউট করা হয়েছে।', type: 'info' });
+        } catch (err) {
+          console.error(err);
+        }
+      };
+    }
+
+    if (btnManualSync) {
+      btnManualSync.onclick = async () => {
+        btnManualSync.disabled = true;
+        btnManualSync.textContent = 'সিঙ্ক হচ্ছে…';
+        try {
+          await window.SupabaseSync.syncToCloud();
+          await window.SupabaseSync.syncFromCloud();
+          btnManualSync.disabled = false;
+          btnManualSync.innerHTML = `<span class="icon">${Icons.repeat}</span> এখনই সিঙ্ক করুন`;
+          UIOverlay.toast({ message: 'ক্লাউড ডেটা সফলভাবে সিঙ্ক হয়েছে ✅', type: 'success' });
+        } catch (e) {
+          btnManualSync.disabled = false;
+          btnManualSync.innerHTML = `<span class="icon">${Icons.repeat}</span> এখনই সিঙ্ক করুন`;
+          UIOverlay.toast({ message: 'সিঙ্ক করার সময় সমস্যা হয়েছে।', type: 'error' });
+        }
+      };
+    }
+
+    if (window.SupabaseSync) {
+      window.SupabaseSync.init();
+      window.SupabaseSync.onAuthState((evt, user) => {
+        updateAuthModalUI();
+      });
+    }
+
+    // Search & Filter Icons
+    const searchIconSlot = document.getElementById('search-icon-slot');
+    if (searchIconSlot) searchIconSlot.innerHTML = Icons.search;
+    const emptySearchIcon = document.getElementById('empty-search-icon');
+    if (emptySearchIcon) emptySearchIcon.innerHTML = Icons.search;
+    const filterMakkiIcon = document.getElementById('icon-filter-makki');
+    if (filterMakkiIcon) filterMakkiIcon.innerHTML = Icons.kaaba;
+    const filterMadaniIcon = document.getElementById('icon-filter-madani');
+    if (filterMadaniIcon) filterMadaniIcon.innerHTML = Icons.mosque;
+
+    // Hamburger Dropdown Toggle
+    const menuBtn = document.getElementById('menu-btn');
+    const menuDropdown = document.getElementById('menu-dropdown');
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = menuDropdown.classList.contains('open') || menuDropdown.classList.contains('visible');
+      if (isOpen) {
+        menuDropdown.classList.remove('open', 'visible');
+      } else {
+        menuDropdown.classList.add('open', 'visible');
+      }
+    };
+    document.addEventListener('click', (e) => {
+      if (!menuDropdown.contains(e.target) && e.target !== menuBtn) {
+        menuDropdown.classList.remove('open', 'visible');
+      }
+    });
+
+    // Audio Download Overlay Controls
+    const dlOverlay = document.getElementById('dl-overlay');
+    document.getElementById('menu-download-btn').onclick = () => {
+      menuDropdown.classList.remove('open', 'visible');
+      dlOverlay.classList.add('open', 'visible');
+      refreshDownloadPanels();
+    };
+    document.getElementById('dl-close').onclick = () => {
+      dlOverlay.classList.remove('open', 'visible');
+    };
+
+
+    // Download panel tabs
+    document.querySelectorAll('.dl-tab').forEach((tab) => {
+      tab.onclick = () => {
+        document.querySelectorAll('.dl-tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        const type = tab.dataset.tab;
+        document.getElementById('dl-panel-ayah').style.display = type === 'ayah' ? 'block' : 'none';
+        document.getElementById('dl-panel-word').style.display = type === 'word' ? 'block' : 'none';
+      };
+    });
+
+    function toBn(num) {
+      const bn = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+      return String(num).replace(/[0-9]/g, (d) => bn[Number(d)]);
+    }
+
+    const AUDIO_CACHE = 'quran-audio-v1';
+    const AYAH_AUDIO_BASE = 'https://everyayah.com/data/Alafasy_128kbps';
+    const WORD_AUDIO_BASE = 'https://audio.qurancdn.com/wbw';
+
+    let globalSurahsMeta = [];
+    let activeDownloadCounts = { ayah: {}, word: {} };
+    let isDownloading = false;
+    let lastActiveSurah = null;
+
+    async function getCachedCounts() {
+      const wordCounts = {};
+      const ayahCounts = {};
+      if (!('caches' in window)) return { wordCounts, ayahCounts };
+      try {
+        const cache = await caches.open(AUDIO_CACHE);
+        const keys = await cache.keys();
+        for (const req of keys) {
+          const url = req.url;
+          if (url.includes('everyayah.com')) {
+            const m = url.match(/\/(\d{3})(\d{3})\.mp3/);
+            if (m) {
+              const s = parseInt(m[1], 10);
+              ayahCounts[s] = (ayahCounts[s] || 0) + 1;
+            }
+          } else if (url.includes('audio.qurancdn.com/wbw') || url.includes('/wbw/')) {
+            const m = url.match(/\/(\d{3})_(\d{3})_(\d{3})\.mp3/);
+            if (m) {
+              const s = parseInt(m[1], 10);
+              wordCounts[s] = (wordCounts[s] || 0) + 1;
+            }
+          }
+        }
+        return { wordCounts, ayahCounts };
+      } catch (e) {
+        return { wordCounts: {}, ayahCounts: {} };
+      }
+    }
+
+    let stopRequested = false;
+
+    async function downloadOneAudio(cache, url) {
+      try {
+        const existing = await cache.match(url);
+        if (existing) return true;
+      } catch (e) {}
+
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          const res = await fetch(url, { mode: 'no-cors', signal: controller.signal });
+          clearTimeout(timer);
+          if (res && (res.ok || res.type === 'opaque')) {
+            await cache.put(url, res.clone());
+            return true;
+          }
+        } catch (err) {
+          if (attempt === 2) {
+            console.warn(`[Download] Skipping failed url: ${url}`);
+            return false;
+          }
+          await new Promise((r) => setTimeout(r, 350));
+        }
+      }
+      return false;
+    }
+
+    async function updateStoragePersistenceUI() {
+      const banner = document.getElementById('dl-storage-protection-banner');
+      const titleEl = document.getElementById('storage-persist-title');
+      const descEl = document.getElementById('storage-persist-desc');
+      const btn = document.getElementById('storage-persist-btn');
+      if (!banner || !('storage' in navigator) || !navigator.storage.persist) return;
+
+      let isPersisted = false;
+      try {
+        isPersisted = await navigator.storage.persisted();
+      } catch (e) {}
+
+      let usageText = '';
+      if (navigator.storage.estimate) {
+        try {
+          const est = await navigator.storage.estimate();
+          if (est.usage) {
+            const mb = (est.usage / (1024 * 1024)).toFixed(1);
+            usageText = ` • ব্যবহৃত স্টোরেজ: ${toBn(mb)} MB`;
+          }
+        } catch (e) {}
+      }
+
+      if (isPersisted) {
+        banner.classList.add('persisted');
+        if (titleEl) titleEl.textContent = '🛡️ স্থায়ী মেমোরি সুরক্ষা: সক্রিয় (Protected)';
+        if (descEl) descEl.textContent = `ক্রোম বা অ্যান্ড্রয়েড ক্যাশ ক্লিয়ারের হাত থেকে অডিও ফাইল সুরক্ষিত আছে${usageText}`;
+        if (btn) {
+          btn.textContent = 'সুরক্ষিত ✅';
+          btn.disabled = true;
+        }
+      } else {
+        banner.classList.remove('persisted');
+        if (titleEl) titleEl.textContent = '⚠️ মেমোরি সুরক্ষা: সাধারণ (Best-Effort)';
+        if (descEl) descEl.textContent = `ক্যাশ ক্লিয়ার করলে অডিও ডিলিট হতে পারে। নিরাপদ রাখতে বাটনে চাপুন${usageText}`;
+        if (btn) {
+          btn.textContent = 'সুরক্ষা চালু করুন';
+          btn.disabled = false;
+          btn.onclick = async () => {
+            btn.textContent = 'যাচাই হচ্ছে…';
+            try {
+              const granted = await navigator.storage.persist();
+              if (granted) {
+                if (window.UIOverlay && typeof window.UIOverlay.toast === 'function') {
+                  window.UIOverlay.toast({ message: 'স্থায়ী মেমোরি সুরক্ষা সফলভাবে সক্রিয় হয়েছে! 🛡️', duration: 2500 });
+                }
+              }
+            } catch (err) {}
+            updateStoragePersistenceUI();
+          };
+        }
+      }
+    }
+
+    async function downloadAudioQueue(urls, onProgress, checkStop) {
+      if (navigator.storage && navigator.storage.persist) {
+        try {
+          await navigator.storage.persist();
+          updateStoragePersistenceUI();
+        } catch (e) {}
+      }
+      const cache = await caches.open(AUDIO_CACHE);
+      const CONCURRENCY = 3;
+      const PACING_DELAY_MS = 25;
+
+      let nextIdx = 0;
+      let done = 0;
+
+      async function worker() {
+        while (nextIdx < urls.length) {
+          if (checkStop && checkStop()) break;
+          const idx = nextIdx++;
+          const url = urls[idx];
+          await downloadOneAudio(cache, url);
+          done++;
+          if (onProgress) onProgress(done, urls.length, url);
+          if (PACING_DELAY_MS > 0) {
+            await new Promise((r) => setTimeout(r, PACING_DELAY_MS));
+          }
+        }
+      }
+
+      const workerCount = Math.min(CONCURRENCY, urls.length);
+      const workers = [];
+      for (let i = 0; i < workerCount; i++) workers.push(worker());
+      await Promise.all(workers);
+      return done;
+    }
+
+    function ayahUrlsForSurah(s) {
+      const sPad = String(s.surah).padStart(3, '0');
+      const urls = [];
+      for (let a = 1; a <= s.total_ayahs; a++) {
+        urls.push(`${AYAH_AUDIO_BASE}/${sPad}${String(a).padStart(3, '0')}.mp3`);
+      }
+      return urls;
+    }
+
+    async function wordUrlsForSurah(s) {
+      const content = await QuranDB.loadSurah(s.surah);
+      const urls = [];
+      (content.ayahs || []).forEach((ayah) => {
+        (ayah.words || []).forEach((w) => {
+          const [ws, wa, wp] = w.key.split(':').map((n) => String(n).padStart(3, '0'));
+          urls.push(`${WORD_AUDIO_BASE}/${ws}_${wa}_${wp}.mp3`);
+        });
+      });
+      return urls;
+    }
+
+    function updateDownloadProgressUI(type, done, total, url, activeBtn) {
+      const ayahMatch = url ? url.match(/\/(\d{3})(\d{3})\.mp3/) : null;
+      const wordMatch = url ? url.match(/\/(\d{3})_(\d{3})_(\d{3})\.mp3/) : null;
+      const sNum = ayahMatch ? parseInt(ayahMatch[1], 10) : (wordMatch ? parseInt(wordMatch[1], 10) : null);
+      const aNum = ayahMatch ? parseInt(ayahMatch[2], 10) : (wordMatch ? parseInt(wordMatch[2], 10) : null);
+      const wNum = wordMatch ? parseInt(wordMatch[3], 10) : null;
+
+      const overallPct = total > 0 ? Math.round((done / total) * 100) : 0;
+      if (activeBtn) {
+        activeBtn.innerHTML = `<span class="icon">${Icons.download}</span> ডাউনলোড হচ্ছে… ${toBn(done)} / ${toBn(total)} (${toBn(overallPct)}%)`;
+      }
+
+      if (sNum) {
+        const surahInfo = globalSurahsMeta.find((item) => item.surah === sNum);
+        const surahName = surahInfo ? (surahInfo.name_bn_script || surahInfo.name_bn || surahInfo.name_transliteration) : `সূরা ${toBn(sNum)}`;
+        const surahTotal = surahInfo ? (type === 'ayah' ? surahInfo.total_ayahs : surahInfo.total_words) : 0;
+
+        if (!activeDownloadCounts[type]) activeDownloadCounts[type] = {};
+        activeDownloadCounts[type][sNum] = (activeDownloadCounts[type][sNum] || 0) + 1;
+        const sDone = Math.min(activeDownloadCounts[type][sNum], surahTotal);
+        const sPct = surahTotal > 0 ? Math.round((sDone / surahTotal) * 100) : 0;
+
+        // Update Surah Row in DOM
+        const countEl = document.getElementById(`dl-count-${type}-${sNum}`);
+        if (countEl) {
+          countEl.textContent = `${toBn(sDone)} / ${toBn(surahTotal)}`;
+        }
+        const fillEl = document.getElementById(`dl-fill-${type}-${sNum}`);
+        if (fillEl) {
+          fillEl.style.width = `${sPct}%`;
+        }
+
+        // Highlight active surah row
+        const rowEl = document.getElementById(`dl-row-${type}-${sNum}`);
+        if (rowEl) {
+          if (lastActiveSurah && lastActiveSurah !== sNum) {
+            const oldRow = document.getElementById(`dl-row-${type}-${lastActiveSurah}`);
+            if (oldRow) oldRow.classList.remove('downloading');
+          }
+          rowEl.classList.add('downloading');
+          if (lastActiveSurah !== sNum) {
+            rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            lastActiveSurah = sNum;
+          }
+        }
+
+        // Update overall status header
+        const statusEl = document.getElementById(type === 'ayah' ? 'dl-ayah-overall-status' : 'dl-word-overall-status');
+        if (statusEl) {
+          if (type === 'ayah') {
+            statusEl.innerHTML = `
+              <div style="font-size:0.86rem;color:var(--text-primary);font-family:var(--font-bangla)">
+                <span class="dl-active-pulse">●</span> <strong>সূরা ${surahName} (${toBn(sNum)}), আয়াত ${toBn(aNum)}</strong> ডাউনলোড হচ্ছে…
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">
+                মোট অগ্রগতি: ${toBn(done)} / ${toBn(total)} (${toBn(overallPct)}%)
+              </div>
+            `;
+          } else {
+            statusEl.innerHTML = `
+              <div style="font-size:0.86rem;color:var(--text-primary);font-family:var(--font-bangla)">
+                <span class="dl-active-pulse">●</span> <strong>সূরা ${surahName} (${toBn(sNum)}), আয়াত ${toBn(aNum)}, শব্দ ${toBn(wNum)}</strong> ডাউনলোড হচ্ছে…
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">
+                মোট অগ্রগতি: ${toBn(done)} / ${toBn(total)} (${toBn(overallPct)}%)
+              </div>
+            `;
+          }
+        }
+      }
+    }
+
+    async function refreshDownloadPanels() {
+      updateStoragePersistenceUI();
+      const meta = await QuranDB.getSurahsMeta();
+      globalSurahsMeta = meta;
+      const { wordCounts, ayahCounts } = await getCachedCounts();
+      activeDownloadCounts = {
+        ayah: { ...ayahCounts },
+        word: { ...wordCounts }
+      };
+
+      ['ayah', 'word'].forEach((type) => {
+        const listEl = document.getElementById(type === 'ayah' ? 'dl-list-ayah' : 'dl-list-word');
+        const counts = type === 'ayah' ? ayahCounts : wordCounts;
+        listEl.innerHTML = '';
+        let totalDone = 0, totalAll = 0;
+
+        meta.forEach((s) => {
+          const total = type === 'ayah' ? s.total_ayahs : s.total_words;
+          const done = Math.min(counts[s.surah] || 0, total);
+          totalDone += done;
+          totalAll += total;
+          const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+          const li = document.createElement('li');
+          li.className = 'dl-surah-row';
+          li.id = `dl-row-${type}-${s.surah}`;
+          li.innerHTML = `
+            <div class="dl-surah-name">
+              <span>${toBn(String(s.surah).padStart(2, '0'))}. ${s.name_bn_script || s.name_bn || s.name_transliteration}</span>
+              <span class="dl-surah-count" id="dl-count-${type}-${s.surah}">${toBn(done)} / ${toBn(total)}</span>
+            </div>
+            <div class="dl-row-progress-track">
+              <div class="dl-row-progress-fill" id="dl-fill-${type}-${s.surah}" style="width:${percent}%"></div>
+            </div>
+          `;
+
+          li.onclick = async () => {
+            if (isDownloading) {
+              UIOverlay.toast({
+                message: 'একটি ডাউনলোড ইতিমধ্যে চলছে, শেষ হওয়া পর্যন্ত অপেক্ষা করুন বা বিরতি দিন।',
+                type: 'warning'
+              });
+              return;
+            }
+            if (done >= total) {
+              UIOverlay.toast({
+                message: 'এই সূরার সব অডিও আগেই ডাউনলোড করা আছে।',
+                type: 'info'
+              });
+              return;
+            }
+            li.querySelector('.dl-surah-count').textContent = 'প্রস্তুত হচ্ছে…';
+            li.classList.add('downloading');
+            isDownloading = true;
+
+            try {
+              const urls = type === 'ayah' ? ayahUrlsForSurah(s) : await wordUrlsForSurah(s);
+              await downloadAudioQueue(
+                urls,
+                (d, t, url) => {
+                  updateDownloadProgressUI(type, d, t, url, null);
+                },
+                () => false
+              );
+              UIOverlay.toast({
+                message: `সূরা ${s.name_bn_script || s.name_bn || s.surah}-এর অডিও ডাউনলোড সম্পন্ন ✅`,
+                type: 'success'
+              });
+            } catch (err) {
+              console.error(err);
+              UIOverlay.toast({
+                message: 'ডাউনলোড করার সময় সমস্যা হয়েছে, ইন্টারনেট সংযোগ চেক করুন।',
+                type: 'error'
+              });
+            } finally {
+              isDownloading = false;
+              li.classList.remove('downloading');
+              refreshDownloadPanels();
+            }
+          };
+
+          listEl.appendChild(li);
+        });
+
+        const statusEl = document.getElementById(type === 'ayah' ? 'dl-ayah-overall-status' : 'dl-word-overall-status');
+        statusEl.textContent = `মোট ${toBn(totalDone)} / ${toBn(totalAll)} ফাইল সংরক্ষিত হয়েছে`;
+      });
+    }
+
+    document.getElementById('dl-all-ayah').onclick = async () => {
+      const btn = document.getElementById('dl-all-ayah');
+      if (isDownloading) {
+        stopRequested = true;
+        btn.textContent = 'থামানো হচ্ছে…';
+        return;
+      }
+
+      const meta = await QuranDB.getSurahsMeta();
+      globalSurahsMeta = meta;
+
+      let totalAyahs = 0;
+      meta.forEach((s) => { totalAyahs += s.total_ayahs; });
+
+      isDownloading = true;
+      stopRequested = false;
+      btn.innerHTML = `<span class="icon">${Icons.pause}</span> ডাউনলোড বিরতি দিন (Pause)`;
+      btn.classList.add('btn-active-downloading');
+
+      let overallDone = 0;
+
+      try {
+        for (let i = 0; i < meta.length; i++) {
+          if (stopRequested) break;
+          const s = meta[i];
+          const urls = ayahUrlsForSurah(s);
+
+          await downloadAudioQueue(
+            urls,
+            (surahDone, surahTotal, url) => {
+              overallDone++;
+              updateDownloadProgressUI('ayah', Math.min(overallDone, totalAyahs), totalAyahs, url, btn);
+            },
+            () => stopRequested
+          );
+        }
+      } catch (err) {
+        console.error('[Download] Error:', err);
+      } finally {
+        isDownloading = false;
+        btn.classList.remove('btn-active-downloading');
+        btn.innerHTML = `<span class="icon">${Icons.download}</span> সব আয়াতের অডিও ডাউনলোড করুন`;
+        if (lastActiveSurah) {
+          const oldRow = document.getElementById(`dl-row-ayah-${lastActiveSurah}`);
+          if (oldRow) oldRow.classList.remove('downloading');
+          lastActiveSurah = null;
+        }
+        if (stopRequested) {
+          UIOverlay.toast({
+            message: 'ডাউনলোড সাময়িকভাবে বিরতি দেওয়া হয়েছে।',
+            type: 'info'
+          });
+        } else {
+          UIOverlay.alert({
+            title: 'আয়াত অডিও সংরক্ষণ সম্পন্ন',
+            message: `আলহামদুলিল্লাহ! সব আয়াতের অডিও (${toBn(totalAyahs)}টি) সফলভাবে অফলাইনে সংরক্ষিত হয়েছে ✅`,
+            type: 'success'
+          });
+        }
+        refreshDownloadPanels();
+      }
+    };
+
+    document.getElementById('dl-all-word').onclick = async () => {
+      const btn = document.getElementById('dl-all-word');
+      if (isDownloading) {
+        stopRequested = true;
+        btn.textContent = 'থামানো হচ্ছে…';
+        return;
+      }
+
+      const meta = await QuranDB.getSurahsMeta();
+      globalSurahsMeta = meta;
+
+      let totalWords = 0;
+      meta.forEach((s) => { totalWords += (s.total_words || 0); });
+
+      isDownloading = true;
+      stopRequested = false;
+      btn.innerHTML = `<span class="icon">${Icons.pause}</span> ডাউনলোড বিরতি দিন (Pause)`;
+      btn.classList.add('btn-active-downloading');
+
+      let overallDone = 0;
+
+      try {
+        for (let i = 0; i < meta.length; i++) {
+          if (stopRequested) break;
+          const s = meta[i];
+          btn.innerHTML = `<span class="icon">${Icons.pause}</span> সূরা ${toBn(s.surah)}/${toBn(meta.length)} লোড হচ্ছে…`;
+          const urls = await wordUrlsForSurah(s);
+
+          await downloadAudioQueue(
+            urls,
+            (surahDone, surahTotal, url) => {
+              overallDone++;
+              updateDownloadProgressUI('word', Math.min(overallDone, totalWords), totalWords, url, btn);
+            },
+            () => stopRequested
+          );
+        }
+      } catch (err) {
+        console.error('[Download] Error:', err);
+      } finally {
+        isDownloading = false;
+        btn.classList.remove('btn-active-downloading');
+        btn.innerHTML = `<span class="icon">${Icons.download}</span> সব শব্দের অডিও ডাউনলোড করুন`;
+        if (lastActiveSurah) {
+          const oldRow = document.getElementById(`dl-row-word-${lastActiveSurah}`);
+          if (oldRow) oldRow.classList.remove('downloading');
+          lastActiveSurah = null;
+        }
+        if (stopRequested) {
+          UIOverlay.toast({
+            message: 'ডাউনলোড সাময়িকভাবে বিরতি দেওয়া হয়েছে।',
+            type: 'info'
+          });
+        } else {
+          UIOverlay.alert({
+            title: 'শব্দ অডিও সংরক্ষণ সম্পন্ন',
+            message: `আলহামদুলিল্লাহ! সব শব্দের অডিও (${toBn(totalWords)}টি) সফলভাবে অফলাইনে সংরক্ষিত হয়েছে ✅`,
+            type: 'success'
+          });
+        }
+        refreshDownloadPanels();
+      }
+    };
+
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          console.log('[PWA] Service Worker registered successfully.');
+          if (reg) reg.update();
+        }).catch((err) => {
+          console.warn('[PWA] Service Worker registration failed:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

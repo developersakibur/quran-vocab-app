@@ -1,0 +1,6 @@
+{
+  "name": "Quran Vocabulary App",
+  "description": "Comprehensive Quranic Arabic-to-Bengali vocabulary, grammar morphology, quiz, and spaced-repetition learning platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

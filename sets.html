@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>শব্দ সেট</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e6e5c">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div>
+      <span class="eyebrow" id="surah-meaning">সূরা</span>
+      <h1 id="page-title">শব্দ সেট বাছাই করো</h1>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="থিম পরিবর্তন করুন">
+      <span class="icon" id="theme-icon"></span>
+    </button>
+  </header>
+
+  <!-- Loading state -->
+  <main class="quiz-stage" id="loading-stage">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">লোড হচ্ছে…</p>
+  </main>
+
+  <ul class="surah-list" id="set-list" style="display:none"></ul>
+
+  <script src="js/icons.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/storage/storage-manager.js"></script>
+  <script src="js/data/word-repository.js"></script>
+  <script src="js/set-progress-manager.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const surahNum = params.get('surah');
+    const SET_SIZE = QURAN_APP_CONFIG.SET_SIZE;
+
+    function setBadgeHtml(surahNum, setIndex) {
+      const p = SetProgressManager.getSetProgress(surahNum, setIndex);
+      if (p.passed) return `<span class="surah-progress-badge passed"><span class="icon">${Icons.check}</span> পাস — ${p.bestPercent}%</span>`;
+      if (p.attempts > 0) return `<span class="surah-progress-badge attempted">সেরা স্কোর ${p.bestPercent}%</span>`;
+      return '';
+    }
+
+    async function init() {
+      try {
+        if (!surahNum) throw new Error('সূরা নির্বাচিত হয়নি।');
+
+        const metaList = await WordRepository.getSurahsMeta();
+        const meta = metaList.find(s => String(s.surah) === String(surahNum));
+        document.getElementById('surah-meaning').textContent = meta ? (meta.name_bn_script || meta.name_transliteration) : `সূরা ${surahNum}`;
+
+        const words = await WordRepository.getWordsForSurah(surahNum);
+        const totalSets = Math.ceil(words.length / SET_SIZE);
+
+        document.getElementById('loading-stage').style.display = 'none';
+        const listEl = document.getElementById('set-list');
+        listEl.style.display = 'block';
+        listEl.innerHTML = '';
+
+        for (let setIndex = 1; setIndex <= totalSets; setIndex++) {
+          const startWord = (setIndex - 1) * SET_SIZE + 1;
+          const endWord = Math.min(setIndex * SET_SIZE, words.length);
+
+          const li = document.createElement('li');
+          li.className = 'surah-row';
+          li.onclick = () => { window.location.href = `quiz.html?surah=${surahNum}&set=${setIndex}`; };
+          li.innerHTML = `
+            <div class="surah-number">${setIndex}</div>
+            <div class="surah-info">
+              <p class="surah-name-main">সেট ${setIndex}</p>
+              <p class="surah-name-meaning">শব্দ ${startWord}–${endWord}</p>
+              ${setBadgeHtml(surahNum, setIndex)}
+            </div>
+            <div class="surah-meta">
+              <span class="count">${endWord - startWord + 1} শব্দ</span>
+            </div>
+          `;
+          listEl.appendChild(li);
+        }
+      } catch (err) {
+        document.getElementById('loading-stage').innerHTML = `
+          <p style="font-family:var(--font-bangla); color:var(--color-danger); text-align:center;">
+            <span class="icon">${Icons.warning}</span> লোড করতে সমস্যা হয়েছে: ${err.message}
+          </p>`;
+        console.error(err);
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed:', err));
+    }
+
+    init();
+  </script>
+</body>
+</html>

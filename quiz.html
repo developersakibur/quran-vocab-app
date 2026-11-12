@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Surah Test</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e6e5c">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div>
+      <span class="eyebrow" id="surah-meaning">সূরা</span>
+      <h1 id="quiz-title">প্রশ্ন</h1>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="থিম পরিবর্তন করুন">
+      <span class="icon" id="theme-icon"></span>
+    </button>
+  </header>
+
+  <div class="quiz-header">
+    <span class="quiz-progress-label" id="progress-label">প্রশ্ন ১ / ২০</span>
+    <div class="quiz-progress-track">
+      <div class="quiz-progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <main class="quiz-stage" id="loading-stage">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">লোড হচ্ছে…</p>
+  </main>
+
+  <!-- Quiz stage (hidden until data loaded) -->
+  <main class="quiz-stage" id="quiz-stage" style="display:none">
+    <div class="arabic-card">
+      <div class="arabic-word" id="arabic-word">—</div>
+    </div>
+    <div class="options" id="options"></div>
+  </main>
+
+  <!-- Footer navigation: previous | ayah audio | word audio | next -->
+  <footer class="quiz-footer" id="quiz-footer" style="display:none">
+    <button class="footer-btn nav-btn" id="prev-btn" aria-label="পূর্ববর্তী প্রশ্ন"><span class="icon" id="icon-prev"></span></button>
+    <button class="footer-btn" id="ayah-audio-btn" aria-label="সম্পূর্ণ আয়াত শুনুন"><span class="icon" id="icon-ayah-audio"></span></button>
+    <button class="footer-btn" id="word-audio-btn" aria-label="শব্দের উচ্চারণ শুনুন"><span class="icon" id="icon-word-audio"></span></button>
+    <button class="footer-btn nav-btn" id="next-btn" aria-label="পরবর্তী প্রশ্ন"><span class="icon" id="icon-next"></span></button>
+  </footer>
+
+  <audio id="word-audio-player"></audio>
+  <audio id="ayah-audio-player"></audio>
+
+  <!-- Small toast for audio-missing / info messages -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Result screen (hidden until finished) -->
+  <main class="result-wrap" id="result-wrap" style="display:none">
+    <p class="eyebrow" id="result-surah-name">সূরা</p>
+    <div class="result-score" id="result-score">০ / ০</div>
+    <div class="result-percent" id="result-percent">০%</div>
+    <div class="result-badge" id="result-badge">পাস</div>
+    <div class="result-actions">
+      <button class="btn-secondary" id="home-btn">হোমে ফিরুন</button>
+      <button class="btn-primary" id="retry-btn">আবার দাও</button>
+    </div>
+  </main>
+
+  <!-- Exit-confirm modal for back button mid-quiz -->
+  <div class="modal-overlay" id="exit-modal">
+    <div class="modal-box">
+      <p class="modal-text">তুমি এখনো কুইজ শেষ করোনি। এখন বের হলে এই চেষ্টার অগ্রগতি সেভ হবে না। তুমি কি নিশ্চিত?</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="exit-cancel">থাকি</button>
+        <button class="btn-primary" id="exit-confirm">বের হও</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/storage/storage-manager.js"></script>
+  <script src="js/data/word-repository.js"></script>
+  <script src="js/progress-manager.js"></script>
+  <script src="js/set-progress-manager.js"></script>
+  <script src="js/distractor-generator.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed:', err));
+    }
+
+    // Static footer icons
+    document.getElementById('icon-prev').innerHTML = Icons.arrowLeft;
+    document.getElementById('icon-next').innerHTML = Icons.arrowRight;
+    document.getElementById('icon-ayah-audio').innerHTML = Icons.book;
+    document.getElementById('icon-word-audio').innerHTML = Icons.speaker;
+
+    const params = new URLSearchParams(window.location.search);
+    const surahNum = params.get('surah') || '1';
+    const setIndex = params.get('set') ? parseInt(params.get('set'), 10) : null;
+    const SET_SIZE = QURAN_APP_CONFIG.SET_SIZE;
+    const PASS_THRESHOLD = QURAN_APP_CONFIG.PASS_THRESHOLD;
+
+    // Where "home" means for this session — a set-based quiz goes back
+    // to the set list, a whole-surah quiz goes back to the surah list.
+    const backUrl = setIndex ? `sets.html?surah=${surahNum}` : 'index.html';
+
+    let allWords = [];        // {arabic, meaning_bn, key, root} — the pool for this quiz
+    let queue = [];           // shuffled word order for this attempt
+    let questionOptions = []; // parallel to queue — 4 options per question, generated once and kept stable on revisit
+    let answers = [];         // parallel to queue — null until answered, else {chosenText, isCorrect}
+    let currentIndex = 0;
+    let quizFinished = false;
+
+    function hasAnyProgress() {
+      return answers.some(a => a !== null);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove('visible'), 2200);
+    }
+
+    // ---- Audio sources (external CDNs — no local storage needed) ----
+    const WORD_AUDIO_BASE = 'https://audio.qurancdn.com/wbw';
+    const AYAH_AUDIO_BASE = 'https://everyayah.com/data/Alafasy_128kbps';
+
+    function wordAudioPath(key) {
+      const [s, a, p] = key.split(':').map(n => String(n).padStart(3, '0'));
+      return `${WORD_AUDIO_BASE}/${s}_${a}_${p}.mp3`;
+    }
+
+    function ayahAudioPath(key) {
+      const [s, a] = key.split(':');
+      const sPad = String(s).padStart(3, '0');
+      const aPad = String(a).padStart(3, '0');
+      return `${AYAH_AUDIO_BASE}/${sPad}${aPad}.mp3`;
+    }
+
+    document.getElementById('word-audio-btn').onclick = () => {
+      const word = queue[currentIndex];
+      if (!word) return;
+      const player = document.getElementById('word-audio-player');
+      player.src = wordAudioPath(word.key);
+      player.play().catch(() => showToast('অডিও চালাতে সমস্যা হচ্ছে — ইন্টারনেট সংযোগ চেক করো'));
+    };
+
+    document.getElementById('ayah-audio-btn').onclick = () => {
+      const word = queue[currentIndex];
+      if (!word) return;
+      const player = document.getElementById('ayah-audio-player');
+      player.src = ayahAudioPath(word.key);
+      player.play().catch(() => showToast('অডিও চালাতে সমস্যা হচ্ছে — ইন্টারনেট সংযোগ চেক করো'));
+    };
+
+    // Press & Hold to play word audio in quiz card
+    const cardEl = document.querySelector('.arabic-card');
+    if (cardEl) {
+      cardEl.title = 'শব্দে চেপে ধরে রাখুন অডিও শুনতে (Hold to play audio)';
+      cardEl.style.cursor = 'pointer';
+      let holdTimer = null;
+      let startX = 0, startY = 0;
+
+      cardEl.addEventListener('touchstart', (e) => {
+        const t = e.touches[0];
+        startX = t.clientX; startY = t.clientY;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          document.getElementById('word-audio-btn').click();
+          if (navigator.vibrate) navigator.vibrate(35);
+          showToast('উচ্চারণ বাজছে 🔊');
+        }, 360);
+      }, { passive: true });
+
+      cardEl.addEventListener('touchmove', (e) => {
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10) {
+          clearTimeout(holdTimer);
+        }
+      }, { passive: true });
+
+      cardEl.addEventListener('touchend', () => clearTimeout(holdTimer));
+      cardEl.addEventListener('touchcancel', () => clearTimeout(holdTimer));
+
+      cardEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          document.getElementById('word-audio-btn').click();
+          showToast('উচ্চারণ বাজছে 🔊');
+        }, 360);
+      });
+      cardEl.addEventListener('mouseup', () => clearTimeout(holdTimer));
+      cardEl.addEventListener('mouseleave', () => clearTimeout(holdTimer));
+    }
+
+    async function init() {
+      try {
+        const metaList = await WordRepository.getSurahsMeta();
+        const meta = metaList.find(s => String(s.surah) === String(surahNum));
+        const surahLabel = meta ? (meta.name_bn_script || meta.name_transliteration) : `সূরা ${surahNum}`;
+        document.getElementById('result-surah-name').textContent = meta ? (meta.name_bn_script || meta.name_bn) : '';
+
+        let fullWordList = await WordRepository.getWordsForSurah(surahNum);
+
+        if (setIndex) {
+          const start = (setIndex - 1) * SET_SIZE;
+          allWords = fullWordList.slice(start, start + SET_SIZE);
+          document.getElementById('surah-meaning').textContent = `${surahLabel} — সেট ${setIndex}`;
+          document.getElementById('quiz-title').textContent = `শব্দ ${start + 1}–${start + allWords.length}`;
+        } else {
+          allWords = fullWordList;
+          document.getElementById('surah-meaning').textContent = meta && meta.name_bn ? `অর্থ: ${meta.name_bn}` : '';
+          document.getElementById('quiz-title').textContent = surahLabel;
+        }
+
+        if (allWords.length < 4) {
+          throw new Error('এই সেটে পর্যাপ্ত শব্দ (কমপক্ষে ৪টা) পাওয়া যায়নি — MCQ বানানো সম্ভব না।');
+        }
+
+        startAttempt();
+
+        document.getElementById('loading-stage').style.display = 'none';
+        document.getElementById('quiz-stage').style.display = 'flex';
+        document.getElementById('quiz-footer').style.display = 'flex';
+        renderQuestion();
+      } catch (err) {
+        document.getElementById('loading-stage').innerHTML = `
+          <div class="arabic-card" style="color:var(--color-danger)">
+            <p style="font-family:var(--font-bangla); text-align:center; margin:0;">
+              <span class="icon">${Icons.warning}</span> ডেটা লোড করতে সমস্যা হয়েছে:<br>${err.message}
+            </p>
+          </div>`;
+        console.error(err);
+      }
+    }
+
+    function startAttempt() {
+      queue = DistractorGenerator.shuffle(allWords);
+      questionOptions = new Array(queue.length).fill(null);
+      answers = new Array(queue.length).fill(null);
+      currentIndex = 0;
+      quizFinished = false;
+    }
+
+    function buildOptions(correctWord) {
+      const distractors = DistractorGenerator.buildDistractors(correctWord, allWords);
+      return DistractorGenerator.shuffle([correctWord.meaning_bn, ...distractors]);
+    }
+
+    function renderQuestion() {
+      const total = queue.length;
+      const word = queue[currentIndex];
+
+      document.getElementById('progress-label').textContent = `প্রশ্ন ${currentIndex + 1} / ${total}`;
+      document.getElementById('progress-fill').style.width = `${(currentIndex / total) * 100}%`;
+      document.getElementById('arabic-word').textContent = word.arabic;
+
+      // Options are generated once per question and kept stable so that
+      // navigating back and forth doesn't reshuffle what was already shown.
+      if (!questionOptions[currentIndex]) {
+        questionOptions[currentIndex] = buildOptions(word);
+      }
+      const options = questionOptions[currentIndex];
+      const existingAnswer = answers[currentIndex];
+
+      const optionsEl = document.getElementById('options');
+      optionsEl.innerHTML = '';
+      options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        const radioIcon = document.createElement('span');
+        radioIcon.className = 'icon option-radio';
+        const label = document.createElement('span');
+        label.textContent = opt;
+
+        if (existingAnswer) {
+          btn.disabled = true;
+          const isCorrectOption = opt === word.meaning_bn;
+          const isChosenOption = opt === existingAnswer.chosenText;
+          if (isCorrectOption) {
+            btn.classList.add('correct');
+            radioIcon.innerHTML = Icons.radioChecked;
+          } else if (isChosenOption) {
+            btn.classList.add('wrong');
+            radioIcon.innerHTML = Icons.radioChecked;
+          } else {
+            radioIcon.innerHTML = Icons.radioUnchecked;
+          }
+        } else {
+          radioIcon.innerHTML = Icons.radioUnchecked;
+          btn.onclick = () => handleAnswer(opt, word.meaning_bn);
+        }
+
+        btn.appendChild(radioIcon);
+        btn.appendChild(label);
+        optionsEl.appendChild(btn);
+      });
+
+      updateFooterButtons();
+    }
+
+    function updateFooterButtons() {
+      document.getElementById('prev-btn').disabled = currentIndex === 0;
+      document.getElementById('next-btn').disabled = !answers[currentIndex];
+    }
+
+    function handleAnswer(chosenText, correctText) {
+      if (answers[currentIndex]) return; // already answered, locked
+      answers[currentIndex] = { chosenText, isCorrect: chosenText === correctText };
+      renderQuestion();
+    }
+
+    document.getElementById('prev-btn').onclick = () => {
+      if (currentIndex === 0) return;
+      currentIndex--;
+      renderQuestion();
+    };
+
+    document.getElementById('next-btn').onclick = () => {
+      if (!answers[currentIndex]) return; // must answer before moving on
+      if (currentIndex < queue.length - 1) {
+        currentIndex++;
+        renderQuestion();
+      } else {
+        showResult();
+      }
+    };
+
+    function showResult() {
+      quizFinished = true;
+      document.getElementById('progress-fill').style.width = '100%';
+      document.getElementById('quiz-stage').style.display = 'none';
+      document.getElementById('quiz-footer').style.display = 'none';
+      document.getElementById('result-wrap').style.display = 'flex';
+
+      const total = queue.length;
+      const correctCount = answers.filter(a => a && a.isCorrect).length;
+      const percent = Math.round((correctCount / total) * 100);
+      document.getElementById('result-score').textContent = `${correctCount} / ${total}`;
+      document.getElementById('result-percent').textContent = `${percent}%`;
+
+      if (setIndex) {
+        SetProgressManager.recordSetAttempt(surahNum, setIndex, percent, PASS_THRESHOLD);
+      } else {
+        ProgressManager.recordAttempt(surahNum, percent, PASS_THRESHOLD);
+      }
+
+      const badge = document.getElementById('result-badge');
+      if (percent / 100 >= PASS_THRESHOLD) {
+        badge.innerHTML = `<span class="icon">${Icons.checkCircle}</span> পাস করেছেন`;
+        badge.className = 'result-badge pass';
+      } else {
+        badge.innerHTML = `<span class="icon">${Icons.xCircle}</span> আবার চেষ্টা করুন`;
+        badge.className = 'result-badge fail';
+      }
+    }
+
+    document.getElementById('retry-btn').onclick = () => {
+      document.getElementById('result-wrap').style.display = 'none';
+      document.getElementById('quiz-stage').style.display = 'flex';
+      document.getElementById('quiz-footer').style.display = 'flex';
+      startAttempt();
+      renderQuestion();
+    };
+
+    document.getElementById('home-btn').onclick = () => goHome();
+    function goHome() { window.location.href = backUrl; }
+
+    /* ---- Back-button / exit confirmation while quiz in progress ---- */
+    const exitModal = document.getElementById('exit-modal');
+    history.pushState({ quiz: true }, '');
+    window.addEventListener('popstate', () => {
+      if (!quizFinished && hasAnyProgress()) {
+        exitModal.classList.add('visible');
+        history.pushState({ quiz: true }, ''); // stay on page until user decides
+      } else {
+        goHome();
+      }
+    });
+    document.getElementById('exit-cancel').onclick = () => exitModal.classList.remove('visible');
+    document.getElementById('exit-confirm').onclick = () => goHome();
+
+    init();
+  </script>
+</body>
+</html>
