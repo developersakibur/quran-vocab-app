@@ -1065,6 +1065,14 @@
     practiceSurah: null,
     practiceAyah: null,
     practiceEngine: null,
+    practiceGroup: null,
+    practiceSubGroup: null,
+    practiceList: null,
+    mcqShowAllListsMap: {},
+    mcqActiveStepMap: {},
+    ayahQuizSearch: '',
+    ayahQuizFilter: 'all', // 'all' | 'in-progress' | 'completed'
+    ayahQuizStepMap: {},
     stats: null,
     accountAuthTab: 'signin', // 'signin' | 'signup' | 'verify'
     lastRegisteredEmail: '',
@@ -1095,6 +1103,9 @@
       state.practiceSurah = params.surah ? parseInt(params.surah, 10) : null;
       state.practiceAyah = params.ayah ? parseInt(params.ayah, 10) : null;
       state.practiceEngine = params.engine || null;
+      state.practiceGroup = params.group || null;
+      state.practiceSubGroup = params.sub || null;
+      state.practiceList = params.list ? parseInt(params.list, 10) : null;
     }
 
     // Build URL hash
@@ -1105,7 +1116,10 @@
       const qp = [];
       if (state.practiceSurah) qp.push(`surah=${state.practiceSurah}`);
       if (state.practiceAyah) qp.push(`ayah=${state.practiceAyah}`);
-      if (state.practiceEngine) qp.push(`engine=${state.practiceEngine}`);
+      if (state.practiceEngine) qp.push(`engine=${encodeURIComponent(state.practiceEngine)}`);
+      if (state.practiceGroup) qp.push(`group=${encodeURIComponent(state.practiceGroup)}`);
+      if (state.practiceSubGroup) qp.push(`sub=${encodeURIComponent(state.practiceSubGroup)}`);
+      if (state.practiceList) qp.push(`list=${state.practiceList}`);
       hash = qp.length > 0 ? `#practice?${qp.join('&')}` : '#practice';
     } else if (viewName === 'bookmarks') hash = '#bookmarks';
     else if (viewName === 'account') hash = '#account';
@@ -1165,7 +1179,10 @@
       const surah = urlParams.get('surah');
       const ayah = urlParams.get('ayah');
       const engine = urlParams.get('engine');
-      navigateTo('practice', { surah, ayah, engine }, pushState);
+      const group = urlParams.get('group');
+      const sub = urlParams.get('sub');
+      const list = urlParams.get('list');
+      navigateTo('practice', { surah, ayah, engine, group, sub, list }, pushState);
     } else if (hash === '#bookmarks') {
       navigateTo('bookmarks', {}, pushState);
     } else if (hash === '#account') {
@@ -1257,7 +1274,7 @@
         break;
 
       case 'practice':
-        if (backBtn) backBtn.style.display = state.practiceSurah ? 'grid' : 'none';
+        if (backBtn) backBtn.style.display = (state.practiceSurah || state.practiceEngine) ? 'grid' : 'none';
         if (titleEl) titleEl.textContent = 'অনুশীলন';
         if (eyebrowEl) eyebrowEl.textContent = 'কুইজ ও ফ্ল্যাশকার্ড';
         document.getElementById('view-practice').classList.add('active');
@@ -2400,6 +2417,62 @@
     const container = document.getElementById('practice-hub-container');
     const stage = document.getElementById('practice-drill-stage');
 
+    // MCQ Frequency Groups Roadmap Views (Global MCQ Only)
+    if (state.practiceEngine === 'mcq-groups') {
+      container.style.display = 'flex';
+      stage.style.display = 'none';
+      stage.innerHTML = '';
+      await renderMcqGroupsHubView(container);
+      return;
+    }
+
+    if (state.practiceEngine === 'mcq-group') {
+      container.style.display = 'flex';
+      stage.style.display = 'none';
+      stage.innerHTML = '';
+      await renderMcqSubGroupsView(container, state.practiceGroup);
+      return;
+    }
+
+    if (state.practiceEngine === 'mcq-lists') {
+      container.style.display = 'flex';
+      stage.style.display = 'none';
+      stage.innerHTML = '';
+      await renderMcqListSelectionView(container, state.practiceGroup, state.practiceSubGroup);
+      return;
+    }
+
+    if (state.practiceEngine === 'mcq-list') {
+      container.style.display = 'none';
+      stage.style.display = 'flex';
+      await startMcqListExam(state.practiceGroup, state.practiceSubGroup, state.practiceList);
+      return;
+    }
+
+    // Ayah Word Quiz Progressive Roadmap Views (Surah List -> Ayah List -> Ayah Quiz)
+    if (state.practiceEngine === 'ayah-surahs') {
+      container.style.display = 'flex';
+      stage.style.display = 'none';
+      stage.innerHTML = '';
+      await renderAyahQuizSurahListView(container);
+      return;
+    }
+
+    if (state.practiceEngine === 'ayah-list') {
+      container.style.display = 'flex';
+      stage.style.display = 'none';
+      stage.innerHTML = '';
+      await renderAyahQuizListView(container, state.practiceSurah);
+      return;
+    }
+
+    if (state.practiceEngine === 'ayah-quiz') {
+      container.style.display = 'none';
+      stage.style.display = 'flex';
+      await startAyahQuizExam(state.practiceSurah, state.practiceAyah);
+      return;
+    }
+
     // If an engine is actively selected, show drill stage
     if (state.practiceEngine) {
       container.style.display = 'none';
@@ -2452,16 +2525,16 @@
         <div class="engine-icon-wrap" style="background:var(--color-primary);color:#fff"><span class="icon">${Icons.book}</span></div>
         <div class="engine-info">
           <h3>আয়াত শব্দ কুইজ</h3>
-          <p>নির্দিষ্ট আয়াতের শব্দ অর্থ ও অডিও অনুশীলন।</p>
+          <p>সূরা ও আয়াত ধরে ধাপে ধাপে শব্দের অর্থ অনুশীলন ও আনলক করুন।</p>
         </div>
       </div>
 
       <!-- Engine 2: Smart MCQ -->
-      <div class="practice-engine-card" data-engine="mcq" role="button" tabindex="0">
+      <div class="practice-engine-card" id="card-engine-mcq" data-engine="mcq" role="button" tabindex="0">
         <div class="engine-icon-wrap engine-icon-2"><span class="icon">${Icons.target}</span></div>
         <div class="engine-info">
           <h3>বহুনির্বাচনী কুইজ</h3>
-          <p>${state.practiceSurah ? 'অপশন থেকে সঠিক বাংলা অর্থ চিহ্নিত করুন।' : 'পূর্ণ কুরআনে সবচেয়ে বেশি ব্যবহৃত শব্দগুলো আগে অনুশীলন করুন।'}</p>
+          <p>${state.practiceSurah ? 'অপশন থেকে সঠিক বাংলা অর্থ চিহ্নিত করুন।' : '১০টি ফ্রিকোয়েন্সি গ্রুপ ও ১০-শব্দের ধাপে পূর্ণ কুরআন অনুশীলন করুন।'}</p>
         </div>
       </div>
 
@@ -2501,18 +2574,1293 @@
     const ayahEngineCard = container.querySelector('#card-engine-ayah-select');
     if (ayahEngineCard) {
       ayahEngineCard.onclick = () => {
-        const targetS = state.practiceSurah || 1;
-        navigateTo('ayahs', { surah: targetS });
-        UIOverlay.toast({ message: 'যেকোনো আয়াতের ডানপাশের "কুইজ" বাটনে ট্যাপ করে অনুশীলন শুরু করুন', type: 'info' });
+        if (state.practiceSurah) {
+          navigateTo('practice', { engine: 'ayah-list', surah: state.practiceSurah });
+        } else {
+          navigateTo('practice', { engine: 'ayah-surahs' });
+        }
       };
     }
 
     container.querySelectorAll('.practice-engine-card[data-engine]').forEach((card) => {
       card.onclick = () => {
         const engine = card.dataset.engine;
+        if (engine === 'mcq' && !state.practiceSurah && window.McqFrequencyGroups) {
+          navigateTo('practice', { engine: 'mcq-groups' });
+          return;
+        }
         navigateTo('practice', { surah: state.practiceSurah, engine });
       };
     });
+  }
+
+  // ============================================================
+  // MCQ FREQUENCY GROUPS ROADMAP (10 GROUPS • 30 JUZ • 10-WORD LISTS)
+  // ============================================================
+
+  function formatBnInt(num) {
+    return toBnNumber(Number(num || 0).toLocaleString('en-US'));
+  }
+
+  function setPracticeTopbar(title, eyebrow) {
+    const titleEl = document.getElementById('topbar-title');
+    const eyebrowEl = document.getElementById('topbar-eyebrow');
+    if (titleEl && title) titleEl.textContent = title;
+    if (eyebrowEl && eyebrow) eyebrowEl.textContent = eyebrow;
+  }
+
+  async function loadMcqRoadmapContext() {
+    if (!window.McqFrequencyGroups) {
+      throw new Error('McqFrequencyGroups module not loaded');
+    }
+    const [hierarchy, progressMap, passedMap] = await Promise.all([
+      window.McqFrequencyGroups.loadHierarchy(),
+      typeof QuranDB.getAllWordProgressMap === 'function' ? QuranDB.getAllWordProgressMap() : Promise.resolve({}),
+      typeof QuranDB.getMcqPassedListsMap === 'function' ? QuranDB.getMcqPassedListsMap() : Promise.resolve({})
+    ]);
+    return { hierarchy, progressMap, passedMap };
+  }
+
+  function renderMcqRoadmapError(container, onRetry) {
+    container.innerHTML = `
+      <div class="card mcq-roadmap-error-card">
+        <span class="icon mcq-roadmap-error-icon">${Icons.warning}</span>
+        <h3>ফ্রিকোয়েন্সি সূচী লোড করা যায়নি</h3>
+        <p>অনুগ্রহ করে ইন্টারনেট সংযোগ যাচাই করে আবার চেষ্টা করুন, অথবা অফলাইন ডাটা ডাউনলোড করুন।</p>
+        <div class="mcq-roadmap-error-actions">
+          <button type="button" class="btn-primary" id="btn-mcq-retry-load">আবার চেষ্টা করুন</button>
+          <button type="button" class="btn-secondary" id="btn-mcq-back-practice">অনুশীলন তালিকায় ফিরুন</button>
+        </div>
+      </div>
+    `;
+    const retryBtn = container.querySelector('#btn-mcq-retry-load');
+    if (retryBtn && onRetry) retryBtn.onclick = onRetry;
+    const backBtn = container.querySelector('#btn-mcq-back-practice');
+    if (backBtn) backBtn.onclick = () => navigateTo('practice', { engine: null });
+  }
+
+  // Screen A: Main 10 Frequency Groups Hub (2-Tier Curriculum)
+  async function renderMcqGroupsHubView(container) {
+    setPracticeTopbar('বহুনির্বাচনী রোডম্যাপ', 'ফ্রিকোয়েন্সি অনুযায়ী ১০টি গ্রুপ');
+    container.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let ctx;
+    try {
+      ctx = await loadMcqRoadmapContext();
+    } catch (err) {
+      renderMcqRoadmapError(container, () => renderMcqGroupsHubView(container));
+      return;
+    }
+
+    const { hierarchy, progressMap, passedMap } = ctx;
+    const FG = window.McqFrequencyGroups;
+    const overall = FG.computeOverallSummary(hierarchy, progressMap, passedMap);
+    const resume = FG.findRecommendedResumeList(hierarchy.groups, progressMap, passedMap);
+
+    const foundationGroups = hierarchy.groups.filter((g) => g.tier === 'foundation');
+    const deepGroups = hierarchy.groups.filter((g) => g.tier === 'deep');
+    const overallWordPct = overall.totalUnique > 0
+      ? Math.min(100, Math.round((overall.totalLearnedWords / overall.totalUnique) * 100))
+      : 0;
+
+    const renderGroupCardHtml = (group) => {
+      const sum = FG.computeGroupSummary(group, progressMap, passedMap);
+      const isComplete = sum.totalLists > 0 && sum.passedLists >= sum.totalLists;
+      const subHint = group.subMode === 'juz'
+        ? '৩০ পারায় বিভক্ত'
+        : group.subMode === 'chapters'
+          ? `${toBnNumber(group.subGroups.length)}টি অধ্যায়`
+          : group.subMode === 'freq-tiers'
+            ? `${toBnNumber(group.subGroups.length)}টি ফ্রিকোয়েন্সি স্তর`
+            : group.subMode === 'freq-chapters'
+              ? `${toBnNumber(group.subGroups.length)}টি অধ্যায়`
+              : `${toBnNumber(group.listCount)}টি লিস্ট`;
+
+      return `
+        <button type="button" class="mcq-group-card ${isComplete ? 'is-complete' : ''}" data-group-id="${group.id}">
+          <div class="mcq-group-card-top">
+            <div class="mcq-group-heading">
+              <span class="mcq-group-order tabular-nums">গ্রুপ ${toBnNumber(group.order)}</span>
+              <h3 class="mcq-group-title">${group.titleBn}</h3>
+            </div>
+            <div class="mcq-group-range-wrap">
+              <span class="mcq-group-range tabular-nums">${group.rangeLabelBn}</span>
+              <span class="mcq-card-chevron" aria-hidden="true">${Icons.chevronRight}</span>
+            </div>
+          </div>
+          <p class="mcq-group-desc">${group.descriptionBn}</p>
+          <div class="mcq-progress-track" aria-hidden="true">
+            <div class="mcq-progress-fill" style="width:${sum.pct}%"></div>
+          </div>
+          <div class="mcq-group-card-meta tabular-nums">
+            <span>শেখা শব্দ: <strong>${formatBnInt(sum.learnedWords)}/${formatBnInt(sum.totalWords)}</strong></span>
+            <span>লিস্ট: <strong>${formatBnInt(sum.passedLists)}/${formatBnInt(sum.totalLists)}</strong> · ${subHint}</span>
+          </div>
+        </button>
+      `;
+    };
+
+    const resumeHtml = resume ? `
+      <button type="button" class="mcq-resume-card" id="btn-mcq-resume-hub">
+        <div class="mcq-resume-icon" aria-hidden="true">${Icons.play}</div>
+        <div class="mcq-resume-body">
+          <span class="mcq-resume-kicker">চলমান লিস্ট চালু করুন</span>
+          <strong class="mcq-resume-title">${resume.groupTitleBn}${resume.subGroupId !== 'main' ? ` · ${resume.subGroupTitleBn}` : ''} · লিস্ট ${toBnNumber(resume.listNumber)}</strong>
+          <span class="mcq-resume-sub tabular-nums">অগ্রগতি: ${toBnNumber(resume.learnedCount)}/${toBnNumber(resume.totalWords)} শব্দ · ১০০% স্কোরে পরবর্তী লিস্ট আনলক</span>
+        </div>
+        <span class="mcq-resume-arrow" aria-hidden="true">${Icons.arrowRight}</span>
+      </button>
+    ` : '';
+
+    container.innerHTML = `
+      <div class="mcq-roadmap-wrap">
+        <section class="mcq-overview-card" aria-label="সামগ্রিক বহুনির্বাচনী অগ্রগতি">
+          <div class="mcq-overview-grid">
+            <div class="mcq-overview-metric">
+              <span class="mcq-metric-label">শেখা শব্দ</span>
+              <strong class="mcq-metric-value tabular-nums">${formatBnInt(overall.totalLearnedWords)}<small>/${formatBnInt(overall.totalUnique)}</small></strong>
+            </div>
+            <div class="mcq-overview-metric">
+              <span class="mcq-metric-label">সম্পন্ন লিস্ট</span>
+              <strong class="mcq-metric-value tabular-nums">${formatBnInt(overall.totalPassedLists)}<small>/${formatBnInt(overall.totalLists)}</small></strong>
+            </div>
+            <div class="mcq-overview-metric">
+              <span class="mcq-metric-label">কুরআন কাভারেজ</span>
+              <strong class="mcq-metric-value mcq-metric-accent tabular-nums">${toBnNumber(overall.quranCoveragePct.toFixed(1))}%</strong>
+            </div>
+          </div>
+          <div class="mcq-progress-track mcq-progress-track-lg" aria-hidden="true">
+            <div class="mcq-progress-fill" style="width:${overallWordPct}%"></div>
+          </div>
+        </section>
+
+        ${resumeHtml}
+
+        <section class="mcq-tier-section" aria-labelledby="mcq-tier-1-heading">
+          <div class="mcq-tier-header">
+            <h2 id="mcq-tier-1-heading">ধাপ ১ — মূল ভিত্তি</h2>
+            <span class="mcq-tier-meta tabular-nums">গ্রুপ ১–৬ · ৯৯৪ শব্দ · ৫৮.৮% কুরআন</span>
+          </div>
+          <div class="mcq-group-grid">
+            ${foundationGroups.map(renderGroupCardHtml).join('')}
+          </div>
+        </section>
+
+        <section class="mcq-tier-section" aria-labelledby="mcq-tier-2-heading">
+          <div class="mcq-tier-header">
+            <h2 id="mcq-tier-2-heading">ধাপ ২ — গভীর ও পূর্ণাঙ্গ ভাণ্ডার</h2>
+            <span class="mcq-tier-meta tabular-nums">গ্রুপ ৭–১০ · ১৮,১২৯ শব্দ · ১০০% কুরআন</span>
+          </div>
+          <div class="mcq-group-grid">
+            ${deepGroups.map(renderGroupCardHtml).join('')}
+          </div>
+        </section>
+      </div>
+    `;
+
+    const resumeBtn = container.querySelector('#btn-mcq-resume-hub');
+    if (resumeBtn && resume) {
+      resumeBtn.onclick = () => {
+        navigateTo('practice', {
+          engine: 'mcq-list',
+          group: resume.groupId,
+          sub: resume.subGroupId,
+          list: resume.listNumber
+        });
+      };
+    }
+
+    container.querySelectorAll('.mcq-group-card[data-group-id]').forEach((card) => {
+      card.onclick = () => {
+        const gId = card.dataset.groupId;
+        const gObj = FG.findGroup(hierarchy, gId);
+        if (!gObj) return;
+        if (gObj.subMode === 'direct') {
+          navigateTo('practice', { engine: 'mcq-lists', group: gObj.id, sub: 'main' });
+        } else {
+          navigateTo('practice', { engine: 'mcq-group', group: gObj.id });
+        }
+      };
+    });
+  }
+
+  // Screen B: Sub-Groups / Chapters / 30-Juz Selection View (Groups 6–10)
+  async function renderMcqSubGroupsView(container, groupId) {
+    container.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let ctx;
+    try {
+      ctx = await loadMcqRoadmapContext();
+    } catch (err) {
+      renderMcqRoadmapError(container, () => renderMcqSubGroupsView(container, groupId));
+      return;
+    }
+
+    const { hierarchy, progressMap, passedMap } = ctx;
+    const FG = window.McqFrequencyGroups;
+    const group = FG.findGroup(hierarchy, groupId);
+    if (!group) {
+      navigateTo('practice', { engine: 'mcq-groups' }, false);
+      return;
+    }
+
+    if (group.subMode === 'direct') {
+      state.practiceEngine = 'mcq-lists';
+      state.practiceSubGroup = 'main';
+      await renderMcqListSelectionView(container, group.id, 'main');
+      return;
+    }
+
+    setPracticeTopbar(`গ্রুপ ${toBnNumber(group.order)}: ${group.titleBn}`, `${group.rangeLabelBn} • উপ-বিভাগ নির্বাচন`);
+    const groupSum = FG.computeGroupSummary(group, progressMap, passedMap);
+
+    let bodyHtml = '';
+
+    if (group.subMode === 'juz') {
+      const juz30 = group.subGroups.find((sg) => sg.juz === 30 || sg.id === 'j30');
+      const juz30Sum = juz30 ? FG.computeSubGroupSummary(juz30, progressMap, passedMap) : null;
+
+      const juz30ShortcutHtml = juz30 ? `
+        <button type="button" class="mcq-resume-card mcq-juz30-shortcut" data-sub-id="${juz30.id}">
+          <div class="mcq-resume-icon" aria-hidden="true">${Icons.book}</div>
+          <div class="mcq-resume-body">
+            <span class="mcq-resume-kicker">দ্রুত শুরু (পরিচিত সূরা)</span>
+            <strong class="mcq-resume-title">পারা ৩০ (আম্মাপারা)</strong>
+            <span class="mcq-resume-sub tabular-nums">${formatBnInt(juz30Sum.learnedWords)}/${formatBnInt(juz30Sum.totalWords)} শব্দ · ${toBnNumber(juz30Sum.passedLists)}/${toBnNumber(juz30Sum.totalLists)} লিস্ট সম্পন্ন</span>
+          </div>
+          <span class="mcq-resume-arrow" aria-hidden="true">${Icons.chevronRight}</span>
+        </button>
+      ` : '';
+
+      const juzCardsHtml = group.subGroups.map((sg) => {
+        const s = FG.computeSubGroupSummary(sg, progressMap, passedMap);
+        const done = s.totalLists > 0 && s.passedLists >= s.totalLists;
+        const started = s.learnedWords > 0 || s.passedLists > 0;
+        return `
+          <button type="button" class="mcq-juz-card ${done ? 'is-complete' : started ? 'is-started' : ''}" data-sub-id="${sg.id}">
+            <div class="mcq-juz-card-top">
+              <strong class="mcq-juz-name">${sg.titleBn}</strong>
+              ${done ? `<span class="mcq-juz-check" aria-label="সম্পন্ন">${Icons.checkCircle}</span>` : `<span class="mcq-juz-lists tabular-nums">${toBnNumber(s.totalLists)} লিস্ট</span>`}
+            </div>
+            <div class="mcq-progress-track" aria-hidden="true">
+              <div class="mcq-progress-fill" style="width:${s.pct}%"></div>
+            </div>
+            <div class="mcq-juz-meta tabular-nums">
+              <span>${formatBnInt(s.learnedWords)}/${formatBnInt(s.totalWords)} শব্দ</span>
+              <span>${toBnNumber(s.passedLists)}/${toBnNumber(s.totalLists)}</span>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      bodyHtml = `
+        ${juz30ShortcutHtml}
+        <section class="mcq-tier-section">
+          <div class="mcq-tier-header">
+            <h2>৩০ পারা অনুযায়ী তালিকা</h2>
+            <span class="mcq-tier-meta tabular-nums">প্রতি পারার লিস্ট ১ খোলা আছে</span>
+          </div>
+          <div class="mcq-juz-grid">
+            ${juzCardsHtml}
+          </div>
+        </section>
+      `;
+    } else if (group.subMode === 'freq-chapters') {
+      // Group 8: split into two sections (৪ বার ব্যবহৃত শব্দ & ৩ বার ব্যবহৃত শব্দ)
+      const sectionsMap = new Map();
+      group.subGroups.forEach((sg) => {
+        const sec = sg.sectionLabelBn || group.titleBn;
+        if (!sectionsMap.has(sec)) sectionsMap.set(sec, []);
+        sectionsMap.get(sec).push(sg);
+      });
+
+      const sectionsHtml = Array.from(sectionsMap.entries()).map(([secTitle, items]) => {
+        const secWords = items.reduce((a, b) => a + b.wordCount, 0);
+        const secLists = items.reduce((a, b) => a + b.lists.length, 0);
+        const cardsHtml = items.map((sg) => {
+          const s = FG.computeSubGroupSummary(sg, progressMap, passedMap);
+          const done = s.totalLists > 0 && s.passedLists >= s.totalLists;
+          return `
+            <button type="button" class="mcq-subgroup-card ${done ? 'is-complete' : ''}" data-sub-id="${sg.id}">
+              <div class="mcq-subgroup-top">
+                <div>
+                  <strong class="mcq-subgroup-title">${sg.titleBn}</strong>
+                  <span class="mcq-subgroup-sub tabular-nums">${sg.subtitleBn}</span>
+                </div>
+                <span class="mcq-card-chevron" aria-hidden="true">${Icons.chevronRight}</span>
+              </div>
+              <div class="mcq-progress-track" aria-hidden="true">
+                <div class="mcq-progress-fill" style="width:${s.pct}%"></div>
+              </div>
+              <div class="mcq-group-card-meta tabular-nums">
+                <span>শেখা শব্দ: <strong>${formatBnInt(s.learnedWords)}/${formatBnInt(s.totalWords)}</strong></span>
+                <span>সম্পন্ন লিস্ট: <strong>${toBnNumber(s.passedLists)}/${toBnNumber(s.totalLists)}</strong></span>
+              </div>
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <section class="mcq-tier-section">
+            <div class="mcq-tier-header">
+              <h2>${secTitle}</h2>
+              <span class="mcq-tier-meta tabular-nums">${formatBnInt(secWords)} শব্দ · ${toBnNumber(secLists)} লিস্ট</span>
+            </div>
+            <div class="mcq-group-grid">
+              ${cardsHtml}
+            </div>
+          </section>
+        `;
+      }).join('');
+
+      bodyHtml = sectionsHtml;
+    } else {
+      // Group 6 (6 chapters) & Group 7 (5 exact frequency tiers)
+      const cardsHtml = group.subGroups.map((sg) => {
+        const s = FG.computeSubGroupSummary(sg, progressMap, passedMap);
+        const done = s.totalLists > 0 && s.passedLists >= s.totalLists;
+        return `
+          <button type="button" class="mcq-subgroup-card ${done ? 'is-complete' : ''}" data-sub-id="${sg.id}">
+            <div class="mcq-subgroup-top">
+              <div>
+                <strong class="mcq-subgroup-title">${sg.titleBn}</strong>
+                <span class="mcq-subgroup-sub tabular-nums">${sg.subtitleBn}</span>
+              </div>
+              <span class="mcq-card-chevron" aria-hidden="true">${Icons.chevronRight}</span>
+            </div>
+            <div class="mcq-progress-track" aria-hidden="true">
+              <div class="mcq-progress-fill" style="width:${s.pct}%"></div>
+            </div>
+            <div class="mcq-group-card-meta tabular-nums">
+              <span>শেখা শব্দ: <strong>${formatBnInt(s.learnedWords)}/${formatBnInt(s.totalWords)}</strong></span>
+              <span>সম্পন্ন লিস্ট: <strong>${toBnNumber(s.passedLists)}/${toBnNumber(s.totalLists)}</strong></span>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      bodyHtml = `
+        <section class="mcq-tier-section">
+          <div class="mcq-tier-header">
+            <h2>${group.subMode === 'freq-tiers' ? 'ফ্রিকোয়েন্সি অনুযায়ী উপ-গ্রুপ' : 'ছোট অধ্যায়সমূহ'}</h2>
+            <span class="mcq-tier-meta tabular-nums">প্রতিটির লিস্ট ১ খোলা আছে</span>
+          </div>
+          <div class="mcq-group-grid">
+            ${cardsHtml}
+          </div>
+        </section>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="mcq-roadmap-wrap">
+        <section class="mcq-sub-hero-card">
+          <div class="mcq-sub-hero-top">
+            <div>
+              <span class="mcq-group-order tabular-nums">গ্রুপ ${toBnNumber(group.order)} · ${group.rangeLabelBn}</span>
+              <h2 class="mcq-sub-hero-title">${group.titleBn}</h2>
+            </div>
+            <strong class="mcq-sub-hero-pct tabular-nums">${toBnNumber(groupSum.pct)}%</strong>
+          </div>
+          <p class="mcq-group-desc">${group.descriptionBn}</p>
+          <div class="mcq-progress-track mcq-progress-track-lg" aria-hidden="true">
+            <div class="mcq-progress-fill" style="width:${groupSum.pct}%"></div>
+          </div>
+          <div class="mcq-group-card-meta tabular-nums">
+            <span>মোট শেখা: <strong>${formatBnInt(groupSum.learnedWords)}/${formatBnInt(groupSum.totalWords)} শব্দ</strong></span>
+            <span>সম্পন্ন লিস্ট: <strong>${formatBnInt(groupSum.passedLists)}/${formatBnInt(groupSum.totalLists)}</strong></span>
+          </div>
+        </section>
+
+        ${bodyHtml}
+      </div>
+    `;
+
+    container.querySelectorAll('[data-sub-id]').forEach((btn) => {
+      btn.onclick = () => {
+        const subId = btn.dataset.subId;
+        navigateTo('practice', { engine: 'mcq-lists', group: group.id, sub: subId });
+      };
+    });
+  }
+
+  // Screen C: Progressive Unlock 10-Word List Selection View (with Mini-Steps + Progressive Horizon)
+  async function renderMcqListSelectionView(container, groupId, subGroupId) {
+    container.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let ctx;
+    try {
+      ctx = await loadMcqRoadmapContext();
+    } catch (err) {
+      renderMcqRoadmapError(container, () => renderMcqListSelectionView(container, groupId, subGroupId));
+      return;
+    }
+
+    const { hierarchy, progressMap, passedMap } = ctx;
+    const FG = window.McqFrequencyGroups;
+    const group = FG.findGroup(hierarchy, groupId);
+    if (!group) {
+      navigateTo('practice', { engine: 'mcq-groups' }, false);
+      return;
+    }
+
+    const subGroup = FG.findSubGroup(group, subGroupId || 'main');
+    if (!subGroup) {
+      navigateTo('practice', { engine: 'mcq-group', group: group.id }, false);
+      return;
+    }
+
+    const subTitle = group.subMode === 'direct'
+      ? `গ্রুপ ${toBnNumber(group.order)}: ${group.titleBn}`
+      : `${subGroup.titleBn}`;
+    const subEyebrow = group.subMode === 'direct'
+      ? `${group.rangeLabelBn} • ১০-শব্দের লিস্ট`
+      : `গ্রুপ ${toBnNumber(group.order)} (${group.rangeLabelBn}) • ১০-শব্দের লিস্ট`;
+    setPracticeTopbar(subTitle, subEyebrow);
+
+    const summary = FG.computeSubGroupSummary(subGroup, progressMap, passedMap);
+    const listStates = summary.states;
+    const activeState = listStates.find((s) => s.isActive) || listStates.find((s) => s.isUnlocked && !s.isPassed) || listStates[0];
+
+    const steps = FG.buildMiniStepsForLists(listStates, 10);
+    const mapKey = `${group.id}:${subGroup.id}`;
+    const hasMiniSteps = steps.length > 1;
+
+    let activeStepIdx = state.mcqActiveStepMap[mapKey];
+    if (typeof activeStepIdx !== 'number' || activeStepIdx < 0 || activeStepIdx >= steps.length) {
+      const foundIdx = steps.findIndex((st) => st.hasActive);
+      activeStepIdx = foundIdx >= 0 ? foundIdx : 0;
+      state.mcqActiveStepMap[mapKey] = activeStepIdx;
+    }
+
+    const currentStep = steps[activeStepIdx] || steps[0];
+    const showAllKey = `${mapKey}:step${activeStepIdx}`;
+    const isShowAll = Boolean(state.mcqShowAllListsMap[showAllKey]);
+
+    // Progressive Horizon applies cleanly inside the active list view (or current step)
+    const horizon = FG.computeProgressiveHorizon(currentStep.items, isShowAll, 3);
+
+    const miniStepsHtml = hasMiniSteps ? `
+      <div class="mcq-mini-steps-bar" role="tablist" aria-label="লিস্ট ধাপসমূহ">
+        ${steps.map((step) => `
+          <button
+            type="button"
+            class="mcq-mini-step-btn ${step.stepIndex === activeStepIdx ? 'active' : ''} ${step.passedCount >= step.items.length ? 'is-complete' : ''}"
+            data-step-idx="${step.stepIndex}"
+            role="tab"
+            aria-selected="${step.stepIndex === activeStepIdx ? 'true' : 'false'}"
+          >
+            <span class="tabular-nums">${step.labelBn}</span>
+            <small class="tabular-nums">${toBnNumber(step.passedCount)}/${toBnNumber(step.items.length)}</small>
+          </button>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const listRowsHtml = horizon.visibleItems.map((st) => {
+      const list = st.list;
+      const previewAr = list.words.slice(0, 3).map((w) => w.arabic).join(' · ');
+      const pct = st.totalWords > 0 ? Math.round((st.learnedCount / st.totalWords) * 100) : 0;
+      const statusIcon = st.isPassed
+        ? Icons.checkCircle
+        : st.isUnlocked
+          ? Icons.play
+          : Icons.lock;
+      const statusLabel = st.isPassed
+        ? 'সম্পন্ন'
+        : st.isUnlocked
+          ? (st.learnedCount > 0 ? 'চলমান' : 'খোলা')
+          : 'লক';
+      const rowClass = st.isPassed
+        ? 'is-passed'
+        : st.isUnlocked
+          ? 'is-active'
+          : 'is-locked';
+
+      return `
+        <button
+          type="button"
+          class="mcq-list-row ${rowClass}"
+          data-list-num="${list.listNumber}"
+          data-unlocked="${st.isUnlocked ? '1' : '0'}"
+          aria-label="লিস্ট ${toBnNumber(list.listNumber)}, ${toBnNumber(st.learnedCount)} এর মধ্যে ${toBnNumber(st.totalWords)} শব্দ শেখা হয়েছে, অবস্থা ${statusLabel}"
+        >
+          <span class="mcq-list-status-icon" aria-hidden="true">${statusIcon}</span>
+          <div class="mcq-list-main">
+            <div class="mcq-list-title-row">
+              <strong class="mcq-list-title tabular-nums">লিস্ট ${toBnNumber(list.listNumber)}</strong>
+              <span class="mcq-list-word-count tabular-nums">${toBnNumber(st.totalWords)} শব্দ</span>
+            </div>
+            <div class="mcq-list-preview-ar" dir="rtl">${previewAr}</div>
+            <div class="mcq-progress-track" aria-hidden="true">
+              <div class="mcq-progress-fill" style="width:${pct}%"></div>
+            </div>
+          </div>
+          <div class="mcq-list-right">
+            <strong class="mcq-list-fraction tabular-nums">${toBnNumber(st.learnedCount)}/${toBnNumber(st.totalWords)}</strong>
+            <span class="mcq-list-status-text">${statusLabel}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    const horizonToggleHtml = horizon.hiddenCount > 0 ? `
+      <button type="button" class="mcq-horizon-toggle-btn" id="btn-mcq-horizon-toggle">
+        <span>বাকি সব লিস্ট দেখুন (+${toBnNumber(horizon.hiddenCount)}টি লিস্ট)</span>
+        <span class="icon" aria-hidden="true">${Icons.chevronDown}</span>
+      </button>
+    ` : (isShowAll && currentStep.items.length > 5 ? `
+      <button type="button" class="mcq-horizon-toggle-btn" id="btn-mcq-horizon-toggle">
+        <span>সংক্ষিপ্ত তালিকা দেখুন</span>
+      </button>
+    ` : '');
+
+    const resumeCtaHtml = activeState ? `
+      <button type="button" class="btn-primary mcq-start-active-btn" id="btn-mcq-start-active">
+        <span class="icon" aria-hidden="true">${Icons.play}</span>
+        <span>${activeState.isPassed ? `লিস্ট ${toBnNumber(activeState.list.listNumber)} আবার অনুশীলন করুন` : `লিস্ট ${toBnNumber(activeState.list.listNumber)} শুরু করুন (${toBnNumber(activeState.learnedCount)}/${toBnNumber(activeState.totalWords)})`}</span>
+      </button>
+    ` : '';
+
+    container.innerHTML = `
+      <div class="mcq-roadmap-wrap">
+        <section class="mcq-sub-hero-card">
+          <div class="mcq-sub-hero-top">
+            <div>
+              <span class="mcq-group-order tabular-nums">${subEyebrow}</span>
+              <h2 class="mcq-sub-hero-title">${subTitle}</h2>
+            </div>
+            <strong class="mcq-sub-hero-pct tabular-nums">${toBnNumber(summary.pct)}%</strong>
+          </div>
+          <div class="mcq-progress-track mcq-progress-track-lg" aria-hidden="true">
+            <div class="mcq-progress-fill" style="width:${summary.pct}%"></div>
+          </div>
+          <div class="mcq-group-card-meta tabular-nums">
+            <span>শেখা শব্দ: <strong>${formatBnInt(summary.learnedWords)}/${formatBnInt(summary.totalWords)}</strong></span>
+            <span>সম্পন্ন লিস্ট: <strong>${toBnNumber(summary.passedLists)}/${toBnNumber(summary.totalLists)}</strong></span>
+          </div>
+          <div class="mcq-unlock-rule-note">
+            <span class="icon" aria-hidden="true">${Icons.unlock}</span>
+            <span>প্রতিটি লিস্টে শতভাগ (১০০%) সঠিক উত্তর দিলে পরবর্তী লিস্ট আনলক হবে।</span>
+          </div>
+          ${resumeCtaHtml}
+        </section>
+
+        ${miniStepsHtml}
+
+        <div class="mcq-lists-stack" id="mcq-lists-stack">
+          ${listRowsHtml}
+        </div>
+
+        ${horizonToggleHtml}
+      </div>
+    `;
+
+    const startActiveBtn = container.querySelector('#btn-mcq-start-active');
+    if (startActiveBtn && activeState) {
+      startActiveBtn.onclick = () => {
+        navigateTo('practice', {
+          engine: 'mcq-list',
+          group: group.id,
+          sub: subGroup.id,
+          list: activeState.list.listNumber
+        });
+      };
+    }
+
+    container.querySelectorAll('.mcq-mini-step-btn[data-step-idx]').forEach((tabBtn) => {
+      tabBtn.onclick = () => {
+        const nextIdx = parseInt(tabBtn.dataset.stepIdx, 10) || 0;
+        state.mcqActiveStepMap[mapKey] = nextIdx;
+        renderMcqListSelectionView(container, group.id, subGroup.id);
+      };
+    });
+
+    const toggleBtn = container.querySelector('#btn-mcq-horizon-toggle');
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        state.mcqShowAllListsMap[showAllKey] = !isShowAll;
+        renderMcqListSelectionView(container, group.id, subGroup.id);
+      };
+    }
+
+    container.querySelectorAll('.mcq-list-row').forEach((row) => {
+      row.onclick = () => {
+        const isUnlocked = row.dataset.unlocked === '1';
+        const listNum = parseInt(row.dataset.listNum, 10) || 1;
+        if (!isUnlocked) {
+          row.classList.remove('mcq-lock-shake');
+          void row.offsetWidth;
+          row.classList.add('mcq-lock-shake');
+          showToast('এই লিস্ট খুলতে আগের লিস্টে শতভাগ সঠিক উত্তর দিন', 2600, 'warning');
+          return;
+        }
+        navigateTo('practice', {
+          engine: 'mcq-list',
+          group: group.id,
+          sub: subGroup.id,
+          list: listNum
+        });
+      };
+    });
+  }
+
+  // Launch an MCQ Exam for a Specific Frequency List
+  async function startMcqListExam(groupId, subGroupId, listNumber) {
+    const stage = document.getElementById('practice-drill-stage');
+    stage.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let ctx;
+    try {
+      ctx = await loadMcqRoadmapContext();
+    } catch (err) {
+      renderMcqRoadmapError(stage, () => startMcqListExam(groupId, subGroupId, listNumber));
+      return;
+    }
+
+    const { hierarchy, progressMap, passedMap } = ctx;
+    const FG = window.McqFrequencyGroups;
+    const group = FG.findGroup(hierarchy, groupId);
+    if (!group) {
+      navigateTo('practice', { engine: 'mcq-groups' }, false);
+      return;
+    }
+    const subGroup = FG.findSubGroup(group, subGroupId || 'main');
+    if (!subGroup) {
+      navigateTo('practice', { engine: 'mcq-group', group: group.id }, false);
+      return;
+    }
+
+    const states = FG.computeSubGroupListStates(subGroup.lists, progressMap, passedMap);
+    const targetNum = parseInt(listNumber, 10) || 1;
+    const targetState = states.find((s) => s.list.listNumber === targetNum) || states[0];
+
+    if (!targetState) {
+      navigateTo('practice', { engine: 'mcq-lists', group: group.id, sub: subGroup.id }, false);
+      return;
+    }
+
+    // Strict progression guard (blocks direct URL jump to locked list)
+    if (!targetState.isUnlocked) {
+      showToast('এই লিস্টটি এখনো লক করা আছে। আগের লিস্টটি ১০০% সঠিক উত্তরে সম্পন্ন করুন।', 2800, 'warning');
+      navigateTo('practice', { engine: 'mcq-lists', group: group.id, sub: subGroup.id }, false);
+      return;
+    }
+
+    const listObj = targetState.list;
+    const nextListObj = subGroup.lists.find((l) => l.listNumber === listObj.listNumber + 1) || null;
+
+    const listWords = listObj.words.map((w) => {
+      const parts = String(w.key || '1:1:1').split(':').map((n) => parseInt(n, 10));
+      const sNum = parts[0] || 1;
+      const aNum = parts[1] || 1;
+      return {
+        key: w.key,
+        arabic: w.arabic,
+        meaning_bn: w.meaning_bn,
+        root: w.root || '',
+        occurrenceCount: w.occurrenceCount,
+        juz: w.juz,
+        surah: sNum,
+        ayah: aNum,
+        verse_key: `${sNum}:${aNum}`
+      };
+    });
+
+    const listDistractors = FG.buildDistractorPoolForList(hierarchy, group.id, listWords);
+
+    const mcqListMeta = {
+      groupId: group.id,
+      groupOrder: group.order,
+      groupTitleBn: group.titleBn,
+      groupRangeBn: group.rangeLabelBn,
+      subGroupId: subGroup.id,
+      subGroupTitleBn: subGroup.titleBn,
+      isDirectGroup: group.subMode === 'direct',
+      listNumber: listObj.listNumber,
+      listKey: listObj.listKey,
+      totalWords: listObj.totalWords,
+      nextListNumber: nextListObj ? nextListObj.listNumber : null
+    };
+
+    setPracticeTopbar(
+      `লিস্ট ${toBnNumber(listObj.listNumber)} • ${group.subMode === 'direct' ? group.titleBn : subGroup.titleBn}`,
+      'শতভাগ (১০০%) সঠিক উত্তরে পরবর্তী লিস্ট আনলক'
+    );
+
+    await startPracticeDrill('mcq', null, null, listWords, mcqListMeta, listDistractors);
+  }
+
+  // ============================================================
+  // AYAH WORD QUIZ ROADMAP (114 SURAHS • SEQUENTIAL AYAH UNLOCK)
+  // ============================================================
+
+  function renderAyahRoadmapError(container, onRetry, backParams) {
+    container.innerHTML = `
+      <div class="card mcq-roadmap-error-card">
+        <span class="icon mcq-roadmap-error-icon">${Icons.warning}</span>
+        <h3>সূরার তথ্য লোড করা যায়নি</h3>
+        <p>অনুগ্রহ করে ইন্টারনেট সংযোগ যাচাই করে আবার চেষ্টা করুন, অথবা অফলাইন ডাটা ডাউনলোড করুন।</p>
+        <div class="mcq-roadmap-error-actions">
+          <button type="button" class="btn-primary" id="btn-ayah-retry-load">আবার চেষ্টা করুন</button>
+          <button type="button" class="btn-secondary" id="btn-ayah-back-roadmap">ফিরে যান</button>
+        </div>
+      </div>
+    `;
+    const retryBtn = container.querySelector('#btn-ayah-retry-load');
+    if (retryBtn && onRetry) retryBtn.onclick = onRetry;
+    const backBtn = container.querySelector('#btn-ayah-back-roadmap');
+    if (backBtn) backBtn.onclick = () => navigateTo('practice', backParams || { engine: 'ayah-surahs' });
+  }
+
+  // Screen 1: Ayah Quiz Surah List (All 114 Surahs with Completed Ayahs Count)
+  async function renderAyahQuizSurahListView(container) {
+    setPracticeTopbar('আয়াত শব্দ কুইজ', 'সূরা নির্বাচন করুন');
+    container.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let surahsMeta;
+    let passedMap;
+    try {
+      [surahsMeta, passedMap] = await Promise.all([
+        QuranDB.getSurahsMeta(),
+        typeof QuranDB.getAyahQuizPassedMap === 'function' ? QuranDB.getAyahQuizPassedMap() : Promise.resolve({})
+      ]);
+    } catch (err) {
+      renderAyahRoadmapError(container, () => renderAyahQuizSurahListView(container), { engine: null });
+      return;
+    }
+
+    const AQR = window.AyahQuizRoadmap;
+    if (!AQR) {
+      renderAyahRoadmapError(container, () => renderAyahQuizSurahListView(container), { engine: null });
+      return;
+    }
+
+    const allRows = AQR.buildAyahQuizSurahRows(surahsMeta, passedMap);
+    const overview = AQR.computeGlobalAyahQuizOverview(allRows);
+    const resume = AQR.findRecommendedResumeAyah(allRows);
+
+    const inProgressCount = allRows.filter((r) => r.isStarted && !r.isComplete).length;
+    const completedCount = allRows.filter((r) => r.isComplete).length;
+
+    const resumeHtml = resume ? `
+      <button type="button" class="mcq-resume-card" id="btn-ayah-quiz-resume" aria-label="চলমান আয়াত কুইজ চালু করুন">
+        <span class="mcq-resume-icon" aria-hidden="true">${Icons.play}</span>
+        <span class="mcq-resume-body">
+          <span class="mcq-resume-kicker">${resume.isSurahStarted ? 'চলমান আয়াত কুইজ' : 'শুরু করার পরামর্শ'}</span>
+          <strong class="mcq-resume-title">সূরা ${toBnNumber(resume.surah)}: ${resume.surahNameBn} · আয়াত ${toBnNumber(resume.ayah)}</strong>
+          <span class="mcq-resume-sub tabular-nums">${toBnNumber(resume.completedAyahs)}/${toBnNumber(resume.totalAyahs)} আয়াত সম্পন্ন</span>
+        </span>
+        <span class="mcq-resume-arrow" aria-hidden="true">${Icons.chevronRight}</span>
+      </button>
+    ` : '';
+
+    const activeFilter = state.ayahQuizFilter || 'all';
+    const currentQuery = state.ayahQuizSearch || '';
+    const escAttr = (s) => String(s || '').replace(/"/g, '&quot;');
+
+    container.innerHTML = `
+      <div class="mcq-roadmap-wrap ayah-roadmap-wrap">
+        <section class="mcq-overview-card" aria-label="আয়াত কুইজ সারসংক্ষেপ">
+          <div class="mcq-overview-grid">
+            <div class="mcq-overview-metric">
+              <span class="mcq-metric-label">সম্পন্ন আয়াত</span>
+              <strong class="mcq-metric-value tabular-nums">${formatBnInt(overview.completedAyahs)} <small>/ ${formatBnInt(overview.totalAyahs)}</small></strong>
+            </div>
+            <div class="mcq-overview-metric">
+              <span class="mcq-metric-label">সম্পন্ন সূরা</span>
+              <strong class="mcq-metric-value tabular-nums">${toBnNumber(overview.completedSurahs)} <small>/ ${toBnNumber(overview.totalSurahs)}</small></strong>
+            </div>
+            <div class="mcq-overview-metric">
+              <span class="mcq-metric-label">মোট অগ্রগতি</span>
+              <strong class="mcq-metric-value mcq-metric-accent tabular-nums">${toBnNumber(overview.pct)}%</strong>
+            </div>
+          </div>
+          <div class="mcq-progress-track mcq-progress-track-lg" aria-hidden="true">
+            <div class="mcq-progress-fill" style="width:${Math.min(100, overview.pct)}%"></div>
+          </div>
+          <div class="mcq-unlock-rule-note">
+            <span class="icon" aria-hidden="true">${Icons.unlock}</span>
+            <span>সব সূরার প্রথম আয়াত খোলা থাকে। আগের আয়াত সম্পন্ন করলে পরবর্তী আয়াত এক এক করে আনলক হবে।</span>
+          </div>
+        </section>
+
+        ${resumeHtml}
+
+        <div class="ayah-quiz-controls">
+          <div class="ayah-quiz-search-box">
+            <span class="ayah-quiz-search-icon" aria-hidden="true">${Icons.search}</span>
+            <input
+              type="text"
+              class="ayah-quiz-search-input"
+              id="ayah-quiz-search-input"
+              value="${escAttr(currentQuery)}"
+              placeholder="সূরা খুঁজুন (নাম বা নম্বর)…"
+              autocomplete="off"
+              aria-label="আয়াত কুইজের জন্য সূরা খুঁজুন"
+            >
+            <button
+              type="button"
+              class="ayah-quiz-search-clear"
+              id="ayah-quiz-search-clear"
+              style="display:${currentQuery ? 'grid' : 'none'}"
+              aria-label="অনুসন্ধান মুছুন"
+            >
+              <span class="icon">${Icons.close}</span>
+            </button>
+          </div>
+
+          <div class="ayah-quiz-filter-tabs" role="tablist" aria-label="সূরা ফিল্টার">
+            <button type="button" class="ayah-quiz-filter-btn ${activeFilter === 'all' ? 'active' : ''}" data-filter="all" role="tab" aria-selected="${activeFilter === 'all'}">
+              <span>সব</span>
+              <span class="tabular-nums">${toBnNumber(allRows.length)}</span>
+            </button>
+            <button type="button" class="ayah-quiz-filter-btn ${activeFilter === 'in-progress' ? 'active' : ''}" data-filter="in-progress" role="tab" aria-selected="${activeFilter === 'in-progress'}">
+              <span>চলমান</span>
+              <span class="tabular-nums">${toBnNumber(inProgressCount)}</span>
+            </button>
+            <button type="button" class="ayah-quiz-filter-btn ${activeFilter === 'completed' ? 'active' : ''}" data-filter="completed" role="tab" aria-selected="${activeFilter === 'completed'}">
+              <span>সম্পন্ন</span>
+              <span class="tabular-nums">${toBnNumber(completedCount)}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ayah-surah-grid" id="ayah-quiz-surah-grid"></div>
+      </div>
+    `;
+
+    const gridEl = container.querySelector('#ayah-quiz-surah-grid');
+    const searchInput = container.querySelector('#ayah-quiz-search-input');
+    const clearBtn = container.querySelector('#ayah-quiz-search-clear');
+
+    function renderFilteredSurahGrid() {
+      const filtered = AQR.filterAyahQuizSurahs(allRows, state.ayahQuizSearch, state.ayahQuizFilter);
+      if (filtered.length === 0) {
+        const emptyTitle = state.ayahQuizFilter === 'completed'
+          ? 'এখনো কোনো সূরা সম্পূর্ণ হয়নি'
+          : state.ayahQuizFilter === 'in-progress'
+            ? 'এখনো কোনো চলমান সূরা নেই'
+            : 'কোনো সূরা পাওয়া যায়নি';
+        const emptyDesc = state.ayahQuizSearch
+          ? 'আপনার সার্চ শব্দের সাথে মিল রেখে কোনো সূরা পাওয়া যায়নি।'
+          : 'যেকোনো সূরার প্রথম আয়াত দিয়ে কুইজ শুরু করলে এখানে অগ্রগতি দেখাবে।';
+
+        gridEl.innerHTML = `
+          <div class="card ayah-quiz-empty-state">
+            <h3 class="ayah-quiz-empty-title">${emptyTitle}</h3>
+            <p class="ayah-quiz-empty-desc">${emptyDesc}</p>
+            <button type="button" class="btn-secondary ayah-quiz-reset-btn" id="btn-ayah-filter-reset">সব সূরা দেখুন</button>
+          </div>
+        `;
+        const resetBtn = gridEl.querySelector('#btn-ayah-filter-reset');
+        if (resetBtn) {
+          resetBtn.onclick = () => {
+            state.ayahQuizSearch = '';
+            state.ayahQuizFilter = 'all';
+            if (searchInput) searchInput.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+            container.querySelectorAll('.ayah-quiz-filter-btn').forEach((b) => {
+              const isAll = b.dataset.filter === 'all';
+              b.classList.toggle('active', isAll);
+              b.setAttribute('aria-selected', isAll ? 'true' : 'false');
+            });
+            renderFilteredSurahGrid();
+          };
+        }
+        return;
+      }
+
+      gridEl.innerHTML = filtered.map((row) => {
+        const statusText = row.isComplete
+          ? 'সম্পন্ন'
+          : row.isStarted
+            ? 'চলমান'
+            : 'খোলা';
+        const cardStateClass = row.isComplete
+          ? 'is-complete'
+          : row.isStarted
+            ? 'is-started'
+            : '';
+
+        return `
+          <button
+            type="button"
+            class="ayah-surah-card ${cardStateClass}"
+            data-surah-num="${row.surah}"
+            aria-label="সূরা ${toBnNumber(row.surah)} ${row.nameBnScript}, ${toBnNumber(row.totalAyahs)} এর মধ্যে ${toBnNumber(row.completedAyahs)} আয়াত সম্পন্ন"
+          >
+            <span class="ayah-surah-num tabular-nums">${toBnNumber(row.surah)}</span>
+            <div class="ayah-surah-main">
+              <div class="ayah-surah-top">
+                <div class="ayah-surah-names">
+                  <strong class="ayah-surah-title">${row.nameBnScript}</strong>
+                  <span class="ayah-surah-sub">${row.nameBn ? `${row.nameBn} · ` : ''}${row.revelationBn}</span>
+                </div>
+                <span class="ayah-surah-ar" dir="rtl">${row.nameArabic}</span>
+              </div>
+              <div class="mcq-progress-track" aria-hidden="true">
+                <div class="mcq-progress-fill" style="width:${row.pct}%"></div>
+              </div>
+              <div class="ayah-surah-footer tabular-nums">
+                <span class="ayah-surah-count"><strong>${toBnNumber(row.completedAyahs)}/${toBnNumber(row.totalAyahs)}</strong> আয়াত সম্পন্ন</span>
+                <span class="ayah-surah-status-wrap">
+                  <span class="ayah-surah-status">${statusText}</span>
+                  <span class="mcq-card-chevron" aria-hidden="true">${Icons.chevronRight}</span>
+                </span>
+              </div>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      gridEl.querySelectorAll('.ayah-surah-card[data-surah-num]').forEach((card) => {
+        card.onclick = () => {
+          const sNum = parseInt(card.dataset.surahNum, 10) || 1;
+          navigateTo('practice', { engine: 'ayah-list', surah: sNum });
+        };
+      });
+    }
+
+    renderFilteredSurahGrid();
+
+    const resumeBtn = container.querySelector('#btn-ayah-quiz-resume');
+    if (resumeBtn && resume) {
+      resumeBtn.onclick = () => {
+        navigateTo('practice', { engine: 'ayah-quiz', surah: resume.surah, ayah: resume.ayah });
+      };
+    }
+
+    if (searchInput) {
+      searchInput.oninput = () => {
+        state.ayahQuizSearch = searchInput.value;
+        if (clearBtn) clearBtn.style.display = state.ayahQuizSearch ? 'grid' : 'none';
+        renderFilteredSurahGrid();
+      };
+    }
+
+    if (clearBtn) {
+      clearBtn.onclick = () => {
+        state.ayahQuizSearch = '';
+        if (searchInput) {
+          searchInput.value = '';
+          searchInput.focus();
+        }
+        clearBtn.style.display = 'none';
+        renderFilteredSurahGrid();
+      };
+    }
+
+    container.querySelectorAll('.ayah-quiz-filter-btn[data-filter]').forEach((btn) => {
+      btn.onclick = () => {
+        state.ayahQuizFilter = btn.dataset.filter || 'all';
+        container.querySelectorAll('.ayah-quiz-filter-btn').forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        renderFilteredSurahGrid();
+      };
+    });
+  }
+
+  // Screen 2: Per-Surah Ayah List with Progressive Sequential Unlock
+  async function renderAyahQuizListView(container, surahNumber) {
+    const sNum = parseInt(surahNumber, 10);
+    if (!sNum || sNum < 1 || sNum > 114) {
+      navigateTo('practice', { engine: 'ayah-surahs' }, false);
+      return;
+    }
+
+    setPracticeTopbar(`সূরা ${toBnNumber(sNum)}`, 'আয়াত তালিকা লোড হচ্ছে…');
+    container.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let surahMeta;
+    let surahData;
+    let progressMap;
+    let passedMap;
+    try {
+      [surahMeta, surahData, progressMap, passedMap] = await Promise.all([
+        QuranDB.getSurahMeta(sNum),
+        QuranDB.loadSurah(sNum),
+        typeof QuranDB.getAllWordProgressMap === 'function' ? QuranDB.getAllWordProgressMap() : Promise.resolve({}),
+        typeof QuranDB.getAyahQuizPassedMap === 'function' ? QuranDB.getAyahQuizPassedMap() : Promise.resolve({})
+      ]);
+    } catch (err) {
+      renderAyahRoadmapError(container, () => renderAyahQuizListView(container, sNum), { engine: 'ayah-surahs' });
+      return;
+    }
+
+    const AQR = window.AyahQuizRoadmap;
+    if (!AQR || !surahData || !Array.isArray(surahData.ayahs)) {
+      renderAyahRoadmapError(container, () => renderAyahQuizListView(container, sNum), { engine: 'ayah-surahs' });
+      return;
+    }
+
+    const surahName = (surahMeta && (surahMeta.name_bn_script || surahMeta.name_bn)) || `সূরা ${toBnNumber(sNum)}`;
+    const surahArabic = (surahMeta && surahMeta.name_arabic) || '';
+    const revelationBn = (surahMeta && surahMeta.revelation_bn) || '';
+    setPracticeTopbar(surahName, `সূরা ${toBnNumber(sNum)} • আয়াত শব্দ কুইজ`);
+
+    const summary = AQR.computeSurahAyahSummary(sNum, surahData.ayahs, progressMap, passedMap);
+    const activeState = summary.states.find((s) => s.isActive)
+      || summary.states.find((s) => s.isUnlocked && !s.isPassed)
+      || summary.states[0];
+
+    const steps = AQR.buildAyahMiniSteps(summary.states, 20);
+    const hasMiniSteps = steps.length > 1;
+
+    let activeStepIdx = state.ayahQuizStepMap[sNum];
+    if (typeof activeStepIdx !== 'number' || activeStepIdx < 0 || activeStepIdx >= steps.length) {
+      const foundIdx = steps.findIndex((st) => st.hasActive);
+      activeStepIdx = foundIdx >= 0 ? foundIdx : 0;
+      state.ayahQuizStepMap[sNum] = activeStepIdx;
+    }
+
+    const currentStep = steps[activeStepIdx] || steps[0];
+
+    const miniStepsHtml = hasMiniSteps ? `
+      <div class="mcq-mini-steps-bar" role="tablist" aria-label="আয়াত ধাপসমূহ">
+        ${steps.map((step) => `
+          <button
+            type="button"
+            class="mcq-mini-step-btn ${step.stepIndex === activeStepIdx ? 'active' : ''} ${step.passedCount >= step.totalCount ? 'is-complete' : ''}"
+            data-step-idx="${step.stepIndex}"
+            role="tab"
+            aria-selected="${step.stepIndex === activeStepIdx ? 'true' : 'false'}"
+          >
+            <span class="tabular-nums">${step.labelBn}</span>
+            <small class="tabular-nums">${toBnNumber(step.passedCount)}/${toBnNumber(step.totalCount)}</small>
+          </button>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const ayahRowsHtml = (currentStep ? currentStep.items : []).map((st) => {
+      const statusIcon = st.isPassed
+        ? Icons.checkCircle
+        : st.isUnlocked
+          ? Icons.play
+          : Icons.lock;
+      const statusLabel = st.isPassed
+        ? 'সম্পন্ন'
+        : st.isUnlocked
+          ? (st.learnedCount > 0 ? 'চলমান' : 'খোলা')
+          : 'লক';
+      const rowClass = st.isPassed
+        ? 'is-passed'
+        : st.isUnlocked
+          ? 'is-active'
+          : 'is-locked';
+
+      return `
+        <button
+          type="button"
+          class="mcq-list-row ayah-list-row ${rowClass}"
+          data-ayah-num="${st.ayah}"
+          data-unlocked="${st.isUnlocked ? '1' : '0'}"
+          aria-label="আয়াত ${toBnNumber(st.ayah)}, মোট ${toBnNumber(st.totalWords)} শব্দের মধ্যে ${toBnNumber(st.learnedCount)} শব্দ শেখা হয়েছে, অবস্থা ${statusLabel}"
+        >
+          <span class="mcq-list-status-icon" aria-hidden="true">${statusIcon}</span>
+          <div class="mcq-list-main">
+            <div class="mcq-list-title-row">
+              <strong class="mcq-list-title tabular-nums">আয়াত ${toBnNumber(st.ayah)}</strong>
+              <span class="mcq-list-word-count tabular-nums">${toBnNumber(st.totalWords)} শব্দ</span>
+            </div>
+            <div class="mcq-list-preview-ar" dir="rtl">${st.arabic}</div>
+            <div class="mcq-progress-track" aria-hidden="true">
+              <div class="mcq-progress-fill" style="width:${st.pct}%"></div>
+            </div>
+          </div>
+          <div class="mcq-list-right">
+            <strong class="mcq-list-fraction tabular-nums">${toBnNumber(st.learnedCount)}/${toBnNumber(st.totalWords)}</strong>
+            <span class="mcq-list-status-text">${statusLabel}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    const activeCtaHtml = activeState ? `
+      <button type="button" class="btn-primary mcq-start-active-btn" id="btn-ayah-start-active">
+        <span class="icon" aria-hidden="true">${Icons.play}</span>
+        <span>${activeState.isPassed
+          ? `আয়াত ${toBnNumber(activeState.ayah)} আবার অনুশীলন করুন`
+          : `আয়াত ${toBnNumber(activeState.ayah)} শুরু করুন (${toBnNumber(activeState.learnedCount)}/${toBnNumber(activeState.totalWords)} শব্দ)`}</span>
+      </button>
+    ` : '';
+
+    container.innerHTML = `
+      <div class="mcq-roadmap-wrap ayah-roadmap-wrap">
+        <section class="mcq-sub-hero-card">
+          <div class="mcq-sub-hero-top">
+            <div>
+              <span class="mcq-group-order tabular-nums">সূরা ${toBnNumber(sNum)}${revelationBn ? ` · ${revelationBn}` : ''}</span>
+              <h2 class="mcq-sub-hero-title">
+                ${surahName}
+                ${surahArabic ? `<span class="ayah-hero-ar" dir="rtl">${surahArabic}</span>` : ''}
+              </h2>
+            </div>
+            <strong class="mcq-sub-hero-pct tabular-nums">${toBnNumber(summary.pct)}%</strong>
+          </div>
+          <div class="mcq-progress-track mcq-progress-track-lg" aria-hidden="true">
+            <div class="mcq-progress-fill" style="width:${summary.pct}%"></div>
+          </div>
+          <div class="mcq-group-card-meta tabular-nums">
+            <span>সম্পন্ন আয়াত: <strong>${toBnNumber(summary.completedAyahs)}/${toBnNumber(summary.totalAyahs)}</strong></span>
+            <span>শেখা শব্দ: <strong>${formatBnInt(summary.learnedWords)}/${formatBnInt(summary.totalWords)}</strong></span>
+          </div>
+          <div class="mcq-unlock-rule-note">
+            <span class="icon" aria-hidden="true">${Icons.unlock}</span>
+            <span>প্রতিটি সূরার প্রথম আয়াত খোলা থাকে। প্রতিটি আয়াতের কুইজে শতভাগ (১০০%) সঠিক উত্তর দিলে পরবর্তী আয়াত আনলক হবে।</span>
+          </div>
+          ${activeCtaHtml}
+        </section>
+
+        ${miniStepsHtml}
+
+        <div class="mcq-lists-stack" id="ayah-quiz-lists-stack">
+          ${ayahRowsHtml}
+        </div>
+      </div>
+    `;
+
+    const startActiveBtn = container.querySelector('#btn-ayah-start-active');
+    if (startActiveBtn && activeState) {
+      startActiveBtn.onclick = () => {
+        navigateTo('practice', {
+          engine: 'ayah-quiz',
+          surah: sNum,
+          ayah: activeState.ayah
+        });
+      };
+    }
+
+    container.querySelectorAll('.mcq-mini-step-btn[data-step-idx]').forEach((tabBtn) => {
+      tabBtn.onclick = () => {
+        const nextIdx = parseInt(tabBtn.dataset.stepIdx, 10) || 0;
+        state.ayahQuizStepMap[sNum] = nextIdx;
+        renderAyahQuizListView(container, sNum);
+      };
+    });
+
+    container.querySelectorAll('.ayah-list-row').forEach((row) => {
+      row.onclick = () => {
+        const isUnlocked = row.dataset.unlocked === '1';
+        const ayahNum = parseInt(row.dataset.ayahNum, 10) || 1;
+        if (!isUnlocked) {
+          row.classList.remove('mcq-lock-shake');
+          void row.offsetWidth;
+          row.classList.add('mcq-lock-shake');
+          showToast('এই আয়াত খুলতে আগের আয়াতের কুইজ শতভাগ সঠিক উত্তরে সম্পন্ন করুন', 2600, 'warning');
+          return;
+        }
+        navigateTo('practice', {
+          engine: 'ayah-quiz',
+          surah: sNum,
+          ayah: ayahNum
+        });
+      };
+    });
+  }
+
+  // Screen 3: Launch Ayah Word Quiz Exam (with Strict Unlock Guard)
+  async function startAyahQuizExam(surahNumber, ayahNumber) {
+    const stage = document.getElementById('practice-drill-stage');
+    const sNum = parseInt(surahNumber, 10);
+    const aNum = parseInt(ayahNumber, 10) || 1;
+    if (!sNum || sNum < 1 || sNum > 114) {
+      navigateTo('practice', { engine: 'ayah-surahs' }, false);
+      return;
+    }
+
+    stage.innerHTML = '<div class="loading-spinner" style="margin:48px auto"></div>';
+
+    let surahMeta;
+    let surahData;
+    let progressMap;
+    let passedMap;
+    try {
+      [surahMeta, surahData, progressMap, passedMap] = await Promise.all([
+        QuranDB.getSurahMeta(sNum),
+        QuranDB.loadSurah(sNum),
+        typeof QuranDB.getAllWordProgressMap === 'function' ? QuranDB.getAllWordProgressMap() : Promise.resolve({}),
+        typeof QuranDB.getAyahQuizPassedMap === 'function' ? QuranDB.getAyahQuizPassedMap() : Promise.resolve({})
+      ]);
+    } catch (err) {
+      renderAyahRoadmapError(stage, () => startAyahQuizExam(sNum, aNum), { engine: 'ayah-list', surah: sNum });
+      return;
+    }
+
+    const AQR = window.AyahQuizRoadmap;
+    if (!AQR || !surahData || !Array.isArray(surahData.ayahs)) {
+      renderAyahRoadmapError(stage, () => startAyahQuizExam(sNum, aNum), { engine: 'ayah-list', surah: sNum });
+      return;
+    }
+
+    const summary = AQR.computeSurahAyahSummary(sNum, surahData.ayahs, progressMap, passedMap);
+    const targetState = summary.states.find((s) => s.ayah === aNum) || summary.states[0];
+    if (!targetState) {
+      navigateTo('practice', { engine: 'ayah-list', surah: sNum }, false);
+      return;
+    }
+
+    // Strict progression guard (blocks direct URL jump to locked ayah)
+    if (!targetState.isUnlocked) {
+      showToast('এই আয়াতটি এখনো লক করা আছে। আগের আয়াতের কুইজ ১০০% সঠিক উত্তরে সম্পন্ন করুন।', 2800, 'warning');
+      navigateTo('practice', { engine: 'ayah-list', surah: sNum }, false);
+      return;
+    }
+
+    const rawAyah = surahData.ayahs.find((a) => parseInt(a.ayah, 10) === targetState.ayah);
+    const eligibleWords = AQR.getQuizEligibleWords(rawAyah);
+    const ayahWords = eligibleWords.map((w) => ({
+      ...w,
+      surah: sNum,
+      ayah: targetState.ayah,
+      verse_key: (rawAyah && rawAyah.verse_key) || `${sNum}:${targetState.ayah}`,
+      ayah_arabic: (rawAyah && rawAyah.arabic) || '',
+      ayah_translation_bn: (rawAyah && rawAyah.translation_bn) || ''
+    }));
+
+    // Build rich distractor pool from the whole surah (plus Surah 1 fallback if short surah)
+    const distractorPool = [];
+    for (const a of surahData.ayahs) {
+      for (const w of (a.words || [])) {
+        if (w && w.meaning_bn && w.meaning_bn.trim()) {
+          distractorPool.push(w);
+        }
+      }
+    }
+    if (distractorPool.length < 16 && sNum !== 1) {
+      try {
+        const s1 = await QuranDB.loadSurah(1);
+        for (const a of (s1 && s1.ayahs) || []) {
+          for (const w of (a.words || [])) {
+            if (w && w.meaning_bn && w.meaning_bn.trim()) {
+              distractorPool.push(w);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    const surahName = (surahMeta && (surahMeta.name_bn_script || surahMeta.name_bn)) || `সূরা ${toBnNumber(sNum)}`;
+    const ayahQuizMeta = {
+      surah: sNum,
+      surahNameBn: surahName,
+      ayah: targetState.ayah,
+      totalAyahs: summary.totalAyahs,
+      totalWords: ayahWords.length,
+      nextAyahNumber: targetState.ayah < summary.totalAyahs ? targetState.ayah + 1 : null,
+      nextSurahNumber: sNum < 114 ? sNum + 1 : null
+    };
+
+    setPracticeTopbar(
+      `${surahName} • আয়াত ${toBnNumber(targetState.ayah)}`,
+      'শতভাগ (১০০%) সঠিক উত্তরে পরবর্তী আয়াত আনলক'
+    );
+
+    await startPracticeDrill('mcq', sNum, targetState.ayah, ayahWords, null, distractorPool, ayahQuizMeta);
   }
 
   // ============================================================
@@ -3431,7 +4779,7 @@
   }
 
   // Active Drill Execution
-  async function startPracticeDrill(engine, surahNumber, ayahNumber = null, customDeckWords = null) {
+  async function startPracticeDrill(engine, surahNumber, ayahNumber = null, customDeckWords = null, mcqListMeta = null, customDistractorPool = null, ayahQuizMeta = null) {
     const stage = document.getElementById('practice-drill-stage');
     stage.innerHTML = '<div class="loading-spinner" style="margin:40px auto"></div>';
 
@@ -3440,15 +4788,19 @@
     }
 
     let words = [];
-    let globalDistractorPool = [];
+    let globalDistractorPool = Array.isArray(customDistractorPool) ? customDistractorPool.slice() : [];
     let drillHeaderTitle = '';
     const isFlashcardMode = engine === 'saved-flashcard' || engine === 'flashcard';
-    const isGlobalFrequencyMode = !surahNumber && !ayahNumber && !Array.isArray(customDeckWords)
+    const isGlobalFrequencyMode = !surahNumber && !ayahNumber && !Array.isArray(customDeckWords) && !mcqListMeta && !ayahQuizMeta
       && (engine === 'mcq' || engine === 'fill' || engine === 'flashcard');
 
     if (Array.isArray(customDeckWords) && customDeckWords.length > 0) {
       words = customDeckWords.slice();
-      drillHeaderTitle = engine === 'saved-flashcard' ? 'সংরক্ষিত শব্দের ফ্ল্যাশকার্ড' : 'ফ্ল্যাশকার্ড অনুশীলন';
+      drillHeaderTitle = mcqListMeta
+        ? `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • ${mcqListMeta.isDirectGroup ? mcqListMeta.groupTitleBn : mcqListMeta.subGroupTitleBn}`
+        : ayahQuizMeta
+          ? `${ayahQuizMeta.surahNameBn} • আয়াত ${toBnNumber(ayahQuizMeta.ayah)}`
+          : (engine === 'saved-flashcard' ? 'সংরক্ষিত শব্দের ফ্ল্যাশকার্ড' : 'ফ্ল্যাশকার্ড অনুশীলন');
     } else if (engine === 'saved-flashcard') {
       const bookmarks = await QuranDB.getBookmarksList();
       if (bookmarks.length === 0) {
@@ -3732,6 +5084,7 @@
     let score = 0;
     const ratingCounts = { again: 0, hard: 0, good: 0, easy: 0 };
     const missedFlashcards = [];
+    const missedMcqWords = [];
 
     function renderQuestion() {
       if (currentIndex >= drillSet.length) {
@@ -3743,7 +5096,11 @@
       const progressPercent = Math.round((currentIndex / drillSet.length) * 100);
 
       let titleText;
-      if (engine === 'saved-flashcard') {
+      if (mcqListMeta) {
+        titleText = `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • প্রশ্ন ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
+      } else if (ayahQuizMeta) {
+        titleText = `আয়াত ${toBnNumber(ayahQuizMeta.surah)}:${toBnNumber(ayahQuizMeta.ayah)} • শব্দ ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
+      } else if (engine === 'saved-flashcard') {
         titleText = `সংরক্ষিত ফ্ল্যাশকার্ড ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
       } else if (engine === 'flashcard') {
         titleText = `ফ্ল্যাশকার্ড ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
@@ -3759,7 +5116,7 @@
           <span style="font-family:var(--font-bangla);font-size:0.85rem;font-weight:600">
             ${titleText}
           </span>
-          <span style="font-size:0.85rem;font-weight:700;color:var(--color-primary)">${toBnNumber(score)} আয়ত্ত</span>
+          <span class="tabular-nums" style="font-size:0.85rem;font-weight:700;color:var(--color-primary)">${toBnNumber(score)} আয়ত্ত</span>
         </div>
         <div class="drill-progress-bar">
           <div class="drill-progress-fill" style="width:${progressPercent}%"></div>
@@ -3768,6 +5125,21 @@
       `;
 
       stage.querySelector('#drill-exit-btn').onclick = () => {
+        if (mcqListMeta) {
+          navigateTo('practice', {
+            engine: 'mcq-lists',
+            group: mcqListMeta.groupId,
+            sub: mcqListMeta.subGroupId
+          });
+          return;
+        }
+        if (ayahQuizMeta) {
+          navigateTo('practice', {
+            engine: 'ayah-list',
+            surah: ayahQuizMeta.surah
+          });
+          return;
+        }
         navigateTo('practice', { surah: surahNumber, engine: null });
       };
 
@@ -4195,6 +5567,7 @@
               }
             });
 
+            missedMcqWords.push(q);
             await QuranDB.recordSpacedRepetition(q.key, 1, q);
           }
 
@@ -4244,8 +5617,268 @@
     }
 
     // Summary screen
-    function renderDrillSummary(finalScore, total) {
+    async function renderDrillSummary(finalScore, total) {
       const percent = total > 0 ? Math.round((finalScore / total) * 100) : 0;
+
+      // Dedicated Strict-100% Frequency List Exam Summary
+      if (mcqListMeta) {
+        const passed = window.McqFrequencyGroups
+          ? window.McqFrequencyGroups.didPassMcqListExam(finalScore, total)
+          : (total > 0 && finalScore === total);
+
+        if (passed && typeof QuranDB.markMcqListPassed === 'function') {
+          await QuranDB.markMcqListPassed(mcqListMeta.listKey, finalScore, total);
+        }
+
+        const remainingNeeded = Math.max(0, total - finalScore);
+        const contextLabel = mcqListMeta.isDirectGroup
+          ? `গ্রুপ ${toBnNumber(mcqListMeta.groupOrder)}: ${mcqListMeta.groupTitleBn} · লিস্ট ${toBnNumber(mcqListMeta.listNumber)}`
+          : `${mcqListMeta.subGroupTitleBn} · লিস্ট ${toBnNumber(mcqListMeta.listNumber)}`;
+
+        const missedListHtml = (!passed && missedMcqWords.length > 0) ? `
+          <div class="mcq-missed-review">
+            <div class="mcq-missed-review-header">ভুল হওয়া শব্দগুলো দেখে নিন (${toBnNumber(missedMcqWords.length)}টি)</div>
+            <ul class="mcq-missed-review-list">
+              ${missedMcqWords.map((mw) => `
+                <li class="mcq-missed-review-item">
+                  <span class="mcq-missed-ar" dir="rtl">${mw.arabic}</span>
+                  <span class="mcq-missed-bn">${mw.meaning_bn}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : '';
+
+        const primaryActionHtml = passed && mcqListMeta.nextListNumber
+          ? `
+            <button type="button" class="btn-primary mcq-summary-btn" id="btn-mcq-next-list">
+              <span>পরবর্তী লিস্ট শুরু করুন (লিস্ট ${toBnNumber(mcqListMeta.nextListNumber)})</span>
+              <span class="icon" aria-hidden="true">${Icons.arrowRight}</span>
+            </button>
+          `
+          : `
+            <button type="button" class="btn-primary mcq-summary-btn" id="btn-drill-again">
+              <span class="icon" aria-hidden="true">${Icons.repeat}</span>
+              <span>${passed ? 'আবার অনুশীলন করুন' : 'আবার চেষ্টা করুন'}</span>
+            </button>
+          `;
+
+        const secondaryRetryHtml = passed && mcqListMeta.nextListNumber ? `
+          <button type="button" class="btn-secondary mcq-summary-btn" id="btn-drill-again">
+            <span class="icon" aria-hidden="true">${Icons.repeat}</span>
+            <span>এই লিস্ট পুনরায় দিন</span>
+          </button>
+        ` : '';
+
+        stage.innerHTML = `
+          <div class="practice-container mcq-summary-stage">
+            <div class="card mcq-summary-card ${passed ? 'is-passed' : 'is-incomplete'}">
+              <div class="mcq-summary-icon ${passed ? 'passed' : 'incomplete'}" aria-hidden="true">
+                ${passed ? Icons.checkCircle : Icons.lock}
+              </div>
+              <span class="mcq-summary-context">${contextLabel}</span>
+              <h2 class="mcq-summary-title">
+                ${passed
+                  ? (mcqListMeta.nextListNumber
+                    ? `মাশাআল্লাহ! লিস্ট ${toBnNumber(mcqListMeta.nextListNumber)} আনলক হয়েছে!`
+                    : 'আলহামদুলিল্লাহ! এই অধ্যায়ের সব লিস্ট সম্পন্ন!')
+                  : `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} এখনো সম্পন্ন হয়নি`}
+              </h2>
+              <div class="mcq-summary-score tabular-nums">
+                ${toBnNumber(finalScore)} / ${toBnNumber(total)} <span>(${toBnNumber(percent)}%)</span>
+              </div>
+              <p class="mcq-summary-desc">
+                ${passed
+                  ? 'আপনি শতভাগ (১০০%) সঠিক উত্তর দিয়েছেন। আপনার অগ্রগতি সংরক্ষিত হয়েছে।'
+                  : `পরবর্তী লিস্ট আনলক করতে শতভাগ (১০০%) সঠিক উত্তর প্রয়োজন — আরও ${toBnNumber(remainingNeeded)}টি সঠিক উত্তর লাগবে।`}
+              </p>
+
+              ${missedListHtml}
+
+              <div class="mcq-summary-actions">
+                ${primaryActionHtml}
+                ${secondaryRetryHtml}
+                <button type="button" class="btn-secondary mcq-summary-btn" id="btn-drill-finish">
+                  <span class="icon" aria-hidden="true">${Icons.arrowLeft}</span>
+                  <span>লিস্ট তালিকায় ফিরুন</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const nextBtn = stage.querySelector('#btn-mcq-next-list');
+        if (nextBtn && mcqListMeta.nextListNumber) {
+          nextBtn.onclick = () => {
+            navigateTo('practice', {
+              engine: 'mcq-list',
+              group: mcqListMeta.groupId,
+              sub: mcqListMeta.subGroupId,
+              list: mcqListMeta.nextListNumber
+            });
+          };
+        }
+
+        const againBtn = stage.querySelector('#btn-drill-again');
+        if (againBtn) {
+          againBtn.onclick = () => {
+            startMcqListExam(mcqListMeta.groupId, mcqListMeta.subGroupId, mcqListMeta.listNumber);
+          };
+        }
+
+        const finishBtn = stage.querySelector('#btn-drill-finish');
+        if (finishBtn) {
+          finishBtn.onclick = () => {
+            if (passed) {
+              delete state.mcqActiveStepMap[`${mcqListMeta.groupId}:${mcqListMeta.subGroupId}`];
+            }
+            navigateTo('practice', {
+              engine: 'mcq-lists',
+              group: mcqListMeta.groupId,
+              sub: mcqListMeta.subGroupId
+            });
+          };
+        }
+        return;
+      }
+
+      // Dedicated Strict-100% Ayah Word Quiz Exam Summary
+      if (ayahQuizMeta) {
+        const passed = window.AyahQuizRoadmap
+          ? window.AyahQuizRoadmap.didPassAyahQuiz(finalScore, total)
+          : (total > 0 && finalScore === total);
+
+        if (passed && typeof QuranDB.markAyahQuizPassed === 'function') {
+          await QuranDB.markAyahQuizPassed(ayahQuizMeta.surah, ayahQuizMeta.ayah, finalScore, total);
+        }
+
+        const remainingNeeded = Math.max(0, total - finalScore);
+        const contextLabel = `সূরা ${toBnNumber(ayahQuizMeta.surah)}: ${ayahQuizMeta.surahNameBn} · আয়াত ${toBnNumber(ayahQuizMeta.ayah)}`;
+
+        const missedListHtml = (!passed && missedMcqWords.length > 0) ? `
+          <div class="mcq-missed-review">
+            <div class="mcq-missed-review-header">ভুল হওয়া শব্দগুলো দেখে নিন (${toBnNumber(missedMcqWords.length)}টি)</div>
+            <ul class="mcq-missed-review-list">
+              ${missedMcqWords.map((mw) => `
+                <li class="mcq-missed-review-item">
+                  <span class="mcq-missed-ar" dir="rtl">${mw.arabic}</span>
+                  <span class="mcq-missed-bn">${mw.meaning_bn}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : '';
+
+        let primaryActionHtml = '';
+        if (passed && ayahQuizMeta.nextAyahNumber) {
+          primaryActionHtml = `
+            <button type="button" class="btn-primary mcq-summary-btn" id="btn-ayah-next-quiz">
+              <span>পরবর্তী আয়াত শুরু করুন (আয়াত ${toBnNumber(ayahQuizMeta.nextAyahNumber)})</span>
+              <span class="icon" aria-hidden="true">${Icons.arrowRight}</span>
+            </button>
+          `;
+        } else if (passed && ayahQuizMeta.nextSurahNumber) {
+          primaryActionHtml = `
+            <button type="button" class="btn-primary mcq-summary-btn" id="btn-ayah-next-surah">
+              <span>পরবর্তী সূরায় যান (সূরা ${toBnNumber(ayahQuizMeta.nextSurahNumber)})</span>
+              <span class="icon" aria-hidden="true">${Icons.arrowRight}</span>
+            </button>
+          `;
+        } else {
+          primaryActionHtml = `
+            <button type="button" class="btn-primary mcq-summary-btn" id="btn-drill-again">
+              <span class="icon" aria-hidden="true">${Icons.repeat}</span>
+              <span>${passed ? 'আবার অনুশীলন করুন' : 'আবার চেষ্টা করুন'}</span>
+            </button>
+          `;
+        }
+
+        const secondaryRetryHtml = (passed && (ayahQuizMeta.nextAyahNumber || ayahQuizMeta.nextSurahNumber)) ? `
+          <button type="button" class="btn-secondary mcq-summary-btn" id="btn-drill-again">
+            <span class="icon" aria-hidden="true">${Icons.repeat}</span>
+            <span>এই আয়াত পুনরায় দিন</span>
+          </button>
+        ` : '';
+
+        stage.innerHTML = `
+          <div class="practice-container mcq-summary-stage">
+            <div class="card mcq-summary-card ${passed ? 'is-passed' : 'is-incomplete'}">
+              <div class="mcq-summary-icon ${passed ? 'passed' : 'incomplete'}" aria-hidden="true">
+                ${passed ? Icons.checkCircle : Icons.lock}
+              </div>
+              <span class="mcq-summary-context">${contextLabel}</span>
+              <h2 class="mcq-summary-title">
+                ${passed
+                  ? (ayahQuizMeta.nextAyahNumber
+                    ? `মাশাআল্লাহ! আয়াত ${toBnNumber(ayahQuizMeta.nextAyahNumber)} আনলক হয়েছে!`
+                    : `আলহামদুলিল্লাহ! ${ayahQuizMeta.surahNameBn} সূরার সব আয়াত সম্পন্ন!`)
+                  : `আয়াত ${toBnNumber(ayahQuizMeta.ayah)} এখনো সম্পন্ন হয়নি`}
+              </h2>
+              <div class="mcq-summary-score tabular-nums">
+                ${toBnNumber(finalScore)} / ${toBnNumber(total)} <span>(${toBnNumber(percent)}%)</span>
+              </div>
+              <p class="mcq-summary-desc">
+                ${passed
+                  ? 'আপনি এই আয়াতের সব শব্দের সঠিক অর্থ চিহ্নিত করেছেন। আপনার অগ্রগতি সংরক্ষিত হয়েছে।'
+                  : `পরবর্তী আয়াত আনলক করতে শতভাগ (১০০%) সঠিক উত্তর প্রয়োজন — আরও ${toBnNumber(remainingNeeded)}টি সঠিক উত্তর লাগবে।`}
+              </p>
+
+              ${missedListHtml}
+
+              <div class="mcq-summary-actions">
+                ${primaryActionHtml}
+                ${secondaryRetryHtml}
+                <button type="button" class="btn-secondary mcq-summary-btn" id="btn-drill-finish">
+                  <span class="icon" aria-hidden="true">${Icons.arrowLeft}</span>
+                  <span>আয়াত তালিকায় ফিরুন</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const nextAyahBtn = stage.querySelector('#btn-ayah-next-quiz');
+        if (nextAyahBtn && ayahQuizMeta.nextAyahNumber) {
+          nextAyahBtn.onclick = () => {
+            navigateTo('practice', {
+              engine: 'ayah-quiz',
+              surah: ayahQuizMeta.surah,
+              ayah: ayahQuizMeta.nextAyahNumber
+            });
+          };
+        }
+
+        const nextSurahBtn = stage.querySelector('#btn-ayah-next-surah');
+        if (nextSurahBtn && ayahQuizMeta.nextSurahNumber) {
+          nextSurahBtn.onclick = () => {
+            navigateTo('practice', {
+              engine: 'ayah-list',
+              surah: ayahQuizMeta.nextSurahNumber
+            });
+          };
+        }
+
+        const againBtn = stage.querySelector('#btn-drill-again');
+        if (againBtn) {
+          againBtn.onclick = () => {
+            startAyahQuizExam(ayahQuizMeta.surah, ayahQuizMeta.ayah);
+          };
+        }
+
+        const finishBtn = stage.querySelector('#btn-drill-finish');
+        if (finishBtn) {
+          finishBtn.onclick = () => {
+            if (passed) {
+              delete state.ayahQuizStepMap[ayahQuizMeta.surah];
+            }
+            navigateTo('practice', {
+              engine: 'ayah-list',
+              surah: ayahQuizMeta.surah
+            });
+          };
+        }
+        return;
+      }
 
       const flashcardBreakdownHtml = isFlashcardMode ? `
         <div class="flashcard-summary-breakdown">
@@ -4506,7 +6139,35 @@
           // Go back to Surah list
           navigateTo('surahs');
         } else if (state.currentView === 'practice' && state.practiceEngine) {
-          navigateTo('practice', { surah: state.practiceSurah, engine: null });
+          if (state.practiceEngine === 'mcq-list') {
+            navigateTo('practice', {
+              engine: 'mcq-lists',
+              group: state.practiceGroup,
+              sub: state.practiceSubGroup
+            });
+          } else if (state.practiceEngine === 'mcq-lists') {
+            const isDirect = state.practiceSubGroup === 'main'
+              || ['g1', 'g2', 'g3', 'g4', 'g5'].includes(state.practiceGroup);
+            if (isDirect) {
+              navigateTo('practice', { engine: 'mcq-groups' });
+            } else {
+              navigateTo('practice', { engine: 'mcq-group', group: state.practiceGroup });
+            }
+          } else if (state.practiceEngine === 'mcq-group') {
+            navigateTo('practice', { engine: 'mcq-groups' });
+          } else if (state.practiceEngine === 'mcq-groups') {
+            navigateTo('practice', { engine: null });
+          } else if (state.practiceEngine === 'ayah-quiz') {
+            navigateTo('practice', { engine: 'ayah-list', surah: state.practiceSurah });
+          } else if (state.practiceEngine === 'ayah-list') {
+            navigateTo('practice', { engine: 'ayah-surahs' });
+          } else if (state.practiceEngine === 'ayah-surahs') {
+            navigateTo('practice', { engine: null });
+          } else {
+            navigateTo('practice', { surah: state.practiceSurah, engine: null });
+          }
+        } else if (state.currentView === 'practice' && state.practiceSurah) {
+          navigateTo('ayahs', { surah: state.practiceSurah });
         } else {
           navigateTo('surahs');
         }
@@ -4559,12 +6220,17 @@
       }
     }, { passive: true });
 
-    // Refresh active account or bookmarks view after cloud sync completes
+    // Refresh active account, bookmarks, or MCQ roadmap view after cloud sync completes
     window.addEventListener('quran-cloud-synced', () => {
       if (state.currentView === 'bookmarks') {
         renderBookmarksView();
       } else if (state.currentView === 'account') {
         renderAccountDashboardView();
+      } else if (
+        state.currentView === 'practice' &&
+        ['mcq-groups', 'mcq-group', 'mcq-lists', 'ayah-surahs', 'ayah-list'].includes(state.practiceEngine)
+      ) {
+        renderPracticeHubView();
       }
     });
 

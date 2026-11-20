@@ -1264,6 +1264,168 @@
     }
   }
 
+  const MCQ_PASS_KEY_PREFIX = 'mcq_pass:';
+  const AYAH_PASS_KEY_PREFIX = 'ayah_pass:';
+
+  function isMcqPassKey(key) {
+    return typeof key === 'string' && key.startsWith(MCQ_PASS_KEY_PREFIX);
+  }
+
+  function isAyahPassKey(key) {
+    return typeof key === 'string' && key.startsWith(AYAH_PASS_KEY_PREFIX);
+  }
+
+  function isNonWordProgressKey(key) {
+    return isMcqPassKey(key) || isAyahPassKey(key);
+  }
+
+  async function getMcqPassedListsMap() {
+    const progressMap = await getAllWordProgressMap();
+    const passedMap = {};
+    for (const [storageKey, item] of Object.entries(progressMap || {})) {
+      if (!isMcqPassKey(storageKey) || !item) continue;
+      const listKey = storageKey.slice(MCQ_PASS_KEY_PREFIX.length);
+      if (!listKey) continue;
+      const isPassed = item.status === 'mastered' || Number(item.repetitions || 0) > 0 || Number(item.box || 0) >= 5;
+      if (isPassed) {
+        passedMap[listKey] = {
+          passed: true,
+          score: Number(item.correctCount || item.intervalDays || item.interval || 10),
+          total: Number(item.intervalDays || item.interval || item.correctCount || 10),
+          passedAt: Number(item.lastReviewed || item.last_reviewed || Date.now())
+        };
+      }
+    }
+    return passedMap;
+  }
+
+  async function markMcqListPassed(listKey, score, total) {
+    if (!listKey) return false;
+    const cleanListKey = String(listKey).startsWith(MCQ_PASS_KEY_PREFIX)
+      ? String(listKey).slice(MCQ_PASS_KEY_PREFIX.length)
+      : String(listKey);
+    const storageKey = `${MCQ_PASS_KEY_PREFIX}${cleanListKey}`;
+    const nowMs = Date.now();
+    const safeTotal = Math.max(1, Math.floor(Number(total || score || 10)));
+    const safeScore = Math.max(1, Math.floor(Number(score || safeTotal)));
+
+    const record = {
+      word_id: storageKey,
+      status: 'mastered',
+      box: 5,
+      repetitions: 1,
+      interval: safeTotal,
+      intervalDays: safeTotal,
+      easeFactor: 2.5,
+      lastReviewed: nowMs,
+      nextReview: 0,
+      nextReviewDate: null,
+      correctCount: safeScore,
+      wrongCount: 0
+    };
+
+    try {
+      const db = await openDatabase();
+      const tx = db.transaction('word_progress', 'readwrite');
+      tx.objectStore('word_progress').put(record);
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.warn('[QuranDB] Failed to save MCQ list pass in IndexedDB:', e);
+    }
+
+    if (global.StorageManager) {
+      try {
+        const localP = global.StorageManager.get('progress-v1', {});
+        localP[storageKey] = { ...record };
+        global.StorageManager.set('progress-v1', localP);
+      } catch (e) {}
+    }
+
+    scheduleCloudAccountSync();
+    return true;
+  }
+
+  async function getAyahQuizPassedMap() {
+    const progressMap = await getAllWordProgressMap();
+    const passedMap = {};
+    for (const [storageKey, item] of Object.entries(progressMap || {})) {
+      if (!isAyahPassKey(storageKey) || !item) continue;
+      const verseKey = storageKey.slice(AYAH_PASS_KEY_PREFIX.length);
+      if (!verseKey || !verseKey.includes(':')) continue;
+      const parts = verseKey.split(':');
+      const surahNum = parseInt(parts[0], 10);
+      const ayahNum = parseInt(parts[1], 10);
+      if (!surahNum || !ayahNum) continue;
+
+      const isPassed = item.status === 'mastered' || Number(item.repetitions || 0) > 0 || Number(item.box || 0) >= 5;
+      if (isPassed) {
+        passedMap[verseKey] = {
+          verseKey,
+          surah: surahNum,
+          ayah: ayahNum,
+          passed: true,
+          score: Number(item.correctCount || item.intervalDays || item.interval || 1),
+          total: Number(item.intervalDays || item.interval || item.correctCount || 1),
+          passedAt: Number(item.lastReviewed || item.last_reviewed || Date.now())
+        };
+      }
+    }
+    return passedMap;
+  }
+
+  async function markAyahQuizPassed(surahNumber, ayahNumber, score, total) {
+    const sNum = Math.floor(Number(surahNumber));
+    const aNum = Math.floor(Number(ayahNumber));
+    if (!sNum || !aNum || sNum < 1 || sNum > 114 || aNum < 1) return false;
+
+    const verseKey = `${sNum}:${aNum}`;
+    const storageKey = `${AYAH_PASS_KEY_PREFIX}${verseKey}`;
+    const nowMs = Date.now();
+    const safeTotal = Math.max(1, Math.floor(Number(total || score || 1)));
+    const safeScore = Math.max(1, Math.floor(Number(score || safeTotal)));
+
+    const record = {
+      word_id: storageKey,
+      status: 'mastered',
+      box: 5,
+      repetitions: 1,
+      interval: safeTotal,
+      intervalDays: safeTotal,
+      easeFactor: 2.5,
+      lastReviewed: nowMs,
+      nextReview: 0,
+      nextReviewDate: null,
+      correctCount: safeScore,
+      wrongCount: 0
+    };
+
+    try {
+      const db = await openDatabase();
+      const tx = db.transaction('word_progress', 'readwrite');
+      tx.objectStore('word_progress').put(record);
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.warn('[QuranDB] Failed to save Ayah quiz pass in IndexedDB:', e);
+    }
+
+    if (global.StorageManager) {
+      try {
+        const localP = global.StorageManager.get('progress-v1', {});
+        localP[storageKey] = { ...record };
+        global.StorageManager.set('progress-v1', localP);
+      } catch (e) {}
+    }
+
+    scheduleCloudAccountSync();
+    return true;
+  }
+
   async function getWeakWordsList() {
     const db = await openDatabase();
     const req = db.transaction('weak_words', 'readonly').objectStore('weak_words').getAll();
@@ -1382,6 +1544,7 @@
     let learned = 0;
     let mastered = 0;
     for (const p of progList) {
+      if (!p || isNonWordProgressKey(p.word_id)) continue;
       if (p.status === 'mastered') mastered++;
       if (p.repetitions > 0) learned++;
     }
@@ -1458,7 +1621,7 @@
 
       // Ensure any word reviewed in word_progress also marks its review date
       for (const wp of (progList || [])) {
-        if (!wp || !wp.lastReviewed) continue;
+        if (!wp || !wp.lastReviewed || isNonWordProgressKey(wp.word_id)) continue;
         const dk = toDateKey(wp.lastReviewed);
         if (!dk) continue;
         if (!historyMap[dk]) {
@@ -1473,8 +1636,8 @@
     try {
       if (global.StorageManager && typeof global.StorageManager.get === 'function') {
         const localProg = global.StorageManager.get('progress-v1', {});
-        for (const entry of Object.values(localProg || {})) {
-          if (!entry || !entry.lastReviewed) continue;
+        for (const [k, entry] of Object.entries(localProg || {})) {
+          if (isNonWordProgressKey(k) || !entry || !entry.lastReviewed || isNonWordProgressKey(entry.word_id)) continue;
           const dk = toDateKey(entry.lastReviewed);
           if (!dk) continue;
           if (!historyMap[dk]) {
@@ -2130,6 +2293,12 @@
     computeRememberPoint,
     getAllWordProgressMap,
     mergeCloudWordProgress,
+    isMcqPassKey,
+    getMcqPassedListsMap,
+    markMcqListPassed,
+    isAyahPassKey,
+    getAyahQuizPassedMap,
+    markAyahQuizPassed,
     getWeakWordsList,
     toggleBookmark,
     isBookmarked,

@@ -8,7 +8,7 @@
    - Bypasses non-GET and cross-origin APIs (e.g., Supabase sync).
    ============================================================ */
 
-const APP_SHELL_CACHE = 'quran-app-shell-v34';
+const APP_SHELL_CACHE = 'quran-app-shell-v36';
 const AUDIO_CACHE = 'quran-audio-v1';
 const SOUND_CACHE = 'quran-sound-effects-v1';
 
@@ -36,6 +36,8 @@ const CORE_SHELL_FILES = [
   './js/storage/storage-manager.js',
   './js/reading-history.js',
   './js/progress-chart.js',
+  './js/mcq-frequency-groups.js',
+  './js/ayah-quiz-roadmap.js',
   './js/app.js'
 ];
 
@@ -67,7 +69,8 @@ const OPTIONAL_SHELL_FILES = [
   './js/progress-manager.js',
   './js/set-progress-manager.js',
   './js/distractor-generator.js',
-  './data/surahs-meta.json'
+  './data/surahs-meta.json',
+  './data/lookup/frequency-index.json'
 ];
 
 function buildPrecacheHeaders(relPath) {

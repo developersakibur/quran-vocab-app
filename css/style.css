@@ -7024,3 +7024,1227 @@ body.overlay-open {
   }
 }
 
+/* ============================================================
+   MCQ FREQUENCY GROUPS ROADMAP & PROGRESSIVE 10-WORD LISTS
+   Zero-pill editorial hierarchy, tabular-nums, Light & Dark harmony
+   ============================================================ */
+.mcq-roadmap-wrap {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 38px;
+}
+
+.mcq-overview-card,
+.mcq-sub-hero-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mcq-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mcq-overview-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mcq-metric-label {
+  font-family: var(--font-bangla);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.mcq-metric-value {
+  font-family: var(--font-bangla);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.mcq-metric-value small {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.mcq-metric-accent {
+  color: var(--color-primary);
+}
+
+/* One-Tap Resume Shortcut Card */
+.mcq-resume-card {
+  width: 100%;
+  text-align: left;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  min-height: 62px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.mcq-resume-card:hover {
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.mcq-resume-card:active {
+  transform: scale(0.99);
+}
+
+.mcq-resume-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.mcq-resume-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mcq-resume-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mcq-resume-kicker {
+  font-family: var(--font-bangla);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.01em;
+}
+
+.mcq-resume-title {
+  font-family: var(--font-bangla);
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.mcq-resume-sub {
+  font-family: var(--font-bangla);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.mcq-resume-arrow {
+  width: 20px;
+  height: 20px;
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mcq-resume-arrow svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Tier Sections & Headers */
+.mcq-tier-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mcq-tier-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 2px 2px 0;
+}
+
+.mcq-tier-header h2 {
+  font-family: var(--font-bangla);
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.mcq-tier-meta {
+  font-family: var(--font-bangla);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Main Group Cards & Sub-Group Cards */
+.mcq-group-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.mcq-group-card,
+.mcq-subgroup-card {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  min-height: 88px;
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.mcq-group-card:hover,
+.mcq-subgroup-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.mcq-group-card:active,
+.mcq-subgroup-card:active {
+  transform: scale(0.99);
+}
+
+.mcq-group-card.is-complete,
+.mcq-subgroup-card.is-complete {
+  border-color: var(--color-success);
+}
+
+.mcq-group-card-top,
+.mcq-subgroup-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mcq-group-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mcq-group-order {
+  font-family: var(--font-bangla);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.mcq-group-title,
+.mcq-subgroup-title {
+  font-family: var(--font-bangla);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.3;
+  display: block;
+}
+
+.mcq-subgroup-sub {
+  font-family: var(--font-bangla);
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 2px;
+}
+
+.mcq-group-range-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mcq-group-range {
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.mcq-card-chevron {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mcq-card-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mcq-group-desc {
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.mcq-progress-track {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.mcq-progress-track-lg {
+  height: 7px;
+}
+
+.mcq-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width 0.25s ease;
+}
+
+.is-complete .mcq-progress-fill,
+.is-passed .mcq-progress-fill {
+  background: var(--color-success);
+}
+
+.mcq-group-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+  font-family: var(--font-bangla);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.mcq-group-card-meta strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+/* Sub-Group / List Hero Card */
+.mcq-sub-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mcq-sub-hero-title {
+  font-family: var(--font-bangla);
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+
+.mcq-sub-hero-pct {
+  font-family: var(--font-bangla);
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.mcq-unlock-rule-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-bangla);
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+  background: var(--bg-muted);
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
+.mcq-unlock-rule-note .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mcq-unlock-rule-note .icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mcq-start-active-btn {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.mcq-start-active-btn .icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 30-Juz Grid (Groups 9 & 10) */
+.mcq-juz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mcq-juz-card {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  min-height: 82px;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.mcq-juz-card:hover {
+  border-color: var(--color-primary);
+}
+
+.mcq-juz-card:active {
+  transform: scale(0.985);
+}
+
+.mcq-juz-card.is-complete {
+  border-color: var(--color-success);
+}
+
+.mcq-juz-card.is-started {
+  border-color: var(--color-primary);
+}
+
+.mcq-juz-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.mcq-juz-name {
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.mcq-juz-lists {
+  font-family: var(--font-bangla);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.mcq-juz-check {
+  width: 18px;
+  height: 18px;
+  color: var(--color-success);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mcq-juz-check svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mcq-juz-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: var(--font-bangla);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+/* Mini-Step Segmented Tabs (for >20 lists) */
+.mcq-mini-steps-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.mcq-mini-step-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.mcq-mini-step-btn small {
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.mcq-mini-step-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+.mcq-mini-step-btn.is-complete:not(.active) {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+/* Progressive 10-Word List Rows */
+.mcq-lists-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.mcq-list-row {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.mcq-list-row.is-active {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.mcq-list-row.is-passed {
+  border-color: var(--color-success);
+}
+
+.mcq-list-row.is-locked {
+  background: var(--bg-muted);
+  opacity: 0.76;
+}
+
+.mcq-list-row:not(.is-locked):active {
+  transform: scale(0.99);
+}
+
+.mcq-list-status-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.mcq-list-status-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mcq-list-row.is-passed .mcq-list-status-icon {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.mcq-list-row.is-locked .mcq-list-status-icon {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.mcq-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mcq-list-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mcq-list-title {
+  font-family: var(--font-bangla);
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mcq-list-word-count {
+  font-family: var(--font-bangla);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.mcq-list-preview-ar {
+  font-family: var(--font-arabic);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.mcq-list-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 54px;
+}
+
+.mcq-list-fraction {
+  font-family: var(--font-bangla);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mcq-list-status-text {
+  font-family: var(--font-bangla);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.mcq-list-row.is-passed .mcq-list-status-text {
+  color: var(--color-success);
+}
+
+.mcq-list-row.is-locked .mcq-list-status-text {
+  color: var(--text-secondary);
+}
+
+.mcq-horizon-toggle-btn {
+  width: 100%;
+  min-height: 46px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.mcq-horizon-toggle-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.mcq-horizon-toggle-btn .icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes mcqLockShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-3px); }
+}
+
+.mcq-lock-shake {
+  animation: mcqLockShake 0.28s ease;
+}
+
+/* MCQ Exam Summary & Missed-Words Review */
+.mcq-summary-stage {
+  padding-top: 20px;
+}
+
+.mcq-summary-card {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 26px 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcq-summary-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+}
+
+.mcq-summary-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.mcq-summary-icon.passed {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.mcq-summary-icon.incomplete {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+}
+
+.mcq-summary-context {
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mcq-summary-title {
+  font-family: var(--font-bangla);
+  font-size: 1.16rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.mcq-summary-score {
+  font-family: var(--font-bangla);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 4px 0;
+}
+
+.mcq-summary-card.is-passed .mcq-summary-score {
+  color: var(--color-success);
+}
+
+.mcq-summary-score span {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mcq-summary-desc {
+  font-family: var(--font-bangla);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 8px;
+  max-width: 380px;
+}
+
+.mcq-missed-review {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin: 4px 0 8px;
+}
+
+.mcq-missed-review-header {
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.mcq-missed-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcq-missed-review-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+}
+
+.mcq-missed-ar {
+  font-family: var(--font-arabic);
+  font-size: 1.2rem;
+  line-height: 1.65;
+  padding: 0 4px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.mcq-missed-bn {
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.mcq-summary-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 8px;
+}
+
+.mcq-summary-btn {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-bangla);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.mcq-summary-btn .icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.mcq-roadmap-error-card {
+  max-width: 460px;
+  margin: 24px auto;
+  padding: 28px 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.mcq-roadmap-error-icon {
+  width: 42px;
+  height: 42px;
+  color: var(--color-danger);
+}
+
+.mcq-roadmap-error-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (min-width: 680px) {
+  .mcq-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mcq-juz-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ============================================================
+   AYAH WORD QUIZ ROADMAP (SURAH DIRECTORY & AYAH UNLOCK LIST)
+   ============================================================ */
+.ayah-quiz-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ayah-quiz-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ayah-quiz-search-icon {
+  position: absolute;
+  left: 13px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ayah-quiz-search-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.ayah-quiz-search-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 42px 10px 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ayah-quiz-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.ayah-quiz-search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.ayah-quiz-search-clear {
+  position: absolute;
+  right: 6px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.ayah-quiz-search-clear:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+.ayah-quiz-search-clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ayah-quiz-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.ayah-quiz-filter-btn {
+  min-height: 40px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ayah-quiz-filter-btn.active {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+  font-weight: 700;
+}
+
+.ayah-surah-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.ayah-surah-card {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ayah-surah-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.ayah-surah-card:active {
+  transform: scale(0.99);
+}
+
+.ayah-surah-card.is-started {
+  border-color: var(--color-primary);
+}
+
+.ayah-surah-card.is-complete {
+  border-color: var(--color-success);
+}
+
+.ayah-surah-num {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ayah-surah-card.is-complete .ayah-surah-num {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.ayah-surah-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ayah-surah-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ayah-surah-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ayah-surah-title {
+  font-family: var(--font-bangla);
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.ayah-surah-sub {
+  font-family: var(--font-bangla);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ayah-surah-ar {
+  font-family: var(--font-arabic);
+  font-size: 1.15rem;
+  line-height: 1.45;
+  color: var(--color-primary);
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.ayah-surah-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-bangla);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.ayah-surah-count {
+  white-space: nowrap;
+}
+
+.ayah-surah-count strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.ayah-surah-status-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ayah-surah-status {
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.ayah-surah-card.is-complete .ayah-surah-status {
+  color: var(--color-success);
+}
+
+.ayah-hero-ar {
+  font-family: var(--font-arabic);
+  font-size: 1.18rem;
+  font-weight: 400;
+  color: var(--color-primary);
+  margin-left: 8px;
+}
+
+.ayah-quiz-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ayah-quiz-empty-title {
+  font-family: var(--font-bangla);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.ayah-quiz-empty-desc {
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 360px;
+}
+
+.ayah-quiz-reset-btn {
+  margin-top: 6px;
+  min-height: 44px;
+  padding: 8px 18px;
+}
+
+@media (min-width: 680px) {
+  .ayah-surah-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+

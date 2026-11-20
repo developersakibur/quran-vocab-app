@@ -91,5 +91,13 @@ window.Icons = {
 
   coffee: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h13v8a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V4zm15 2h1a3 3 0 0 1 0 6h-1V6zM3 19h16a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2z"/></svg>',
 
-  pulseDot: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>'
+  pulseDot: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>',
+
+  lock: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10h-1V7a4 4 0 0 0-8 0v3H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-7-3a2 2 0 1 1 4 0v3h-4V7zm3 9.72V18a1 1 0 1 1-2 0v-1.28a1.75 1.75 0 1 1 2 0z"/></svg>',
+
+  unlock: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10h-7V7a2 2 0 0 1 3.73-1 1 1 0 1 0 1.73-1A4 4 0 0 0 8 7v3H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-4 6.72V18a1 1 0 1 1-2 0v-1.28a1.75 1.75 0 1 1 2 0z"/></svg>',
+
+  chevronRight: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.293 5.293a1 1 0 0 1 1.414 0l6 6a1 1 0 0 1 0 1.414l-6 6a1 1 0 0 1-1.414-1.414L14.586 12 9.293 6.707a1 1 0 0 1 0-1.414z"/></svg>',
+
+  chevronDown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.293 9.293a1 1 0 0 1 1.414 0L12 14.586l5.293-5.293a1 1 0 1 1 1.414 1.414l-6 6a1 1 0 0 1-1.414 0l-6-6a1 1 0 0 1 0-1.414z"/></svg>'
 };
