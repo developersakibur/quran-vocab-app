@@ -99,5 +99,11 @@ window.Icons = {
 
   chevronRight: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.293 5.293a1 1 0 0 1 1.414 0l6 6a1 1 0 0 1 0 1.414l-6 6a1 1 0 0 1-1.414-1.414L14.586 12 9.293 6.707a1 1 0 0 1 0-1.414z"/></svg>',
 
-  chevronDown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.293 9.293a1 1 0 0 1 1.414 0L12 14.586l5.293-5.293a1 1 0 1 1 1.414 1.414l-6 6a1 1 0 0 1-1.414 0l-6-6a1 1 0 0 1 0-1.414z"/></svg>'
+  chevronDown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.293 9.293a1 1 0 0 1 1.414 0L12 14.586l5.293-5.293a1 1 0 1 1 1.414 1.414l-6 6a1 1 0 0 1-1.414 0l-6-6a1 1 0 0 1 0-1.414z"/></svg>',
+
+  trash: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h1v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-3 2h10v12H7V7zm3 2.5a1 1 0 0 0-1 1v5.5a1 1 0 1 0 2 0v-5.5a1 1 0 0 0-1-1zm4 0a1 1 0 0 0-1 1v5.5a1 1 0 1 0 2 0v-5.5a1 1 0 0 0-1-1z"/></svg>',
+
+  stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.4"/></svg>',
+
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>'
 };

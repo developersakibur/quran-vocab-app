@@ -17,7 +17,7 @@
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/fonts.css">
-  <link rel="stylesheet" href="css/style.css?v=35">
+  <link rel="stylesheet" href="css/style.css?v=36">
 </head>
 <body>
 
@@ -327,23 +327,30 @@
        ============================================================ -->
   <main class="app-view" id="view-downloads">
     <div class="downloads-page-container">
-      <!-- Single Unified Status & Live Storage Bar -->
-      <section class="dl-single-status-card" id="dl-single-status-card" aria-live="polite">
-        <div class="dl-single-status-row">
-          <div class="dl-status-metric">
-            <span class="dl-status-label" id="dl-status-summary-label">সংরক্ষিত তিলাওয়াত</span>
-            <strong class="dl-status-value tabular-nums" id="dl-single-status-text">০ / ১১৪ সূরা</strong>
+      <!-- Unified 3-Metric Instant Overview & Live Queue Card -->
+      <section class="dl-overview-card" id="dl-single-status-card" aria-live="polite">
+        <div class="dl-overview-grid">
+          <div class="dl-overview-metric">
+            <span class="dl-status-label">মোট অডিও সাইজ</span>
+            <strong class="dl-status-value dl-status-value-accent tabular-nums" id="dl-storage-used-text">০.০ মেগাবাইট</strong>
           </div>
-          <div class="dl-status-divider" aria-hidden="true"></div>
-          <div class="dl-status-metric dl-status-metric-end">
-            <span class="dl-status-label">ব্যবহৃত স্টোরেজ</span>
-            <strong class="dl-status-value tabular-nums" id="dl-storage-used-text">০.০ মেগাবাইট</strong>
+          <div class="dl-overview-metric">
+            <span class="dl-status-label">সূরা তিলাওয়াত</span>
+            <strong class="dl-status-value tabular-nums" id="dl-overview-surah-count">০ / ১১৪</strong>
+          </div>
+          <div class="dl-overview-metric">
+            <span class="dl-status-label">শব্দ অডিও</span>
+            <strong class="dl-status-value tabular-nums" id="dl-overview-word-count">০ / ৭৭,৪৩০</strong>
           </div>
         </div>
+
         <div class="dl-single-progress-wrap" id="dl-active-progress-wrap" style="display:none">
-          <div class="dl-single-progress-meta">
-            <span id="dl-active-progress-label">ডাউনলোড হচ্ছে…</span>
-            <strong class="tabular-nums" id="dl-active-progress-pct">০%</strong>
+          <div class="dl-active-bar-top">
+            <div class="dl-single-progress-meta">
+              <span id="dl-active-progress-label">ডাউনলোড হচ্ছে…</span>
+              <strong class="tabular-nums" id="dl-active-progress-pct">০%</strong>
+            </div>
+            <button type="button" class="dl-stop-all-btn" id="dl-stop-all-btn">সব থামান</button>
           </div>
           <div class="download-progress-track">
             <div class="download-progress-fill" id="dl-active-progress-fill" style="width:0%"></div>
@@ -352,23 +359,33 @@
       </section>
 
       <div class="dl-tabs" role="tablist">
-        <button type="button" class="dl-tab active" data-tab="ayah" role="tab" aria-selected="true">সূরা তিলাওয়াত (১১৪টি)</button>
-        <button type="button" class="dl-tab" data-tab="word" role="tab" aria-selected="false">শব্দ অডিও</button>
+        <button type="button" class="dl-tab active" data-tab="ayah" role="tab" aria-selected="true">সূরা তিলাওয়াত (১১৪)</button>
+        <button type="button" class="dl-tab" data-tab="word" role="tab" aria-selected="false">শব্দ অডিও (১১৪)</button>
       </div>
 
       <div class="dl-tab-panel" id="dl-panel-ayah">
-        <button type="button" class="download-all-btn" id="dl-all-ayah">
-          <span class="icon" id="icon-dl-ayah"></span>
-          <span class="dl-btn-label">সব সূরার পূর্ণাঙ্গ তিলাওয়াত ডাউনলোড করুন</span>
-        </button>
+        <div class="dl-bulk-bar">
+          <button type="button" class="download-all-btn" id="dl-all-ayah">
+            <span class="icon" id="icon-dl-ayah"></span>
+            <span class="dl-btn-label">সব তিলাওয়াত ডাউনলোড</span>
+          </button>
+          <button type="button" class="dl-delete-all-btn" id="dl-delete-all-ayah" disabled>
+            <span>সব মুছুন</span>
+          </button>
+        </div>
         <ul class="dl-surah-list" id="dl-list-ayah"></ul>
       </div>
 
       <div class="dl-tab-panel" id="dl-panel-word" style="display:none">
-        <button type="button" class="download-all-btn" id="dl-all-word">
-          <span class="icon" id="icon-dl-word"></span>
-          <span class="dl-btn-label">সব শব্দের অডিও ডাউনলোড করুন</span>
-        </button>
+        <div class="dl-bulk-bar">
+          <button type="button" class="download-all-btn" id="dl-all-word">
+            <span class="icon" id="icon-dl-word"></span>
+            <span class="dl-btn-label">সব শব্দ অডিও ডাউনলোড</span>
+          </button>
+          <button type="button" class="dl-delete-all-btn" id="dl-delete-all-word" disabled>
+            <span>সব মুছুন</span>
+          </button>
+        </div>
         <ul class="dl-surah-list" id="dl-list-word"></ul>
       </div>
     </div>
@@ -406,7 +423,7 @@
   <div class="toast" id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/icons.js?v=35"></script>
+  <script src="js/icons.js?v=36"></script>
   <script src="js/lib/d3.min.js?v=35"></script>
   <script src="js/lib/supabase-bundle.js?v=35"></script>
   <script src="js/supabase-config.js?v=35"></script>
@@ -425,6 +442,7 @@
   <script src="js/progress-chart.js?v=35"></script>
   <script src="js/mcq-frequency-groups.js?v=35"></script>
   <script src="js/ayah-quiz-roadmap.js?v=35"></script>
+  <script src="js/audio-download-manager.js?v=36"></script>
   <script src="js/app.js?v=35"></script>
 
   <script>
@@ -714,1054 +732,46 @@
       };
     }
 
-    let activeDownloadTab = 'ayah';
-    let lastTabStats = {
-      ayah: { done: 0, total: 114 },
-      word: { done: 0, total: 77430 }
-    };
-
-    function renderSingleTopSummary() {
-      const labelEl = document.getElementById('dl-status-summary-label');
-      const textEl = document.getElementById('dl-single-status-text');
-      const st = lastTabStats[activeDownloadTab] || lastTabStats.ayah;
-      if (labelEl) {
-        labelEl.textContent = activeDownloadTab === 'ayah' ? 'সংরক্ষিত তিলাওয়াত' : 'সংরক্ষিত শব্দ অডিও';
-      }
-      if (textEl) {
-        textEl.textContent = activeDownloadTab === 'ayah'
-          ? `${toBn(st.done)} / ${toBn(st.total)} সূরা`
-          : `${toBn(st.done)} / ${toBn(st.total)} শব্দ`;
-      }
-    }
-
-    // Download panel tabs
-    document.querySelectorAll('.dl-tab').forEach((tab) => {
-      tab.onclick = () => {
-        document.querySelectorAll('.dl-tab').forEach((t) => {
-          t.classList.remove('active');
-          t.setAttribute('aria-selected', 'false');
-        });
-        tab.classList.add('active');
-        tab.setAttribute('aria-selected', 'true');
-        const type = tab.dataset.tab;
-        activeDownloadTab = type;
-        document.getElementById('dl-panel-ayah').style.display = type === 'ayah' ? 'flex' : 'none';
-        document.getElementById('dl-panel-word').style.display = type === 'word' ? 'flex' : 'none';
-        renderSingleTopSummary();
-      };
-    });
-
-    const AUDIO_CACHE = 'quran-audio-v1';
-    const SURAH_AUDIO_BASE = 'https://audio-cdn.tarteel.ai/quran/surah/alafasy/murattal/mp3';
-    const WORD_AUDIO_BASE = 'https://audio.qurancdn.com/wbw';
-
-    let globalSurahsMeta = [];
-    let activeDownloadCounts = { ayah: {}, word: {} };
-    let isDownloading = false;
-    const activeDownloadingRows = new Set();
-    let baseStorageUsageBytes = (() => {
-      try {
-        const saved = Number(localStorage.getItem('quran-app:last-storage-bytes-v1') || '0');
-        return Number.isFinite(saved) && saved > 0 ? saved : 0;
-      } catch (e) {
-        return 0;
-      }
-    })();
-    const inFlightBytesMap = new Map();
-    let lastStorageRenderTs = 0;
-
-    function getConcurrencyLimits() {
-      if (window.QuranDB && typeof window.QuranDB.getOptimalDownloadConcurrency === 'function') {
-        return window.QuranDB.getOptimalDownloadConcurrency();
-      }
-      return { data: 6, wordAudio: 8, surahAudio: 3 };
-    }
-
-    function clearAllDownloadingRows() {
-      activeDownloadingRows.forEach((rowId) => {
-        const el = document.getElementById(rowId);
-        if (el) el.classList.remove('downloading');
-      });
-      activeDownloadingRows.clear();
-    }
-
-    function formatStorageMbBn(bytes) {
-      const mb = Math.max(0, bytes || 0) / (1024 * 1024);
-      const formatted = mb >= 100 ? mb.toFixed(1) : mb.toFixed(2);
-      return `${toBn(formatted)} মেগাবাইট`;
-    }
-
-    function renderLiveStorageUsed(throttled = false) {
-      if (throttled) {
-        const now = Date.now();
-        if (now - lastStorageRenderTs < 140) return;
-        lastStorageRenderTs = now;
-      }
-      const storageEl = document.getElementById('dl-storage-used-text');
-      if (!storageEl) return;
-      let inFlight = 0;
-      inFlightBytesMap.forEach((b) => { inFlight += b; });
-      storageEl.textContent = formatStorageMbBn(baseStorageUsageBytes + inFlight);
-    }
-
-    let storageRefreshPromise = null;
-
-    async function refreshBaseStorageUsage() {
-      if (!window.QuranDB || typeof window.QuranDB.getAppStorageUsageBytes !== 'function') return baseStorageUsageBytes;
-      if (storageRefreshPromise) return storageRefreshPromise;
-      storageRefreshPromise = (async () => {
-        try {
-          const realBytes = await window.QuranDB.getAppStorageUsageBytes();
-          if (typeof realBytes === 'number' && !Number.isNaN(realBytes)) {
-            baseStorageUsageBytes = Math.max(0, realBytes);
-            renderLiveStorageUsed(false);
-          }
-        } catch (e) {}
-        return baseStorageUsageBytes;
-      })().finally(() => {
-        storageRefreshPromise = null;
-      });
-      return storageRefreshPromise;
-    }
-
-    function setActiveProgressBar(visible, labelText, percentVal) {
-      const wrap = document.getElementById('dl-active-progress-wrap');
-      const lbl = document.getElementById('dl-active-progress-label');
-      const pct = document.getElementById('dl-active-progress-pct');
-      const fill = document.getElementById('dl-active-progress-fill');
-      if (!wrap) return;
-      if (!visible) {
-        wrap.style.display = 'none';
-        if (fill) fill.style.width = '0%';
-        return;
-      }
-      wrap.style.display = 'flex';
-      const clamped = Math.max(0, Math.min(100, Math.round(percentVal || 0)));
-      if (lbl && labelText) lbl.textContent = labelText;
-      if (pct) pct.textContent = `${toBn(clamped)}%`;
-      if (fill) fill.style.width = `${clamped}%`;
-    }
-
-    async function getCachedCounts() {
-      const wordCounts = {};
-      const ayahCounts = {};
-      if (!('caches' in window)) return { wordCounts, ayahCounts };
-      try {
-        const cache = await caches.open(AUDIO_CACHE);
-        const keys = await cache.keys();
-        for (const req of keys) {
-          const url = req.url;
-          if (url.includes('audio-cdn.tarteel.ai')) {
-            const m = url.match(/\/(\d{3})\.mp3/);
-            if (m) {
-              const s = parseInt(m[1], 10);
-              ayahCounts[s] = 1;
-            }
-          } else if (url.includes('audio.qurancdn.com/wbw') || url.includes('/wbw/')) {
-            const m = url.match(/\/(\d{3})_(\d{3})_(\d{3})\.mp3/);
-            if (m) {
-              const s = parseInt(m[1], 10);
-              wordCounts[s] = (wordCounts[s] || 0) + 1;
-            }
-          }
-        }
-        return { wordCounts, ayahCounts };
-      } catch (e) {
-        return { wordCounts: {}, ayahCounts: {} };
-      }
-    }
-
-    let stopRequested = false;
-
-    async function downloadOneAudio(cache, url, onByteProgress, checkStop, cachedUrlSet) {
-      if (cachedUrlSet && cachedUrlSet.has(url)) {
-        return true;
-      }
-      if (!cachedUrlSet) {
-        try {
-          const existing = await cache.match(url);
-          if (existing) return true;
-        } catch (e) {}
-      }
-
-      const isTarteelSurah = url.includes('audio-cdn.tarteel.ai');
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        if (checkStop && checkStop()) return false;
-        const controller = new AbortController();
-        const timeoutMs = isTarteelSurah ? 120000 : 12000;
-        let timer = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-          if (isTarteelSurah) {
-            try {
-              const res = await fetch(url, { mode: 'cors', signal: controller.signal });
-              if (res && res.ok && res.body && typeof res.body.getReader === 'function') {
-                const totalBytes = parseInt(res.headers.get('content-length') || '0', 10) || 0;
-                const reader = res.body.getReader();
-                const chunks = [];
-                let receivedBytes = 0;
-                let lastEmitTime = 0;
-                let lastEmitPct = -1;
-
-                while (true) {
-                  if (checkStop && checkStop()) {
-                    try { await reader.cancel(); } catch (e) {}
-                    inFlightBytesMap.delete(url);
-                    clearTimeout(timer);
-                    return false;
-                  }
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  if (value && value.byteLength) {
-                    chunks.push(value);
-                    receivedBytes += value.byteLength;
-                    inFlightBytesMap.set(url, receivedBytes);
-                    // Reset stall watchdog while actively receiving bytes
-                    clearTimeout(timer);
-                    timer = setTimeout(() => controller.abort(), 30000);
-
-                    const now = Date.now();
-                    const pct = totalBytes > 0 ? Math.min(99, Math.round((receivedBytes / totalBytes) * 100)) : 0;
-                    if (onByteProgress && (now - lastEmitTime >= 110 || pct !== lastEmitPct)) {
-                      lastEmitTime = now;
-                      lastEmitPct = pct;
-                      onByteProgress({ url, receivedBytes, totalBytes, percent: pct });
-                    }
-                  }
-                }
-                clearTimeout(timer);
-
-                const blob = new Blob(chunks, { type: res.headers.get('content-type') || 'audio/mpeg' });
-                const cachedRes = new Response(blob, {
-                  status: 200,
-                  statusText: 'OK',
-                  headers: {
-                    'Content-Type': res.headers.get('content-type') || 'audio/mpeg',
-                    'Content-Length': String(blob.size)
-                  }
-                });
-                await cache.put(url, cachedRes);
-                if (cachedUrlSet) cachedUrlSet.add(url);
-                inFlightBytesMap.delete(url);
-                baseStorageUsageBytes += blob.size;
-                renderLiveStorageUsed(true);
-                if (window.QuranDB && window.QuranDB.invalidateAudioCacheSizeMemo) {
-                  window.QuranDB.invalidateAudioCacheSizeMemo(url);
-                }
-                if (onByteProgress) {
-                  onByteProgress({ url, receivedBytes: blob.size, totalBytes: blob.size, percent: 100 });
-                }
-                return true;
-              } else if (res && res.ok) {
-                clearTimeout(timer);
-                const blob = await res.blob();
-                const cachedRes = new Response(blob, {
-                  status: 200,
-                  statusText: 'OK',
-                  headers: {
-                    'Content-Type': res.headers.get('content-type') || 'audio/mpeg',
-                    'Content-Length': String(blob.size)
-                  }
-                });
-                await cache.put(url, cachedRes);
-                if (cachedUrlSet) cachedUrlSet.add(url);
-                baseStorageUsageBytes += blob.size;
-                renderLiveStorageUsed(true);
-                if (window.QuranDB && window.QuranDB.invalidateAudioCacheSizeMemo) {
-                  window.QuranDB.invalidateAudioCacheSizeMemo(url);
-                }
-                if (onByteProgress) onByteProgress({ url, receivedBytes: blob.size, totalBytes: blob.size, percent: 100 });
-                return true;
-              }
-            } catch (corsErr) {
-              inFlightBytesMap.delete(url);
-              if (checkStop && checkStop()) {
-                clearTimeout(timer);
-                return false;
-              }
-              const fallbackRes = await fetch(url, { mode: 'no-cors', signal: controller.signal });
-              clearTimeout(timer);
-              if (fallbackRes && (fallbackRes.ok || fallbackRes.type === 'opaque')) {
-                await cache.put(url, fallbackRes.clone());
-                if (cachedUrlSet) cachedUrlSet.add(url);
-                if (window.QuranDB && window.QuranDB.invalidateAudioCacheSizeMemo) {
-                  window.QuranDB.invalidateAudioCacheSizeMemo(url);
-                }
-                await refreshBaseStorageUsage();
-                if (onByteProgress) onByteProgress({ url, receivedBytes: 0, totalBytes: 0, percent: 100 });
-                return true;
-              }
-            }
-          } else {
-            try {
-              const res = await fetch(url, { mode: 'cors', signal: controller.signal });
-              clearTimeout(timer);
-              if (res && res.ok) {
-                const blob = await res.blob();
-                const cachedRes = new Response(blob, {
-                  status: 200,
-                  statusText: 'OK',
-                  headers: {
-                    'Content-Type': res.headers.get('content-type') || 'audio/mpeg',
-                    'Content-Length': String(blob.size)
-                  }
-                });
-                await cache.put(url, cachedRes);
-                if (cachedUrlSet) cachedUrlSet.add(url);
-                baseStorageUsageBytes += blob.size;
-                renderLiveStorageUsed(true);
-                if (window.QuranDB && window.QuranDB.invalidateAudioCacheSizeMemo) {
-                  window.QuranDB.invalidateAudioCacheSizeMemo(url);
-                }
-                return true;
-              }
-            } catch (wordCorsErr) {
-              if (checkStop && checkStop()) {
-                clearTimeout(timer);
-                return false;
-              }
-              const fallbackRes = await fetch(url, { mode: 'no-cors', signal: controller.signal });
-              clearTimeout(timer);
-              if (fallbackRes && (fallbackRes.ok || fallbackRes.type === 'opaque')) {
-                await cache.put(url, fallbackRes.clone());
-                if (cachedUrlSet) cachedUrlSet.add(url);
-                baseStorageUsageBytes += 16384;
-                renderLiveStorageUsed(true);
-                if (window.QuranDB && window.QuranDB.invalidateAudioCacheSizeMemo) {
-                  window.QuranDB.invalidateAudioCacheSizeMemo(url);
-                }
-                return true;
-              }
-            }
-          }
-        } catch (err) {
-          clearTimeout(timer);
-          inFlightBytesMap.delete(url);
-          if (attempt === 2 || (checkStop && checkStop())) {
-            return false;
-          }
-          await new Promise((r) => setTimeout(r, 250));
-        }
-      }
-      return false;
-    }
-
+    // Sidebar storage persistence indicator (fast local manifest + async verification)
     async function updateStoragePersistenceUI() {
       const sidebarPersistSub = document.getElementById('sidebar-persist-sub');
-      await refreshBaseStorageUsage();
-      if (!('storage' in navigator) || !navigator.storage.persisted) return;
+      if (!sidebarPersistSub) return;
+
+      let usageBytes = 0;
+      if (window.AudioDownloadManager && typeof window.AudioDownloadManager.getSnapshot === 'function') {
+        const snap = window.AudioDownloadManager.getSnapshot();
+        usageBytes = (snap && snap.overview && snap.overview.totalAudioBytes) || 0;
+      }
+      if (usageBytes === 0 && window.QuranDB && typeof window.QuranDB.getAppStorageUsageBytes === 'function') {
+        try {
+          const measured = await window.QuranDB.getAppStorageUsageBytes();
+          if (typeof measured === 'number' && !Number.isNaN(measured)) {
+            usageBytes = Math.max(0, measured);
+          }
+        } catch (e) {}
+      }
 
       let isPersisted = false;
-      try {
-        isPersisted = await navigator.storage.persisted();
-      } catch (e) {}
-
-      if (sidebarPersistSub) {
-        const usageStr = baseStorageUsageBytes > 0 ? ` • ${formatStorageMbBn(baseStorageUsageBytes)}` : '';
-        sidebarPersistSub.textContent = isPersisted
-          ? `স্থায়ী সুরক্ষা সক্রিয় আছে${usageStr}`
-          : `ক্যাশ ক্লিয়ার থেকে অফলাইন ডাটা রক্ষা করুন${usageStr}`;
-      }
-    }
-
-    async function downloadAudioQueue(urls, onProgress, checkStop, onByteProgress, options) {
-      if (navigator.storage && navigator.storage.persist) {
+      if ('storage' in navigator && navigator.storage.persisted) {
         try {
-          await navigator.storage.persist();
-          updateStoragePersistenceUI();
-        } catch (e) {}
-      }
-      await refreshBaseStorageUsage();
-      const cache = await caches.open(AUDIO_CACHE);
-
-      let cachedUrlSet = options && options.cachedUrlSet ? options.cachedUrlSet : null;
-      if (!cachedUrlSet && urls.length > 1) {
-        try {
-          const existingKeys = await cache.keys();
-          cachedUrlSet = new Set(existingKeys.map((k) => k.url));
+          isPersisted = await navigator.storage.persisted();
         } catch (e) {}
       }
 
-      const pendingUrls = cachedUrlSet ? urls.filter((u) => !cachedUrlSet.has(u)) : urls.slice();
-      const alreadyDoneCount = urls.length - pendingUrls.length;
-      if (alreadyDoneCount > 0 && onProgress) {
-        onProgress(alreadyDoneCount, urls.length, null, { cachedSkipped: alreadyDoneCount });
-      }
-      if (pendingUrls.length === 0) {
-        return urls.length;
-      }
-
-      const limits = getConcurrencyLimits();
-      const concurrency = (options && options.concurrency) || (urls.length === 1 ? 1 : limits.wordAudio);
-      let nextIdx = 0;
-      let done = alreadyDoneCount;
-
-      async function worker() {
-        while (nextIdx < pendingUrls.length) {
-          if (checkStop && checkStop()) break;
-          const idx = nextIdx++;
-          const url = pendingUrls[idx];
-          const ok = await downloadOneAudio(cache, url, onByteProgress, checkStop, cachedUrlSet);
-          if (checkStop && checkStop()) break;
-          done++;
-          if (ok && onProgress) onProgress(done, urls.length, url);
-        }
-      }
-
-      const workerCount = Math.min(concurrency, pendingUrls.length);
-      const workers = [];
-      for (let i = 0; i < workerCount; i++) workers.push(worker());
-      await Promise.all(workers);
-      return done;
+      const usageStr =
+        usageBytes > 0 && window.AudioDownloadCore
+          ? ` • ${window.AudioDownloadCore.formatAudioBytesBn(usageBytes, false)}`
+          : '';
+      sidebarPersistSub.textContent = isPersisted
+        ? `স্থায়ী সুরক্ষা সক্রিয় আছে${usageStr}`
+        : `ক্যাশ ক্লিয়ার থেকে অফলাইন ডাটা রক্ষা করুন${usageStr}`;
     }
+    window.updateStoragePersistenceUI = updateStoragePersistenceUI;
 
-    function surahAudioUrlsForSurah(s) {
-      const sPad = String(s.surah).padStart(3, '0');
-      return [`${SURAH_AUDIO_BASE}/${sPad}.mp3`];
+    // Pre-initialize Audio Download Manager silently if needed
+    if (window.AudioDownloadManager && typeof window.AudioDownloadManager.refresh === 'function') {
+      window.refreshDownloadPanels = () => window.AudioDownloadManager.refresh();
     }
-
-    async function wordUrlsForSurah(s) {
-      const content = await QuranDB.loadSurah(s.surah);
-      const urls = [];
-      (content.ayahs || []).forEach((ayah) => {
-        (ayah.words || []).forEach((w) => {
-          const [ws, wa, wp] = w.key.split(':').map((n) => String(n).padStart(3, '0'));
-          urls.push(`${WORD_AUDIO_BASE}/${ws}_${wa}_${wp}.mp3`);
-        });
-      });
-      return urls;
-    }
-
-    function getSurahDisplayName(sNum) {
-      const surahInfo = globalSurahsMeta.find((item) => item.surah === sNum);
-      return surahInfo ? (surahInfo.name_bn_script || surahInfo.name_bn || surahInfo.name_transliteration) : `সূরা ${toBn(sNum)}`;
-    }
-
-    function updateDownloadProgressUI(type, done, total, url, activeBtn, opts) {
-      const surahMatch = url ? url.match(/\/(\d{3})\.mp3/) : null;
-      const wordMatch = url ? url.match(/\/(\d{3})_(\d{3})_(\d{3})\.mp3/) : null;
-      const sNum = wordMatch ? parseInt(wordMatch[1], 10) : (surahMatch ? parseInt(surahMatch[1], 10) : null);
-
-      const overallPct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-      if (activeBtn && !(opts && opts.skipBtnUpdate)) {
-        if (window.DownloadHeaderHelper) {
-          window.DownloadHeaderHelper.setDownloadButtonState(
-            activeBtn,
-            Icons.pause,
-            `ডাউনলোড বিরতি দিন (${toBn(overallPct)}%)`
-          );
-        } else {
-          activeBtn.innerHTML = `<span class="icon">${Icons.pause}</span><span class="dl-btn-label">ডাউনলোড বিরতি দিন (${toBn(overallPct)}%)</span>`;
-        }
-      }
-
-      if (sNum) {
-        const surahName = getSurahDisplayName(sNum);
-        const surahInfo = globalSurahsMeta.find((item) => item.surah === sNum);
-        const surahTotal = surahInfo ? (type === 'ayah' ? 1 : surahInfo.total_words) : 1;
-
-        if (!activeDownloadCounts[type]) activeDownloadCounts[type] = {};
-        if (!(opts && opts.skipCountIncrement)) {
-          activeDownloadCounts[type][sNum] = type === 'ayah' ? 1 : (activeDownloadCounts[type][sNum] || 0) + 1;
-        }
-        const sDone = Math.min(activeDownloadCounts[type][sNum] || 0, surahTotal);
-
-        const countEl = document.getElementById(`dl-count-${type}-${sNum}`);
-        if (countEl) {
-          countEl.textContent = type === 'ayah'
-            ? (sDone >= 1 ? 'সংরক্ষিত' : '০%')
-            : `${toBn(sDone)} / ${toBn(surahTotal)}`;
-        }
-
-        const rowId = `dl-row-${type}-${sNum}`;
-        const rowEl = document.getElementById(rowId);
-        if (rowEl) {
-          if (sDone >= surahTotal) {
-            rowEl.classList.add('is-saved');
-            rowEl.classList.remove('downloading');
-            activeDownloadingRows.delete(rowId);
-          } else {
-            rowEl.classList.add('downloading');
-            activeDownloadingRows.add(rowId);
-          }
-        }
-
-        if (!(opts && opts.skipProgressBar)) {
-          if (type === 'ayah') {
-            lastTabStats.ayah.done = Object.values(activeDownloadCounts.ayah).filter((v) => v >= 1).length;
-            setActiveProgressBar(true, `সূরা ${surahName} (${toBn(done)}/${toBn(total)})`, overallPct);
-          } else {
-            const totalSavedWords = Object.values(activeDownloadCounts.word).reduce((sum, n) => sum + n, 0);
-            lastTabStats.word.done = totalSavedWords;
-            setActiveProgressBar(true, `সূরা ${surahName} — শব্দ অডিও`, overallPct);
-          }
-          renderSingleTopSummary();
-        }
-      }
-    }
-
-    function getInstantSurahsMetaFallback() {
-      if (globalSurahsMeta && globalSurahsMeta.length > 0) return globalSurahsMeta;
-      if (Array.isArray(window.SURAHS_META) && window.SURAHS_META.length > 0) {
-        return window.SURAHS_META.map((item) => ({
-          ...item,
-          surah: parseInt(item.surah || item.number, 10),
-          name_bn: item.name_bn || item.name_translation_bn || '',
-          name_bn_script: item.name_bn_script || item.name_transliteration || ''
-        }));
-      }
-      return [];
-    }
-
-    function ensureDownloadSurahRowsRendered(meta) {
-      if (!Array.isArray(meta) || meta.length === 0) return;
-
-      ['ayah', 'word'].forEach((type) => {
-        const listEl = document.getElementById(type === 'ayah' ? 'dl-list-ayah' : 'dl-list-word');
-        if (!listEl) return;
-        const alreadyBuilt = listEl.dataset.builtCount === String(meta.length) && listEl.children.length === meta.length;
-        if (alreadyBuilt) return;
-
-        const frag = document.createDocumentFragment();
-        meta.forEach((s) => {
-          const total = type === 'ayah' ? 1 : (s.total_words || 0);
-          const countLabel = type === 'ayah' ? 'ডাউনলোড' : `০ / ${toBn(total)}`;
-
-          const li = document.createElement('li');
-          li.className = 'dl-surah-row';
-          li.id = `dl-row-${type}-${s.surah}`;
-          li.innerHTML = `
-            <div class="dl-surah-name">
-              <span class="dl-surah-title">${toBn(String(s.surah).padStart(2, '0'))}. ${s.name_bn_script || s.name_bn || s.name_transliteration}</span>
-              <span class="dl-surah-count" id="dl-count-${type}-${s.surah}">${countLabel}</span>
-            </div>
-          `;
-
-          li.onclick = async () => {
-            if (isDownloading) {
-              UIOverlay.toast({
-                message: 'একটি ডাউনলোড ইতিমধ্যে চলছে, শেষ হওয়া পর্যন্ত অপেক্ষা করুন বা বিরতি দিন।',
-                type: 'warning'
-              });
-              return;
-            }
-            const currentDone = Math.min((activeDownloadCounts[type] && activeDownloadCounts[type][s.surah]) || 0, total);
-            if (currentDone >= total && total > 0) {
-              UIOverlay.toast({
-                message: 'এই সূরার সব অডিও আগেই ডাউনলোড করা আছে।',
-                type: 'info'
-              });
-              return;
-            }
-            const surahTitle = s.name_bn_script || s.name_bn || s.name_transliteration;
-            const rowCountEl = li.querySelector('.dl-surah-count');
-            if (rowCountEl && type === 'ayah') rowCountEl.textContent = '০%';
-            li.classList.add('downloading');
-            activeDownloadingRows.add(li.id);
-            isDownloading = true;
-            setActiveProgressBar(true, `সূরা ${surahTitle} ডাউনলোড হচ্ছে…`, total > 0 ? Math.round((currentDone / total) * 100) : 0);
-
-            try {
-              if (type === 'ayah' && QuranDB.getSurahSegments) {
-                await QuranDB.getSurahSegments(s.surah).catch(() => {});
-              }
-              const urls = type === 'ayah' ? surahAudioUrlsForSurah(s) : await wordUrlsForSurah(s);
-              await downloadAudioQueue(
-                urls,
-                (d, t, url, metaInfo) => {
-                  if (metaInfo && metaInfo.cachedSkipped) {
-                    const pct = t > 0 ? Math.round((d / t) * 100) : 0;
-                    setActiveProgressBar(true, `সূরা ${surahTitle} ডাউনলোড হচ্ছে…`, pct);
-                    return;
-                  }
-                  if (url) updateDownloadProgressUI(type, d, t, url, null);
-                },
-                () => false,
-                type === 'ayah'
-                  ? ({ percent }) => {
-                      if (rowCountEl) rowCountEl.textContent = `${toBn(percent)}%`;
-                      setActiveProgressBar(true, `সূরা ${surahTitle} ডাউনলোড হচ্ছে…`, percent);
-                      renderLiveStorageUsed(true);
-                    }
-                  : null,
-                { concurrency: type === 'ayah' ? 1 : getConcurrencyLimits().wordAudio }
-              );
-              UIOverlay.toast({
-                message: `সূরা ${surahTitle}-এর অডিও ডাউনলোড সম্পন্ন`,
-                type: 'success'
-              });
-            } catch (err) {
-              console.error(err);
-              UIOverlay.toast({
-                message: 'ডাউনলোড করার সময় সমস্যা হয়েছে, ইন্টারনেট সংযোগ চেক করুন।',
-                type: 'error'
-              });
-            } finally {
-              isDownloading = false;
-              clearAllDownloadingRows();
-              setActiveProgressBar(false);
-              refreshDownloadPanels();
-            }
-          };
-
-          frag.appendChild(li);
-        });
-
-        listEl.innerHTML = '';
-        listEl.appendChild(frag);
-        listEl.dataset.builtCount = String(meta.length);
-      });
-    }
-
-    function applyCachedCountsToDownloadRows(meta, ayahCounts, wordCounts) {
-      if (!Array.isArray(meta) || meta.length === 0) return;
-
-      ['ayah', 'word'].forEach((type) => {
-        const counts = type === 'ayah' ? ayahCounts : wordCounts;
-        let totalDone = 0;
-        let totalAll = 0;
-
-        meta.forEach((s) => {
-          const total = type === 'ayah' ? 1 : (s.total_words || 0);
-          const done = Math.min(counts[s.surah] || 0, total);
-          totalDone += done;
-          totalAll += total;
-
-          const isSaved = total > 0 && done >= total;
-          const countLabel = type === 'ayah'
-            ? (isSaved ? 'সংরক্ষিত' : 'ডাউনলোড')
-            : `${toBn(done)} / ${toBn(total)}`;
-
-          const rowEl = document.getElementById(`dl-row-${type}-${s.surah}`);
-          if (rowEl && !activeDownloadingRows.has(rowEl.id)) {
-            rowEl.classList.toggle('is-saved', isSaved);
-          }
-          const countEl = document.getElementById(`dl-count-${type}-${s.surah}`);
-          if (countEl && (!rowEl || !activeDownloadingRows.has(rowEl.id))) {
-            countEl.textContent = countLabel;
-          }
-        });
-
-        lastTabStats[type] = { done: totalDone, total: totalAll };
-      });
-
-      renderSingleTopSummary();
-    }
-
-    async function refreshDownloadPanels() {
-      // 1. Render last-known storage & 114 Surah list IMMEDIATELY (0ms wait — never blank!)
-      if (baseStorageUsageBytes > 0) {
-        renderLiveStorageUsed(false);
-      } else {
-        const storageEl = document.getElementById('dl-storage-used-text');
-        if (storageEl) storageEl.textContent = 'হিসাব হচ্ছে…';
-      }
-
-      let meta = getInstantSurahsMetaFallback();
-      if (meta.length > 0) {
-        globalSurahsMeta = meta;
-        ensureDownloadSurahRowsRendered(meta);
-        applyCachedCountsToDownloadRows(meta, activeDownloadCounts.ayah || {}, activeDownloadCounts.word || {});
-      }
-
-      // 2. Kick off storage measurement & offline status in parallel (NEVER blocks Surah list!)
-      refreshBaseStorageUsage().catch(() => {});
-      refreshOfflineDataStatusUI();
-
-      // 3. Ensure full normalized metadata if fallback wasn't ready
-      if (meta.length === 0 && window.QuranDB && typeof window.QuranDB.getSurahsMeta === 'function') {
-        try {
-          meta = await window.QuranDB.getSurahsMeta();
-          if (Array.isArray(meta) && meta.length > 0) {
-            globalSurahsMeta = meta;
-            ensureDownloadSurahRowsRendered(meta);
-          }
-        } catch (e) {}
-      }
-
-      // 4. Fast cache.keys() scan to update exact saved counts on all 114 rows & top summary
-      try {
-        const { wordCounts, ayahCounts } = await getCachedCounts();
-        activeDownloadCounts = {
-          ayah: { ...ayahCounts },
-          word: { ...wordCounts }
-        };
-        applyCachedCountsToDownloadRows(globalSurahsMeta, ayahCounts, wordCounts);
-      } catch (e) {
-        console.warn('[AudioManager] Cache count refresh notice:', e);
-      }
-    }
-    window.refreshDownloadPanels = refreshDownloadPanels;
-
-    document.getElementById('dl-all-ayah').onclick = async () => {
-      const btn = document.getElementById('dl-all-ayah');
-      if (isDownloading) {
-        stopRequested = true;
-        btn.textContent = 'থামানো হচ্ছে…';
-        return;
-      }
-
-      const meta = await QuranDB.getSurahsMeta();
-      globalSurahsMeta = meta;
-      const totalSurahs = meta.length || 114;
-
-      const cache = await caches.open(AUDIO_CACHE);
-      let cachedUrlSet = new Set();
-      try {
-        const keys = await cache.keys();
-        cachedUrlSet = new Set(keys.map((k) => k.url));
-      } catch (e) {}
-
-      const pendingSurahs = meta.filter((s) => !cachedUrlSet.has(surahAudioUrlsForSurah(s)[0]));
-      if (pendingSurahs.length === 0) {
-        UIOverlay.toast({ message: 'সব সূরার তিলাওয়াত আগেই সংরক্ষিত আছে।', type: 'info' });
-        return;
-      }
-
-      if (navigator.storage && navigator.storage.persist) {
-        try {
-          await navigator.storage.persist();
-          updateStoragePersistenceUI();
-        } catch (e) {}
-      }
-      await refreshBaseStorageUsage();
-
-      isDownloading = true;
-      stopRequested = false;
-      const limits = getConcurrencyLimits();
-      const surahConcurrency = Math.min(limits.surahAudio, pendingSurahs.length);
-
-      const setBtn = (iconSvg, labelText) => {
-        if (window.DownloadHeaderHelper) {
-          window.DownloadHeaderHelper.setDownloadButtonState(btn, iconSvg, labelText);
-        } else {
-          btn.innerHTML = `<span class="icon">${iconSvg}</span><span class="dl-btn-label">${labelText}</span>`;
-        }
-      };
-
-      setBtn(Icons.pause, 'ডাউনলোড বিরতি দিন');
-      btn.classList.add('btn-active-downloading');
-
-      let completedSurahs = totalSurahs - pendingSurahs.length;
-      const surahPctMap = new Map();
-      let nextIdx = 0;
-      const headerThrottle = window.DownloadHeaderHelper
-        ? window.DownloadHeaderHelper.createThrottleGate(300)
-        : { shouldEmit: () => true };
-
-      function emitSurahBatchProgress(force) {
-        if (!headerThrottle.shouldEmit(Date.now(), Boolean(force))) return;
-        let activePartial = 0;
-        const activeSurahs = [];
-        surahPctMap.forEach((pct, sNum) => {
-          activePartial += pct / 100;
-          activeSurahs.push(sNum);
-        });
-        const floatDone = completedSurahs + activePartial;
-        const overallPct = Math.min(100, Math.round((floatDone / totalSurahs) * 100));
-        setBtn(Icons.pause, `ডাউনলোড বিরতি দিন (${toBn(overallPct)}%)`);
-        const headerState = window.DownloadHeaderHelper
-          ? window.DownloadHeaderHelper.formatParallelSurahHeader({
-              activeSurahs,
-              completedSurahs,
-              totalSurahs,
-              overallPercent: overallPct,
-              meta
-            })
-          : {
-              label: `তিলাওয়াত ডাউনলোড (${toBn(completedSurahs)}/${toBn(totalSurahs)})`,
-              percent: overallPct
-            };
-        setActiveProgressBar(true, headerState.label, headerState.percent);
-        renderLiveStorageUsed(true);
-      }
-
-      try {
-        async function surahWorker() {
-          while (nextIdx < pendingSurahs.length) {
-            if (stopRequested) break;
-            const s = pendingSurahs[nextIdx++];
-            const url = surahAudioUrlsForSurah(s)[0];
-            const rowId = `dl-row-ayah-${s.surah}`;
-            const rowEl = document.getElementById(rowId);
-            const rowCountEl = document.getElementById(`dl-count-ayah-${s.surah}`);
-
-            if (rowEl) {
-              rowEl.classList.add('downloading');
-              activeDownloadingRows.add(rowId);
-            }
-            if (rowCountEl) rowCountEl.textContent = '০%';
-            surahPctMap.set(s.surah, 0);
-            emitSurahBatchProgress(true);
-
-            const [, ok] = await Promise.all([
-              QuranDB.getSurahSegments ? QuranDB.getSurahSegments(s.surah).catch(() => {}) : Promise.resolve(),
-              downloadOneAudio(
-                cache,
-                url,
-                ({ percent }) => {
-                  surahPctMap.set(s.surah, percent);
-                  if (rowCountEl) rowCountEl.textContent = `${toBn(percent)}%`;
-                  emitSurahBatchProgress(false);
-                },
-                () => stopRequested,
-                cachedUrlSet
-              )
-            ]);
-
-            surahPctMap.delete(s.surah);
-            if (ok && !stopRequested) {
-              completedSurahs++;
-              updateDownloadProgressUI('ayah', Math.min(completedSurahs, totalSurahs), totalSurahs, url, btn, {
-                skipBtnUpdate: true,
-                skipProgressBar: true
-              });
-              lastTabStats.ayah.done = completedSurahs;
-              renderSingleTopSummary();
-              emitSurahBatchProgress(true);
-            } else if (rowEl) {
-              rowEl.classList.remove('downloading');
-              activeDownloadingRows.delete(rowId);
-              if (rowCountEl && !activeDownloadCounts.ayah[s.surah]) {
-                rowCountEl.textContent = 'ডাউনলোড';
-              }
-            }
-          }
-        }
-
-        const workers = [];
-        for (let w = 0; w < surahConcurrency; w++) workers.push(surahWorker());
-        await Promise.all(workers);
-      } catch (err) {
-        console.error('[Download] Error:', err);
-      } finally {
-        const wasStopped = stopRequested;
-        isDownloading = false;
-        inFlightBytesMap.clear();
-        clearAllDownloadingRows();
-        btn.classList.remove('btn-active-downloading');
-        setBtn(Icons.download, 'সব সূরার পূর্ণাঙ্গ তিলাওয়াত ডাউনলোড করুন');
-        setActiveProgressBar(false);
-        if (wasStopped) {
-          UIOverlay.toast({
-            message: 'ডাউনলোড সাময়িকভাবে বিরতি দেওয়া হয়েছে।',
-            type: 'info'
-          });
-        } else if (completedSurahs >= totalSurahs) {
-          UIOverlay.alert({
-            title: 'সূরা তিলাওয়াত সংরক্ষণ সম্পন্ন',
-            message: `আলহামদুলিল্লাহ! সব সূরার পূর্ণাঙ্গ তিলাওয়াত অডিও (${toBn(totalSurahs)}টি সূরা) সফলভাবে অফলাইনে সংরক্ষিত হয়েছে।`,
-            type: 'success'
-          });
-        } else {
-          UIOverlay.toast({
-            message: `${toBn(completedSurahs)} / ${toBn(totalSurahs)} সূরা সংরক্ষিত হয়েছে। বাকিগুলো পেতে আবার চাপুন।`,
-            type: 'warning'
-          });
-        }
-        refreshDownloadPanels();
-      }
-    };
-
-    document.getElementById('dl-all-word').onclick = async () => {
-      const btn = document.getElementById('dl-all-word');
-      if (isDownloading) {
-        stopRequested = true;
-        btn.textContent = 'থামানো হচ্ছে…';
-        return;
-      }
-
-      const meta = await QuranDB.getSurahsMeta();
-      globalSurahsMeta = meta;
-
-      let totalWords = 0;
-      meta.forEach((s) => { totalWords += (s.total_words || 0); });
-
-      const cache = await caches.open(AUDIO_CACHE);
-      let cachedUrlSet = new Set();
-      const cachedWordCounts = {};
-      try {
-        const keys = await cache.keys();
-        for (const req of keys) {
-          cachedUrlSet.add(req.url);
-          if (req.url.includes('audio.qurancdn.com/wbw') || req.url.includes('/wbw/')) {
-            const m = req.url.match(/\/(\d{3})_(\d{3})_(\d{3})\.mp3/);
-            if (m) {
-              const s = parseInt(m[1], 10);
-              cachedWordCounts[s] = (cachedWordCounts[s] || 0) + 1;
-            }
-          }
-        }
-      } catch (e) {}
-
-      activeDownloadCounts.word = { ...cachedWordCounts };
-      let overallDone = Object.values(cachedWordCounts).reduce((sum, n) => sum + n, 0);
-      const pendingSurahs = meta.filter((s) => (cachedWordCounts[s.surah] || 0) < (s.total_words || 0));
-
-      if (pendingSurahs.length === 0) {
-        UIOverlay.toast({ message: 'সব শব্দের অডিও আগেই সংরক্ষিত আছে।', type: 'info' });
-        return;
-      }
-
-      if (navigator.storage && navigator.storage.persist) {
-        try {
-          await navigator.storage.persist();
-          updateStoragePersistenceUI();
-        } catch (e) {}
-      }
-      await refreshBaseStorageUsage();
-
-      isDownloading = true;
-      stopRequested = false;
-      const limits = getConcurrencyLimits();
-      const wordConcurrency = limits.wordAudio;
-
-      const setWordBtn = (iconSvg, labelText) => {
-        if (window.DownloadHeaderHelper) {
-          window.DownloadHeaderHelper.setDownloadButtonState(btn, iconSvg, labelText);
-        } else {
-          btn.innerHTML = `<span class="icon">${iconSvg}</span><span class="dl-btn-label">${labelText}</span>`;
-        }
-      };
-
-      setWordBtn(Icons.pause, 'ডাউনলোড বিরতি দিন');
-      btn.classList.add('btn-active-downloading');
-
-      // Lookahead prefetcher: loads next 3 surahs' word URL lists ahead while workers stream continuously
-      const prefetchedQueue = [];
-      let prefetchCursor = 0;
-      const PREFETCH_AHEAD = 3;
-
-      async function feedPrefetcher() {
-        while (prefetchCursor < pendingSurahs.length && prefetchedQueue.length < PREFETCH_AHEAD && !stopRequested) {
-          const s = pendingSurahs[prefetchCursor++];
-          const p = wordUrlsForSurah(s)
-            .then((urls) => ({
-              surah: s.surah,
-              pendingUrls: urls.filter((u) => !cachedUrlSet.has(u))
-            }))
-            .catch(() => ({ surah: s.surah, pendingUrls: [] }));
-          prefetchedQueue.push(p);
-        }
-      }
-
-      let activeSurahIdx = 0;
-      let activeSurahPending = null;
-      let activeItemCursor = 0;
-      let loaderPromise = null;
-      const wordHeaderThrottle = window.DownloadHeaderHelper
-        ? window.DownloadHeaderHelper.createThrottleGate(300)
-        : { shouldEmit: () => true };
-
-      function emitWordBatchHeader(force) {
-        if (!wordHeaderThrottle.shouldEmit(Date.now(), Boolean(force))) return;
-        const headerState = window.DownloadHeaderHelper
-          ? window.DownloadHeaderHelper.formatParallelWordHeader({
-              meta,
-              counts: activeDownloadCounts.word,
-              overallDone: Math.min(overallDone, totalWords),
-              totalWords
-            })
-          : {
-              label: `শব্দ অডিও ডাউনলোড (${toBn(Math.min(overallDone, totalWords))}/${toBn(totalWords)})`,
-              percent: totalWords > 0 ? Math.min(100, Math.round((overallDone / totalWords) * 100)) : 0
-            };
-
-        setWordBtn(Icons.pause, `ডাউনলোড বিরতি দিন (${toBn(headerState.percent)}%)`);
-        setActiveProgressBar(true, headerState.label, headerState.percent);
-        lastTabStats.word.done = Math.min(overallDone, totalWords);
-        renderSingleTopSummary();
-      }
-
-      async function getNextWordTask() {
-        while (!stopRequested) {
-          if (activeSurahPending && activeItemCursor < activeSurahPending.pendingUrls.length) {
-            return {
-              surah: activeSurahPending.surah,
-              url: activeSurahPending.pendingUrls[activeItemCursor++]
-            };
-          }
-          if (loaderPromise) {
-            await loaderPromise;
-            continue;
-          }
-          if (activeSurahIdx >= pendingSurahs.length) {
-            return null;
-          }
-          loaderPromise = (async () => {
-            await feedPrefetcher();
-            if (prefetchedQueue.length > 0) {
-              activeSurahPending = await prefetchedQueue.shift();
-              activeItemCursor = 0;
-              activeSurahIdx++;
-              feedPrefetcher();
-            } else {
-              activeSurahPending = null;
-              activeSurahIdx = pendingSurahs.length;
-            }
-          })();
-          try {
-            await loaderPromise;
-          } finally {
-            loaderPromise = null;
-          }
-        }
-        return null;
-      }
-
-      try {
-        await feedPrefetcher();
-        emitWordBatchHeader(true);
-
-        async function continuousWordWorker() {
-          while (!stopRequested) {
-            const task = await getNextWordTask();
-            if (!task || stopRequested) break;
-            const ok = await downloadOneAudio(cache, task.url, null, () => stopRequested, cachedUrlSet);
-            if (stopRequested) break;
-            if (ok) {
-              overallDone++;
-              updateDownloadProgressUI('word', Math.min(overallDone, totalWords), totalWords, task.url, btn, {
-                skipBtnUpdate: true,
-                skipProgressBar: true
-              });
-              emitWordBatchHeader(overallDone >= totalWords);
-            }
-          }
-        }
-
-        const workers = [];
-        for (let w = 0; w < wordConcurrency; w++) workers.push(continuousWordWorker());
-        await Promise.all(workers);
-      } catch (err) {
-        console.error('[Download] Error:', err);
-      } finally {
-        const wasStopped = stopRequested;
-        isDownloading = false;
-        inFlightBytesMap.clear();
-        clearAllDownloadingRows();
-        btn.classList.remove('btn-active-downloading');
-        setWordBtn(Icons.download, 'সব শব্দের অডিও ডাউনলোড করুন');
-        setActiveProgressBar(false);
-        if (wasStopped) {
-          UIOverlay.toast({
-            message: 'ডাউনলোড সাময়িকভাবে বিরতি দেওয়া হয়েছে।',
-            type: 'info'
-          });
-        } else if (overallDone >= totalWords) {
-          UIOverlay.alert({
-            title: 'শব্দ অডিও সংরক্ষণ সম্পন্ন',
-            message: `আলহামদুলিল্লাহ! সব শব্দের অডিও (${toBn(totalWords)}টি) সফলভাবে অফলাইনে সংরক্ষিত হয়েছে।`,
-            type: 'success'
-          });
-        } else {
-          UIOverlay.toast({
-            message: `${toBn(overallDone)} / ${toBn(totalWords)} শব্দ অডিও সংরক্ষিত হয়েছে। বাকিগুলো পেতে আবার চাপুন।`,
-            type: 'warning'
-          });
-        }
-        refreshDownloadPanels();
-      }
-    };
 
     // Initial Offline Status Check
     setTimeout(refreshOfflineDataStatusUI, 800);

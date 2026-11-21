@@ -1028,90 +1028,145 @@ button { font-family: inherit; }
 
 /* ---------- Dedicated Audio Download Manager Page (#view-downloads) ---------- */
 .downloads-page-container {
+  width: 100%;
+  max-width: 100%;
   padding: var(--space-4) var(--space-4) calc(var(--space-7) + 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-x: hidden;
+}
+
+.dl-overview-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow-soft);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.dl-single-status-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: var(--shadow-soft);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-[data-theme='dark'] .dl-single-status-card {
+[data-theme='dark'] .dl-overview-card {
   background: hsl(160 16% 12%);
   border-color: hsl(160 14% 22%);
 }
 
-.dl-single-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.dl-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.dl-status-metric {
+.dl-overview-metric {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
+  padding-right: 8px;
+  border-right: 1px solid var(--border-subtle);
 }
 
-.dl-status-metric-end {
-  text-align: end;
-  align-items: flex-end;
-}
-
-.dl-status-divider {
-  width: 1px;
-  height: 28px;
-  background: var(--border-subtle);
-  flex-shrink: 0;
+.dl-overview-metric:last-child {
+  border-right: none;
+  padding-right: 0;
 }
 
 .dl-status-label {
   font-family: var(--font-bangla);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dl-status-value {
   font-family: var(--font-bangla);
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dl-status-value-accent {
+  color: var(--color-primary);
+}
+
+[data-theme='dark'] .dl-status-value-accent {
+  color: #6ee7b7;
 }
 
 .dl-single-progress-wrap {
-  padding-top: 8px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+
+.dl-active-bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .dl-single-progress-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
   font-family: var(--font-bangla);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--text-primary);
+}
+
+.dl-single-progress-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dl-single-progress-meta strong {
   color: var(--color-primary);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+}
+
+[data-theme='dark'] .dl-single-progress-meta strong {
+  color: #6ee7b7;
+}
+
+.dl-stop-all-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid hsl(0 65% 52% / 0.35);
+  background: hsl(0 72% 52% / 0.08);
+  color: hsl(0 68% 42%);
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.dl-stop-all-btn:hover {
+  background: hsl(0 72% 52% / 0.16);
+}
+
+[data-theme='dark'] .dl-stop-all-btn {
+  color: #fca5a5;
+  border-color: hsl(0 72% 65% / 0.35);
+  background: hsl(0 72% 55% / 0.14);
 }
 
 .dl-single-progress-wrap .download-progress-track {
@@ -1128,13 +1183,13 @@ button { font-family: inherit; }
 }
 
 .dl-tab {
-  min-height: 40px;
-  padding: 8px 10px;
+  min-height: 44px;
+  padding: 8px 12px;
   border: none;
   border-radius: 9px;
   background: transparent;
   font-family: var(--font-bangla);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -1157,29 +1212,111 @@ button { font-family: inherit; }
 .dl-tab-panel {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dl-bulk-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.dl-bulk-bar .download-all-btn {
+  min-height: 46px;
+  margin: 0;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dl-delete-all-btn {
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid hsl(0 64% 52% / 0.35);
+  background: var(--bg-surface);
+  color: hsl(0 66% 44%);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.dl-delete-all-btn:hover:not(:disabled) {
+  background: hsl(0 72% 52% / 0.09);
+}
+
+.dl-delete-all-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.dl-delete-all-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .dl-delete-all-btn {
+  background: hsl(160 16% 12%);
+  color: #fca5a5;
+  border-color: hsl(0 72% 65% / 0.32);
+}
+
+[data-theme='dark'] .dl-delete-all-btn:disabled {
+  color: var(--text-secondary);
+  border-color: hsl(160 14% 22%);
 }
 
 .dl-surah-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
+}
+
+[data-theme='dark'] .dl-surah-list {
+  background: hsl(160 16% 11%);
+  border-color: hsl(160 14% 20%);
 }
 
 .dl-surah-row {
   padding: 12px 14px;
-  min-height: 48px;
+  min-height: 66px;
+  min-width: 0;
+  max-width: 100%;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   transition: background var(--transition-fast);
+}
+
+.dl-surah-row.is-saved {
+  background: hsl(156 54% 22% / 0.035);
+}
+
+[data-theme='dark'] .dl-surah-row.is-saved {
+  background: hsl(156 54% 48% / 0.06);
 }
 
 .dl-surah-row:last-child {
@@ -1191,48 +1328,334 @@ button { font-family: inherit; }
 }
 
 .dl-surah-row.downloading {
-  background: var(--color-primary-soft);
+  background: hsl(156 54% 22% / 0.07);
 }
 
-.dl-surah-name {
+.dl-surah-row.is-queued {
+  background: hsl(38 80% 50% / 0.06);
+}
+
+[data-theme='dark'] .dl-surah-row.downloading {
+  background: hsl(156 52% 45% / 0.12);
+}
+
+[data-theme='dark'] .dl-surah-row.is-queued {
+  background: hsl(38 72% 52% / 0.1);
+}
+
+.dl-row-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dl-row-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
   font-family: var(--font-bangla);
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dl-surah-row.is-saved .dl-row-num {
+  background: hsl(156 54% 22% / 0.12);
+  color: var(--color-primary);
+}
+
+[data-theme='dark'] .dl-surah-row.is-saved .dl-row-num {
+  background: hsl(156 54% 48% / 0.16);
+  color: #6ee7b7;
+}
+
+.dl-surah-row.downloading .dl-row-num {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.dl-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dl-row-title-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
 .dl-surah-title {
+  font-family: var(--font-bangla);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dl-surah-count {
-  font-size: 0.76rem;
-  font-weight: 600;
+.dl-surah-ar {
+  font-family: var(--font-arabic);
+  font-size: 1rem;
   color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.dl-surah-row.is-saved .dl-surah-count {
-  color: var(--color-primary);
+.dl-row-meta {
+  font-family: var(--font-bangla);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-[data-theme='dark'] .dl-surah-row.is-saved .dl-surah-count {
+.dl-meta-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.dl-meta-completed > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .dl-meta-completed {
   color: #6ee7b7;
 }
 
-.dl-surah-row.downloading .dl-surah-count {
+.dl-check-inline {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dl-check-inline svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dl-meta-downloading {
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .dl-meta-downloading {
+  color: #6ee7b7;
+}
+
+.dl-meta-partial,
+.dl-meta-queued {
+  color: hsl(34 86% 36%);
+  font-weight: 600;
+}
+
+[data-theme='dark'] .dl-meta-partial,
+[data-theme='dark'] .dl-meta-queued {
+  color: #fbbf24;
+}
+
+.dl-row-bar {
+  width: 100%;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.dl-row-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width 140ms linear;
+}
+
+.dl-surah-row.is-partial .dl-row-bar-fill {
+  background: hsl(38 88% 46%);
+}
+
+[data-theme='dark'] .dl-row-bar-fill {
+  background: #34d399;
+}
+
+[data-theme='dark'] .dl-surah-row.is-partial .dl-row-bar-fill {
+  background: #fbbf24;
+}
+
+.dl-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dl-icon-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.dl-icon-btn:active {
+  transform: scale(0.94);
+}
+
+.dl-icon-btn .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.dl-action-btn.is-idle,
+.dl-action-btn.is-partial {
+  background: var(--bg-muted);
+  color: var(--color-primary);
+}
+
+.dl-action-btn.is-idle:hover,
+.dl-action-btn.is-partial:hover {
+  background: hsl(156 54% 22% / 0.14);
+}
+
+[data-theme='dark'] .dl-action-btn.is-idle,
+[data-theme='dark'] .dl-action-btn.is-partial {
+  background: hsl(160 16% 18%);
+  color: #6ee7b7;
+}
+
+.dl-action-btn.is-queued {
+  background: hsl(38 80% 50% / 0.14);
+  color: hsl(34 86% 36%);
+}
+
+[data-theme='dark'] .dl-action-btn.is-queued {
+  background: hsl(38 80% 50% / 0.18);
+  color: #fbbf24;
+}
+
+.dl-action-btn.is-completed {
+  color: var(--color-primary);
+  background: hsl(156 54% 22% / 0.1);
+}
+
+[data-theme='dark'] .dl-action-btn.is-completed {
+  color: #6ee7b7;
+  background: hsl(156 54% 48% / 0.14);
+}
+
+.dl-action-btn.is-downloading {
+  color: var(--color-primary);
+}
+
+[data-theme='dark'] .dl-action-btn.is-downloading {
+  color: #6ee7b7;
+}
+
+.dl-ring-svg {
+  width: 38px;
+  height: 38px;
+  transform: rotate(-90deg);
+}
+
+.dl-ring-track {
+  fill: none;
+  stroke: var(--border-subtle);
+  stroke-width: 2.8;
+}
+
+.dl-ring-fill {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 140ms linear;
+}
+
+[data-theme='dark'] .dl-ring-fill {
+  stroke: #34d399;
+}
+
+.dl-stop-center {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(0 68% 46%);
+}
+
+.dl-stop-center svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-theme='dark'] .dl-stop-center {
+  color: #fca5a5;
+}
+
+.dl-delete-btn {
+  color: var(--text-secondary);
+}
+
+.dl-delete-btn:hover {
+  background: hsl(0 72% 52% / 0.1);
+  color: hsl(0 68% 44%);
+}
+
+[data-theme='dark'] .dl-delete-btn:hover {
+  background: hsl(0 72% 55% / 0.16);
+  color: #fca5a5;
+}
+
+@media (max-width: 420px) {
+  .dl-overview-grid {
+    gap: 6px;
+  }
+
+  .dl-status-value {
+    font-size: 0.9rem;
+  }
+
+  .dl-surah-ar {
+    display: none;
+  }
 }
 
 /* ---------- Inline SVG icons ---------- */
