@@ -1167,7 +1167,13 @@
       navigateTo('account', {}, false);
       return;
     }
-    if (hash.startsWith('#word=')) {
+    const deepLink = (window.WordShareCore && typeof window.WordShareCore.parseWordKeyFromLocation === 'function')
+      ? window.WordShareCore.parseWordKeyFromLocation(search, hash)
+      : { wordKey: null, source: null };
+
+    if (deepLink.wordKey && deepLink.source === 'hash') {
+      navigateTo('word', { wordId: deepLink.wordKey }, pushState);
+    } else if (hash.startsWith('#word=')) {
       const wordId = hash.replace('#word=', '');
       navigateTo('word', { wordId }, pushState);
     } else if (hash.startsWith('#surah=')) {
@@ -1189,6 +1195,21 @@
       navigateTo('account', {}, pushState);
     } else if (hash === '#downloads') {
       navigateTo('downloads', {}, pushState);
+    } else if (deepLink.wordKey && deepLink.source === 'query') {
+      // Normalize ?word=S:A:P (and strip fbclid/utm params) cleanly onto #word=S:A:P
+      // so subsequent Back/Home navigation is never hijacked by the query string.
+      if (window.history && typeof window.history.replaceState === 'function') {
+        try {
+          window.history.replaceState(
+            { view: 'word', params: { wordId: deepLink.wordKey } },
+            '',
+            window.location.pathname + '#word=' + deepLink.wordKey
+          );
+        } catch (_err) {
+          // Ignore restricted history environments
+        }
+      }
+      navigateTo('word', { wordId: deepLink.wordKey }, false);
     } else {
       navigateTo('surahs', {}, pushState);
     }
@@ -1245,11 +1266,16 @@
     }
 
     const backBtn = document.getElementById('topbar-back-btn');
+    const shareBtn = document.getElementById('topbar-share-btn');
     const bookmarkBtn = document.getElementById('topbar-bookmark-btn');
     const titleEl = document.getElementById('topbar-title');
     const eyebrowEl = document.getElementById('topbar-eyebrow');
 
+    if (shareBtn) shareBtn.style.display = 'none';
     if (bookmarkBtn) bookmarkBtn.style.display = 'none';
+    if (state.currentView !== 'word' && window.WordShareCard && typeof window.WordShareCard.close === 'function') {
+      window.WordShareCard.close();
+    }
 
     switch (state.currentView) {
       case 'surahs':
@@ -1268,6 +1294,7 @@
 
       case 'word':
         if (backBtn) backBtn.style.display = 'grid';
+        if (shareBtn) shareBtn.style.display = 'grid';
         if (bookmarkBtn) bookmarkBtn.style.display = 'grid';
         document.getElementById('view-word').classList.add('active');
         renderWordDetailView(state.selectedWordKey);
@@ -1963,12 +1990,14 @@
     const container = document.getElementById('word-detail-container');
     const titleEl = document.getElementById('topbar-title');
     const eyebrowEl = document.getElementById('topbar-eyebrow');
+    const shareBtn = document.getElementById('topbar-share-btn');
     const bookmarkBtn = document.getElementById('topbar-bookmark-btn');
 
     container.innerHTML = '<div class="loading-spinner" style="margin:40px auto"></div>';
 
     const word = await QuranDB.getWordDetail(wordKey);
     if (!word) {
+      if (shareBtn) shareBtn.onclick = null;
       container.innerHTML = '<div class="card error-box">শব্দটি খুঁজে পাওয়া যায়নি।</div>';
       return;
     }
@@ -2019,6 +2048,36 @@
     state.currentWordNextKey = nextKey;
 
     const surahNameBn = surahMeta ? (surahMeta.name_bn || surahMeta.name) : `সূরা ${toBnNumber(word.surah)}`;
+    const shareSurahNameBn = surahMeta
+      ? (surahMeta.name_bn_script || surahMeta.name_bn || surahMeta.name)
+      : `সূরা ${toBnNumber(word.surah)}`;
+
+    // Start exact-word concordance lookup once and share result between concordance table & Share Card
+    const exactKeysPromise = QuranDB.getWordsByExactArabic(word.arabic, wordKey).catch(() => [wordKey]);
+    let resolvedExactOccurrences = null;
+
+    if (shareBtn) {
+      shareBtn.onclick = async () => {
+        if (!window.WordShareCard || typeof window.WordShareCard.open !== 'function') return;
+        let occurrences = resolvedExactOccurrences;
+        if (!occurrences) {
+          const rawKeys = await exactKeysPromise;
+          const uniqueKeys = new Set((rawKeys || []).filter(Boolean));
+          uniqueKeys.add(wordKey);
+          occurrences = Math.max(1, uniqueKeys.size);
+          resolvedExactOccurrences = occurrences;
+        }
+        window.WordShareCard.open({
+          wordKey,
+          arabic: word.arabic,
+          surah: word.surah,
+          ayah: word.ayah,
+          position: word.position,
+          surahNameBn: shareSurahNameBn,
+          occurrences,
+        });
+      };
+    }
 
     container.innerHTML = '';
 
@@ -2327,7 +2386,7 @@
     (async () => {
       try {
         const [exactKeysRaw, rootKeysRaw] = await Promise.all([
-          QuranDB.getWordsByExactArabic(word.arabic, wordKey),
+          exactKeysPromise,
           word.root ? QuranDB.getWordsByRoot(word.root) : Promise.resolve([])
         ]);
 
@@ -2341,6 +2400,7 @@
             exactKeys.push(k);
           }
         }
+        resolvedExactOccurrences = Math.max(1, exactKeys.length);
 
         const excluded = new Set(exactSeen);
         excluded.add(wordKey);
@@ -6188,6 +6248,7 @@
     // Keyboard Left/Right Arrow Navigation on Word Detail page
     window.addEventListener('keydown', (e) => {
       if (state.currentView !== 'word') return;
+      if (window.WordShareCard && typeof window.WordShareCard.isOpen === 'function' && window.WordShareCard.isOpen()) return;
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
       if (e.key === 'ArrowLeft') {
@@ -6202,12 +6263,14 @@
     let touchStartY = 0;
     document.addEventListener('touchstart', (e) => {
       if (state.currentView !== 'word') return;
+      if (window.WordShareCard && typeof window.WordShareCard.isOpen === 'function' && window.WordShareCard.isOpen()) return;
       touchStartX = e.changedTouches[0].screenX;
       touchStartY = e.changedTouches[0].screenY;
     }, { passive: true });
 
     document.addEventListener('touchend', (e) => {
       if (state.currentView !== 'word') return;
+      if (window.WordShareCard && typeof window.WordShareCard.isOpen === 'function' && window.WordShareCard.isOpen()) return;
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
       const deltaX = e.changedTouches[0].screenX - touchStartX;
       const deltaY = e.changedTouches[0].screenY - touchStartY;

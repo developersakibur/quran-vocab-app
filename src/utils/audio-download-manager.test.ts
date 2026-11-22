@@ -2,6 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  MAX_PARALLEL_SURAH_DOWNLOADS,
+  WORD_AUDIO_CONCURRENCY,
+  canStartTaskType,
   clearDownloadQueueForType,
   clearTabFromManifest,
   computeAudioOverviewStats,
@@ -16,13 +19,16 @@ import {
   makeTaskId,
   parseAudioManifest,
   parseCacheAudioUrl,
+  pickNextRunnableTask,
   reconcileManifestWithCacheScan,
   recordSurahAudioSaved,
   recordWordAudioProgress,
   removeSurahAudioFromManifest,
   removeSurahWordAudioFromManifest,
   removeTaskFromQueue,
+  sumInFlightBytes,
   type ActiveDownloadState,
+  type DownloadTask,
   type SurahMetaLite
 } from './audio-download-manager.ts';
 
@@ -234,5 +240,68 @@ describe('audio-download-manager cache reconciliation & URL matching', () => {
     assert.equal(formatAudioBytesBn(2.5 * 1024 * 1024, true), '২.৫০ এমবি');
     assert.equal(formatAudioBytesBn(125.4 * 1024 * 1024, true), '১২৫.৪ এমবি');
     assert.equal(formatAudioBytesBn(1.5 * 1024 * 1024 * 1024, true), '১.৫০ জিবি');
+  });
+});
+
+describe('audio-download-manager parallel concurrency (3 surahs, 10 words)', () => {
+  it('enforces 3 parallel surah slots and 10 concurrent word workers', () => {
+    assert.equal(MAX_PARALLEL_SURAH_DOWNLOADS, 3);
+    assert.equal(WORD_AUDIO_CONCURRENCY, 10);
+
+    const makeActive = (surah: number, bytes: number): ActiveDownloadState => ({
+      task: { id: makeTaskId('ayah', surah), type: 'ayah', surah, mode: 'single' },
+      percent: 50,
+      receivedBytes: bytes,
+      totalBytes: bytes * 2,
+      completedUnits: 0,
+      totalUnits: 1
+    });
+
+    let queue: DownloadTask[] = [
+      { id: 'ayah:1', type: 'ayah', surah: 1, mode: 'single' },
+      { id: 'ayah:2', type: 'ayah', surah: 2, mode: 'single' },
+      { id: 'ayah:112', type: 'ayah', surah: 112, mode: 'single' },
+      { id: 'ayah:114', type: 'ayah', surah: 114, mode: 'single' },
+      { id: 'word:1', type: 'word', surah: 1, mode: 'single' }
+    ];
+
+    const active: ActiveDownloadState[] = [];
+
+    // Pick 3 parallel Surahs
+    for (let i = 0; i < 3; i++) {
+      const picked = pickNextRunnableTask(queue, active);
+      assert.ok(picked.task);
+      assert.equal(picked.task.type, 'ayah');
+      queue = picked.queue;
+      active.push(makeActive(picked.task.surah, (i + 1) * 100_000));
+    }
+
+    // 4th Surah cannot start yet because 3 Surah slots are full
+    assert.equal(canStartTaskType(active, 'ayah'), false);
+
+    // Word task CAN start on its own origin slot while 3 Surahs are running
+    assert.equal(canStartTaskType(active, 'word'), true);
+    const wordPick = pickNextRunnableTask(queue, active);
+    assert.equal(wordPick.task?.id, 'word:1');
+    queue = wordPick.queue;
+
+    // 4th Surah stays queued until one of the 3 Surah slots finishes
+    assert.deepEqual(queue.map((t) => t.id), ['ayah:114']);
+    assert.equal(sumInFlightBytes(active), 600_000);
+
+    // Row states show all 3 as downloading and 4th as queued #1
+    const manifest = createEmptyAudioManifest();
+    assert.equal(computeSurahRowDownloadState(SAMPLE_META[0], 'ayah', manifest, active, queue).status, 'downloading');
+    assert.equal(computeSurahRowDownloadState(SAMPLE_META[1], 'ayah', manifest, active, queue).status, 'downloading');
+    assert.equal(computeSurahRowDownloadState(SAMPLE_META[2], 'ayah', manifest, active, queue).status, 'downloading');
+    const row4 = computeSurahRowDownloadState(SAMPLE_META[3], 'ayah', manifest, active, queue);
+    assert.equal(row4.status, 'queued');
+    assert.equal(row4.queuePosition, 1);
+
+    // Free slot 2 -> 4th Surah immediately becomes runnable
+    const remainingActive = active.filter((a) => a.task.surah !== 2);
+    const nextPick = pickNextRunnableTask(queue, remainingActive);
+    assert.equal(nextPick.task?.id, 'ayah:114');
+    assert.equal(nextPick.queue.length, 0);
   });
 });

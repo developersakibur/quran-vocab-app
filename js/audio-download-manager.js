@@ -19,6 +19,9 @@
   const AUDIO_MANIFEST_VERSION = 1;
   const DEFAULT_WORD_AUDIO_BYTES = 16 * 1024;
   const DEFAULT_SURAH_AUDIO_FALLBACK_BYTES = 2400000;
+  const MAX_PARALLEL_SURAH_DOWNLOADS = 3;
+  const MAX_PARALLEL_WORD_SURAH_TASKS = 1;
+  const WORD_AUDIO_CONCURRENCY = 10;
   const RING_CIRCUMFERENCE = 2 * Math.PI * 16; // r=16 => ~100.53
 
   const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
@@ -194,6 +197,52 @@
     };
   }
 
+  function getParallelTaskLimit(type) {
+    return type === 'ayah' ? MAX_PARALLEL_SURAH_DOWNLOADS : MAX_PARALLEL_WORD_SURAH_TASKS;
+  }
+
+  function toActiveArray(active) {
+    if (!active) return [];
+    if (active instanceof Map) return Array.from(active.values());
+    return Array.isArray(active) ? active : [active];
+  }
+
+  function canStartTaskType(active, type) {
+    const list = toActiveArray(active);
+    let count = 0;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] && list[i].task && list[i].task.type === type) count++;
+    }
+    return count < getParallelTaskLimit(type);
+  }
+
+  function pickNextRunnableTask(queueList, active) {
+    const list = Array.isArray(queueList) ? queueList : [];
+    for (let i = 0; i < list.length; i++) {
+      const candidate = list[i];
+      if (canStartTaskType(active, candidate.type)) {
+        return {
+          task: candidate,
+          remainingQueue: list.slice(0, i).concat(list.slice(i + 1))
+        };
+      }
+    }
+    return { task: null, remainingQueue: list.slice() };
+  }
+
+  function sumInFlightBytes(active) {
+    const list = toActiveArray(active);
+    let sum = 0;
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (a && a.task && a.task.type === 'ayah') {
+        const b = Number(a.receivedBytes || 0);
+        if (Number.isFinite(b) && b > 0) sum += b;
+      }
+    }
+    return sum;
+  }
+
   function computeSurahRowDownloadState(surah, type, manifest, active, queue) {
     const sNum = surah.surah;
     const taskId = makeTaskId(type, sNum);
@@ -218,13 +267,14 @@
           ? wordEntry.bytes
           : 0;
 
-    if (active && active.task.id === taskId) {
-      const doneUnits = type === 'ayah' ? 0 : Math.max(savedUnits, active.completedUnits || 0);
+    const activeMatch = toActiveArray(active).find((a) => a && a.task && a.task.id === taskId);
+    if (activeMatch) {
+      const doneUnits = type === 'ayah' ? 0 : Math.max(savedUnits, activeMatch.completedUnits || 0);
       const percent =
         type === 'ayah'
-          ? Math.max(0, Math.min(99, Math.round(active.percent || 0)))
+          ? Math.max(0, Math.min(99, Math.round(activeMatch.percent || 0)))
           : Math.max(0, Math.min(99, Math.round((doneUnits / totalUnits) * 100)));
-      const bytes = type === 'ayah' ? (active.receivedBytes || 0) : savedBytes;
+      const bytes = type === 'ayah' ? (activeMatch.receivedBytes || 0) : savedBytes;
       return {
         surah: sNum,
         type,
@@ -233,7 +283,7 @@
         totalUnits,
         percent,
         bytes,
-        totalBytes: type === 'ayah' ? (active.totalBytes || 0) : 0,
+        totalBytes: type === 'ayah' ? (activeMatch.totalBytes || 0) : 0,
         queuePosition: 0,
         canDelete: false
       };
@@ -387,8 +437,8 @@
   let metaBySurah = new Map();
   let activeTab = 'ayah';
   let queue = [];
-  let activeState = null; // { task, controller, percent, receivedBytes, totalBytes, completedUnits, totalUnits, stopped }
-  let isProcessingQueue = false;
+  const activeTasks = new Map(); // taskId -> { task, controller, percent, receivedBytes, totalBytes, completedUnits, totalUnits, stopped }
+  let persistentStorageRequested = false;
   let isReconciling = false;
   let manifestSaveTimer = null;
   let lastLiveRenderTs = 0;
@@ -477,11 +527,7 @@
   }
 
   function getWordConcurrency() {
-    if (global.QuranDB && typeof global.QuranDB.getOptimalDownloadConcurrency === 'function') {
-      const limits = global.QuranDB.getOptimalDownloadConcurrency();
-      if (limits && limits.wordAudio) return limits.wordAudio;
-    }
-    return 6;
+    return WORD_AUDIO_CONCURRENCY;
   }
 
   function showToastSafe(message, type) {
@@ -693,9 +739,11 @@
   }
 
   // ============================================================
-  // QUEUE EXECUTION ENGINE (FIFO AUTO-QUEUE)
+  // PARALLEL QUEUE EXECUTION ENGINE (3 SURAHS + 10 WORDS)
   // ============================================================
   async function requestPersistentStorageQuietly() {
+    if (persistentStorageRequested) return;
+    persistentStorageRequested = true;
     if (navigator.storage && typeof navigator.storage.persist === 'function') {
       try {
         await navigator.storage.persist();
@@ -706,9 +754,49 @@
     }
   }
 
-  async function runQueueLoop() {
-    if (isProcessingQueue) return;
-    isProcessingQueue = true;
+  function pumpQueue() {
+    let launchedAny = false;
+
+    while (queue.length > 0) {
+      const next = pickNextRunnableTask(queue, activeTasks);
+      if (!next.task) break;
+
+      const task = next.task;
+      queue = next.remainingQueue;
+
+      if (activeTasks.has(task.id)) continue;
+
+      const surahMeta = metaBySurah.get(task.surah) || { surah: task.surah, total_words: 1 };
+      const controller = new AbortController();
+      const state = {
+        task,
+        controller,
+        percent: 0,
+        receivedBytes: 0,
+        totalBytes: 0,
+        completedUnits: 0,
+        totalUnits: task.type === 'ayah' ? 1 : surahMeta.total_words,
+        stopped: false
+      };
+
+      activeTasks.set(task.id, state);
+      launchedAny = true;
+
+      patchSurahRow(task.type, task.surah);
+      executeTask(state);
+    }
+
+    if (launchedAny) {
+      patchAllQueuedRows();
+      renderOverviewAndActiveBar(true);
+      patchTabActionButtons();
+    }
+  }
+
+  async function executeTask(state) {
+    const { task, controller } = state;
+    const surahMeta = metaBySurah.get(task.surah) || { surah: task.surah, total_words: 1 };
+    let completedOk = false;
 
     requestPersistentStorageQuietly();
 
@@ -717,184 +805,157 @@
       if (!cache) {
         showToastSafe('এই ব্রাউজারে অফলাইন ক্যাশ সমর্থিত নয়।', 'error');
         queue = [];
+        state.stopped = true;
         return;
       }
 
-      while (queue.length > 0) {
-        const task = queue.shift();
-        if (!task) break;
+      if (task.type === 'ayah') {
+        const res = await downloadSurahRecitationFile(cache, task.surah, controller.signal, (prog) => {
+          if (state.stopped || controller.signal.aborted || activeTasks.get(task.id) !== state) return;
+          state.receivedBytes = prog.receivedBytes || 0;
+          state.totalBytes = prog.totalBytes || 0;
+          state.percent = prog.percent || 0;
+          emitLiveProgress(task.type, task.surah, false);
+        });
 
-        const surahMeta = metaBySurah.get(task.surah) || { surah: task.surah, total_words: 1 };
-        const controller = new AbortController();
+        const wasStopped = state.stopped || controller.signal.aborted;
+        if (res.ok && !wasStopped) {
+          manifest.surahAudio[task.surah] = {
+            bytes: res.bytes || estimateSurahFallbackBytes(surahMeta),
+            savedAt: Date.now()
+          };
+          saveManifestToStorage(true);
+          completedOk = true;
+        } else if (!wasStopped && !res.ok) {
+          showToastSafe(`সূরা ${getSurahName(task.surah)} ডাউনলোডে সমস্যা হয়েছে, ইন্টারনেট যাচাই করুন।`, 'error');
+        }
+      } else {
+        // Word-by-word audio download for this Surah (10 parallel word fetches, resumable!)
+        let urls = [];
+        try {
+          urls = await getWordUrlsForSurah(task.surah);
+        } catch (e) {
+          urls = [];
+        }
 
-        activeState = {
-          task,
-          controller,
-          percent: 0,
-          receivedBytes: 0,
-          totalBytes: 0,
-          completedUnits: 0,
-          totalUnits: task.type === 'ayah' ? 1 : surahMeta.total_words,
-          stopped: false
-        };
+        if (controller.signal.aborted || state.stopped) {
+          return;
+        }
 
-        // Re-render queued positions & active row immediately
-        renderOverviewAndActiveBar(true);
-        patchTabActionButtons();
-        patchSurahRow(task.type, task.surah);
-        patchAllQueuedRows();
+        const totalWords = Math.max(urls.length, surahMeta.total_words || 1);
+        state.totalUnits = totalWords;
 
-        if (task.type === 'ayah') {
-          const res = await downloadSurahRecitationFile(cache, task.surah, controller.signal, (prog) => {
-            if (!activeState || activeState.task.id !== task.id) return;
-            activeState.receivedBytes = prog.receivedBytes || 0;
-            activeState.totalBytes = prog.totalBytes || 0;
-            activeState.percent = prog.percent || 0;
-            emitLiveProgress(task.type, task.surah, false);
-          });
-
-          const wasStopped = !activeState || activeState.stopped || controller.signal.aborted;
-          activeState = null;
-
-          if (res.ok && !wasStopped) {
-            manifest.surahAudio[task.surah] = {
-              bytes: res.bytes || estimateSurahFallbackBytes(surahMeta),
-              savedAt: Date.now()
-            };
-            saveManifestToStorage(true);
-            if (task.mode === 'single' && queue.length === 0) {
-              showToastSafe(`সূরা ${getSurahName(task.surah)}-এর তিলাওয়াত ডাউনলোড সম্পন্ন`, 'success');
-            }
-          } else if (!wasStopped && !res.ok) {
-            showToastSafe(`সূরা ${getSurahName(task.surah)} ডাউনলোডে সমস্যা হয়েছে, ইন্টারনেট যাচাই করুন।`, 'error');
+        // Build set of already-cached URLs for this surah so resuming skips done words cleanly
+        const sPad = String(task.surah).padStart(3, '0');
+        const prefixRegex = new RegExp(`/${sPad}_\\d{3}_\\d{3}\\.mp3`);
+        const cachedSet = new Set();
+        try {
+          const keys = await cache.keys();
+          for (let i = 0; i < keys.length; i++) {
+            const u = keys[i].url;
+            if (prefixRegex.test(u)) cachedSet.add(u);
           }
+        } catch (e) {}
 
-          patchSurahRow('ayah', task.surah);
-          renderOverviewAndActiveBar(true);
-          patchTabActionButtons();
-        } else {
-          // Word-by-word audio download for this Surah (resumable!)
-          let urls = [];
-          try {
-            urls = await getWordUrlsForSurah(task.surah);
-          } catch (e) {
-            urls = [];
-          }
+        const pendingUrls = urls.filter((u) => !cachedSet.has(u));
+        let doneCount = urls.length - pendingUrls.length;
+        state.completedUnits = doneCount;
+        state.percent = totalWords > 0 ? Math.min(99, Math.round((doneCount / totalWords) * 100)) : 0;
 
-          if (controller.signal.aborted || !activeState || activeState.stopped) {
-            activeState = null;
-            patchSurahRow('word', task.surah);
-            renderOverviewAndActiveBar(true);
-            patchTabActionButtons();
-            continue;
-          }
+        // Sync existing partial count into manifest before downloading remainder
+        if (doneCount > 0) {
+          const prev = manifest.wordAudio[task.surah];
+          const prevBytes = prev && prev.bytes > 0 ? prev.bytes : doneCount * DEFAULT_WORD_AUDIO_BYTES;
+          manifest.wordAudio[task.surah] = {
+            count: Math.min(doneCount, totalWords),
+            bytes: prevBytes,
+            savedAt: Date.now()
+          };
+        }
+        emitLiveProgress('word', task.surah, true);
 
-          const totalWords = Math.max(urls.length, surahMeta.total_words || 1);
-          activeState.totalUnits = totalWords;
+        if (pendingUrls.length > 0 && !controller.signal.aborted && !state.stopped) {
+          const concurrency = Math.min(getWordConcurrency(), pendingUrls.length);
+          let cursor = 0;
+          let failedCount = 0;
 
-          // Build set of already-cached URLs for this surah so resuming skips done words cleanly
-          const sPad = String(task.surah).padStart(3, '0');
-          const prefixRegex = new RegExp(`/${sPad}_\\d{3}_\\d{3}\\.mp3`);
-          const cachedSet = new Set();
-          try {
-            const keys = await cache.keys();
-            for (let i = 0; i < keys.length; i++) {
-              const u = keys[i].url;
-              if (prefixRegex.test(u)) cachedSet.add(u);
-            }
-          } catch (e) {}
+          const worker = async () => {
+            while (cursor < pendingUrls.length) {
+              if (controller.signal.aborted || state.stopped) break;
+              const url = pendingUrls[cursor++];
+              const result = await downloadSingleWordAudio(cache, url, controller.signal);
+              if (controller.signal.aborted || state.stopped) break;
 
-          const pendingUrls = urls.filter((u) => !cachedSet.has(u));
-          let doneCount = urls.length - pendingUrls.length;
-          activeState.completedUnits = doneCount;
-          activeState.percent = totalWords > 0 ? Math.min(99, Math.round((doneCount / totalWords) * 100)) : 0;
-
-          // Sync existing partial count into manifest before downloading remainder
-          if (doneCount > 0) {
-            const prev = manifest.wordAudio[task.surah];
-            const prevBytes = prev && prev.bytes > 0 ? prev.bytes : doneCount * DEFAULT_WORD_AUDIO_BYTES;
-            manifest.wordAudio[task.surah] = {
-              count: Math.min(doneCount, totalWords),
-              bytes: prevBytes,
-              savedAt: Date.now()
-            };
-          }
-          emitLiveProgress('word', task.surah, true);
-
-          if (pendingUrls.length > 0 && !controller.signal.aborted) {
-            const concurrency = Math.min(getWordConcurrency(), pendingUrls.length);
-            let cursor = 0;
-            let failedCount = 0;
-
-            const worker = async () => {
-              while (cursor < pendingUrls.length) {
-                if (controller.signal.aborted || !activeState || activeState.stopped) break;
-                const url = pendingUrls[cursor++];
-                const result = await downloadSingleWordAudio(cache, url, controller.signal);
-                if (controller.signal.aborted || !activeState || activeState.stopped) break;
-
-                if (result.ok) {
-                  doneCount++;
-                  const prevEntry = manifest.wordAudio[task.surah];
-                  const nextBytes = (prevEntry ? prevEntry.bytes : 0) + (result.bytes || DEFAULT_WORD_AUDIO_BYTES);
-                  manifest.wordAudio[task.surah] = {
-                    count: Math.min(doneCount, totalWords),
-                    bytes: nextBytes,
-                    savedAt: Date.now()
-                  };
-                  saveManifestToStorage(false);
-                  if (activeState && activeState.task.id === task.id) {
-                    activeState.completedUnits = doneCount;
-                    activeState.percent = Math.min(99, Math.round((doneCount / totalWords) * 100));
-                    emitLiveProgress('word', task.surah, false);
-                  }
-                } else if (!result.aborted) {
-                  failedCount++;
+              if (result.ok) {
+                doneCount++;
+                const prevEntry = manifest.wordAudio[task.surah];
+                const nextBytes = (prevEntry ? prevEntry.bytes : 0) + (result.bytes || DEFAULT_WORD_AUDIO_BYTES);
+                manifest.wordAudio[task.surah] = {
+                  count: Math.min(doneCount, totalWords),
+                  bytes: nextBytes,
+                  savedAt: Date.now()
+                };
+                saveManifestToStorage(false);
+                if (activeTasks.get(task.id) === state) {
+                  state.completedUnits = doneCount;
+                  state.percent = Math.min(99, Math.round((doneCount / totalWords) * 100));
+                  emitLiveProgress('word', task.surah, false);
                 }
+              } else if (!result.aborted) {
+                failedCount++;
               }
-            };
-
-            const workers = [];
-            for (let w = 0; w < concurrency; w++) workers.push(worker());
-            await Promise.all(workers);
-
-            const wasStopped = !activeState || activeState.stopped || controller.signal.aborted;
-            activeState = null;
-            saveManifestToStorage(true);
-
-            if (!wasStopped && doneCount >= urls.length && urls.length > 0) {
-              if (task.mode === 'single' && queue.length === 0) {
-                showToastSafe(`সূরা ${getSurahName(task.surah)}-এর সব শব্দের অডিও ডাউনলোড সম্পন্ন`, 'success');
-              }
-            } else if (!wasStopped && failedCount > 0) {
-              showToastSafe(`সূরা ${getSurahName(task.surah)}-এর কিছু শব্দ ডাউনলোড হয়নি—আবার ট্যাপ করে বাকিটা সম্পন্ন করুন।`, 'warning');
             }
-          } else {
-            // Already 100% cached
-            if (urls.length > 0) {
-              const prev = manifest.wordAudio[task.surah];
-              manifest.wordAudio[task.surah] = {
-                count: urls.length,
-                bytes: prev && prev.bytes > 0 ? prev.bytes : urls.length * DEFAULT_WORD_AUDIO_BYTES,
-                savedAt: Date.now()
-              };
-              saveManifestToStorage(true);
-            }
-            activeState = null;
+          };
+
+          const workers = [];
+          for (let w = 0; w < concurrency; w++) workers.push(worker());
+          await Promise.all(workers);
+
+          const wasStopped = state.stopped || controller.signal.aborted;
+          saveManifestToStorage(true);
+
+          if (!wasStopped && doneCount >= urls.length && urls.length > 0) {
+            completedOk = true;
+          } else if (!wasStopped && failedCount > 0) {
+            showToastSafe(`সূরা ${getSurahName(task.surah)}-এর কিছু শব্দ ডাউনলোড হয়নি—আবার ট্যাপ করে বাকিটা সম্পন্ন করুন।`, 'warning');
           }
-
-          patchSurahRow('word', task.surah);
-          renderOverviewAndActiveBar(true);
-          patchTabActionButtons();
+        } else if (!controller.signal.aborted && !state.stopped) {
+          // Already 100% cached
+          if (urls.length > 0) {
+            const prev = manifest.wordAudio[task.surah];
+            manifest.wordAudio[task.surah] = {
+              count: urls.length,
+              bytes: prev && prev.bytes > 0 ? prev.bytes : urls.length * DEFAULT_WORD_AUDIO_BYTES,
+              savedAt: Date.now()
+            };
+            saveManifestToStorage(true);
+            completedOk = true;
+          }
         }
       }
     } finally {
-      activeState = null;
-      isProcessingQueue = false;
+      if (activeTasks.get(task.id) === state) {
+        activeTasks.delete(task.id);
+      }
       saveManifestToStorage(true);
+
+      const wasStopped = state.stopped || controller.signal.aborted;
+      if (completedOk && !wasStopped && task.mode === 'single' && activeTasks.size === 0 && queue.length === 0) {
+        showToastSafe(
+          task.type === 'ayah'
+            ? `সূরা ${getSurahName(task.surah)}-এর তিলাওয়াত ডাউনলোড সম্পন্ন`
+            : `সূরা ${getSurahName(task.surah)}-এর সব শব্দের অডিও ডাউনলোড সম্পন্ন`,
+          'success'
+        );
+      }
+
+      patchSurahRow(task.type, task.surah);
+      pumpQueue();
+      patchAllQueuedRows();
       renderOverviewAndActiveBar(true);
       patchTabActionButtons();
-      if (typeof global.updateStoragePersistenceUI === 'function') {
+
+      if (activeTasks.size === 0 && queue.length === 0 && typeof global.updateStoragePersistenceUI === 'function') {
         global.updateStoragePersistenceUI();
       }
     }
@@ -916,14 +977,14 @@
     const sNum = parseInt(surahNum, 10);
     if (!Number.isInteger(sNum) || sNum < 1 || sNum > 114) return false;
     const surahMeta = metaBySurah.get(sNum) || { surah: sNum, total_words: 1 };
-    const rowState = computeSurahRowDownloadState(surahMeta, type, manifest, activeState, queue);
+    const rowState = computeSurahRowDownloadState(surahMeta, type, manifest, activeTasks, queue);
 
     if (rowState.status === 'completed') {
       showToastSafe(`সূরা ${getSurahName(sNum)}-এর অডিও ইতিমধ্যেই ডাউনলোড করা আছে।`, 'info');
       return false;
     }
     if (rowState.status === 'downloading') {
-      stopActiveTask(true);
+      stopTask(type, sNum, true);
       return false;
     }
     if (rowState.status === 'queued') {
@@ -932,17 +993,18 @@
     }
 
     const id = makeTaskId(type, sNum);
-    const hadActive = Boolean(activeState);
+    const willWaitInQueue = !canStartTaskType(activeTasks, type);
     queue.push({ id, type, surah: sNum, mode: mode || 'single' });
 
-    if (hadActive && (mode || 'single') === 'single') {
+    if (willWaitInQueue && (mode || 'single') === 'single') {
       showToastSafe(`সূরা ${getSurahName(sNum)} ডাউনলোড কিউতে যুক্ত হয়েছে`, 'info');
     }
 
+    pumpQueue();
     patchSurahRow(type, sNum);
+    patchAllQueuedRows();
     renderOverviewAndActiveBar(true);
     patchTabActionButtons();
-    runQueueLoop();
     return true;
   }
 
@@ -961,46 +1023,74 @@
     return false;
   }
 
-  function stopActiveTask(showFeedback) {
-    if (!activeState) return false;
-    const { task, controller } = activeState;
-    activeState.stopped = true;
+  function stopTask(type, surahNum, showFeedback) {
+    const id = makeTaskId(type, surahNum);
+    const state = activeTasks.get(id);
+    if (!state) return false;
+
+    state.stopped = true;
+    activeTasks.delete(id);
     try {
-      controller.abort();
+      state.controller.abort();
     } catch (e) {}
+
+    const hadWaitingForSameType = queue.some((t) => t.type === type);
+    patchSurahRow(type, surahNum);
+    pumpQueue();
+    patchAllQueuedRows();
+    renderOverviewAndActiveBar(true);
+    patchTabActionButtons();
+
     if (showFeedback) {
-      const msg =
-        queue.length > 0
-          ? `সূরা ${getSurahName(task.surah)} থামানো হয়েছে — পরবর্তী সূরা শুরু হচ্ছে`
-          : `সূরা ${getSurahName(task.surah)}-এর ডাউনলোড থামানো হয়েছে`;
+      const msg = hadWaitingForSameType
+        ? `সূরা ${getSurahName(surahNum)} থামানো হয়েছে — পরবর্তী সূরা শুরু হচ্ছে`
+        : `সূরা ${getSurahName(surahNum)}-এর ডাউনলোড থামানো হয়েছে`;
       showToastSafe(msg, 'info');
     }
     return true;
   }
 
+  function stopActiveTask(showFeedback) {
+    const first = activeTasks.values().next().value;
+    if (!first) return false;
+    return stopTask(first.task.type, first.task.surah, showFeedback);
+  }
+
   function stopAll(tabTypeOnly) {
     let stoppedSomething = false;
+    const rowsToPatch = [];
+
     if (tabTypeOnly) {
       const removedTasks = queue.filter((t) => t.type === tabTypeOnly);
       queue = queue.filter((t) => t.type !== tabTypeOnly);
       if (removedTasks.length > 0) stoppedSomething = true;
-      removedTasks.forEach((t) => patchSurahRow(t.type, t.surah));
-      if (activeState && activeState.task.type === tabTypeOnly) {
-        activeState.stopped = true;
-        try { activeState.controller.abort(); } catch (e) {}
-        stoppedSomething = true;
+      removedTasks.forEach((t) => rowsToPatch.push(t));
+
+      for (const [id, state] of Array.from(activeTasks.entries())) {
+        if (state.task.type === tabTypeOnly) {
+          state.stopped = true;
+          activeTasks.delete(id);
+          try { state.controller.abort(); } catch (e) {}
+          rowsToPatch.push(state.task);
+          stoppedSomething = true;
+        }
       }
     } else {
       const removedTasks = queue.slice();
       queue = [];
       if (removedTasks.length > 0) stoppedSomething = true;
-      removedTasks.forEach((t) => patchSurahRow(t.type, t.surah));
-      if (activeState) {
-        activeState.stopped = true;
-        try { activeState.controller.abort(); } catch (e) {}
+      removedTasks.forEach((t) => rowsToPatch.push(t));
+
+      for (const [id, state] of Array.from(activeTasks.entries())) {
+        state.stopped = true;
+        activeTasks.delete(id);
+        try { state.controller.abort(); } catch (e) {}
+        rowsToPatch.push(state.task);
         stoppedSomething = true;
       }
     }
+
+    rowsToPatch.forEach((t) => patchSurahRow(t.type, t.surah));
     patchAllQueuedRows();
     renderOverviewAndActiveBar(true);
     patchTabActionButtons();
@@ -1011,9 +1101,8 @@
   }
 
   function toggleBulkDownload(type) {
-    const isTabBusy =
-      (activeState && activeState.task.type === type) ||
-      queue.some((t) => t.type === type);
+    const hasActiveForType = Array.from(activeTasks.values()).some((a) => a.task.type === type);
+    const isTabBusy = hasActiveForType || queue.some((t) => t.type === type);
 
     if (isTabBusy) {
       stopAll(type);
@@ -1030,7 +1119,7 @@
           : (manifest.wordAudio[s.surah] ? manifest.wordAudio[s.surah].count : 0) >= s.total_words;
       if (isDone) continue;
       const id = makeTaskId(type, s.surah);
-      if (activeState && activeState.task.id === id) continue;
+      if (activeTasks.has(id)) continue;
       if (queue.some((t) => t.id === id)) continue;
       queue.push({ id, type, surah: s.surah, mode: 'bulk' });
       added++;
@@ -1046,10 +1135,10 @@
       return;
     }
 
+    pumpQueue();
     patchAllQueuedRows();
     renderOverviewAndActiveBar(true);
     patchTabActionButtons();
-    runQueueLoop();
   }
 
   async function deleteSurahAudio(type, surahNum, skipConfirm) {
@@ -1077,10 +1166,11 @@
     }
 
     // Cancel if somehow active or queued
-    if (activeState && activeState.task.id === makeTaskId(type, sNum)) {
-      stopActiveTask(false);
+    const taskId = makeTaskId(type, sNum);
+    if (activeTasks.has(taskId)) {
+      stopTask(type, sNum, false);
     }
-    queue = queue.filter((t) => t.id !== makeTaskId(type, sNum));
+    queue = queue.filter((t) => t.id !== taskId);
 
     // Delete actual CacheStorage entries
     if ('caches' in global) {
@@ -1209,7 +1299,7 @@
   // ============================================================
   async function reconcileWithCacheStorage() {
     if (isReconciling || !('caches' in global)) return false;
-    if (activeState || queue.length > 0) return false; // Don't race active downloads
+    if (activeTasks.size > 0 || queue.length > 0) return false; // Don't race active downloads
     isReconciling = true;
 
     try {
@@ -1256,7 +1346,7 @@
       }
 
       // If a download started while we were scanning, skip overwriting to avoid race
-      if (activeState || queue.length > 0) return false;
+      if (activeTasks.size > 0 || queue.length > 0) return false;
 
       const { manifest: nextManifest, changed } = reconcileManifestWithCacheScan(
         manifest,
@@ -1404,7 +1494,7 @@
 
     // Tapping the row itself also triggers start/stop/unqueue for easy mobile thumb reach
     li.addEventListener('click', () => {
-      const state = computeSurahRowDownloadState(surahMeta, type, manifest, activeState, queue);
+      const state = computeSurahRowDownloadState(surahMeta, type, manifest, activeTasks, queue);
       if (state.status !== 'completed') {
         handleRowPrimaryAction(type, surahMeta.surah);
       }
@@ -1415,9 +1505,9 @@
 
   function handleRowPrimaryAction(type, surahNum) {
     const surahMeta = metaBySurah.get(surahNum) || { surah: surahNum, total_words: 1 };
-    const state = computeSurahRowDownloadState(surahMeta, type, manifest, activeState, queue);
+    const state = computeSurahRowDownloadState(surahMeta, type, manifest, activeTasks, queue);
     if (state.status === 'downloading') {
-      stopActiveTask(true);
+      stopTask(type, surahNum, true);
     } else if (state.status === 'queued') {
       removeQueuedTask(type, surahNum);
     } else if (state.status === 'idle' || state.status === 'partial') {
@@ -1433,7 +1523,7 @@
     const rowEl = document.getElementById(`dl-row-${type}-${surahNum}`);
     if (!rowEl) return;
 
-    const state = computeSurahRowDownloadState(surahMeta, type, manifest, activeState, queue);
+    const state = computeSurahRowDownloadState(surahMeta, type, manifest, activeTasks, queue);
     const icons = getIcons();
     const surahName = getSurahName(surahNum);
 
@@ -1531,7 +1621,8 @@
   }
 
   function renderOverviewAndActiveBar(force) {
-    const inFlight = activeState && activeState.task.type === 'ayah' ? (activeState.receivedBytes || 0) : 0;
+    const activeList = Array.from(activeTasks.values());
+    const inFlight = sumInFlightBytes(activeList);
     const stats = computeAudioOverviewStats(manifest, surahsMeta, inFlight);
 
     const sizeEl = document.getElementById('dl-storage-used-text');
@@ -1556,15 +1647,32 @@
     const fill = document.getElementById('dl-active-progress-fill');
 
     if (wrap) {
-      if (activeState) {
+      if (activeList.length > 0) {
         wrap.style.display = 'flex';
-        const t = activeState.task;
-        const kindLabel = t.type === 'ayah' ? 'তিলাওয়াত' : 'শব্দ অডিও';
+        const ayahActive = activeList.filter((a) => a.task.type === 'ayah');
+        const wordActive = activeList.filter((a) => a.task.type === 'word');
         const queueSuffix = queue.length > 0 ? ` · কিউতে আরও ${toBn(queue.length)}টি` : '';
-        if (lbl) {
-          lbl.textContent = `${kindLabel}: সূরা ${getSurahName(t.surah)}${queueSuffix}`;
+
+        let labelText = '';
+        if (ayahActive.length > 0 && wordActive.length > 0) {
+          labelText = `তিলাওয়াত (${toBn(ayahActive.length)}টি) ও শব্দ অডিও: ${getSurahName(wordActive[0].task.surah)}${queueSuffix}`;
+        } else if (ayahActive.length > 1) {
+          const names = ayahActive
+            .slice(0, 2)
+            .map((a) => getSurahName(a.task.surah))
+            .join(', ');
+          const extra = ayahActive.length > 2 ? ` +${toBn(ayahActive.length - 2)}` : '';
+          labelText = `${toBn(ayahActive.length)}টি সূরা ডাউনলোড হচ্ছে (${names}${extra})${queueSuffix}`;
+        } else {
+          const t = activeList[0].task;
+          const kindLabel = t.type === 'ayah' ? 'তিলাওয়াত' : 'শব্দ অডিও';
+          labelText = `${kindLabel}: সূরা ${getSurahName(t.surah)}${queueSuffix}`;
         }
-        const pVal = Math.max(0, Math.min(100, Math.round(activeState.percent || 0)));
+
+        if (lbl) lbl.textContent = labelText;
+
+        const sumPct = activeList.reduce((acc, a) => acc + Math.max(0, Math.min(100, a.percent || 0)), 0);
+        const pVal = Math.max(0, Math.min(100, Math.round(sumPct / activeList.length)));
         if (pct) pct.textContent = `${toBn(pVal)}%`;
         if (fill) fill.style.width = `${pVal}%`;
       } else {
@@ -1576,24 +1684,26 @@
 
   function patchTabActionButtons() {
     const icons = getIcons();
+    const activeList = Array.from(activeTasks.values());
     const stats = computeAudioOverviewStats(manifest, surahsMeta, 0);
 
     ['ayah', 'word'].forEach((type) => {
       const dlBtn = document.getElementById(type === 'ayah' ? 'dl-all-ayah' : 'dl-all-word');
       const delBtn = document.getElementById(type === 'ayah' ? 'dl-delete-all-ayah' : 'dl-delete-all-word');
 
-      const isTabBusy =
-        (activeState && activeState.task.type === type) ||
-        queue.some((t) => t.type === type);
+      const tabActiveList = activeList.filter((a) => a.task.type === type);
+      const isTabBusy = tabActiveList.length > 0 || queue.some((t) => t.type === type);
 
       if (dlBtn) {
         dlBtn.classList.toggle('btn-active-downloading', isTabBusy);
         if (isTabBusy) {
-          const pctText =
-            activeState && activeState.task.type === type
-              ? ` (${toBn(Math.round(activeState.percent || 0))}%)`
-              : '';
-          const label = `ডাউনলোড থামান${pctText}`;
+          let suffix = '';
+          if (tabActiveList.length > 1) {
+            suffix = ` (${toBn(tabActiveList.length)}টি চলছে)`;
+          } else if (tabActiveList.length === 1) {
+            suffix = ` (${toBn(Math.round(tabActiveList[0].percent || 0))}%)`;
+          }
+          const label = `ডাউনলোড থামান${suffix}`;
           if (global.DownloadHeaderHelper) {
             global.DownloadHeaderHelper.setDownloadButtonState(dlBtn, icons.stop || icons.pause, label);
           } else {
@@ -1697,18 +1807,38 @@
   }
 
   function getSnapshot() {
-    const inFlight = activeState && activeState.task.type === 'ayah' ? (activeState.receivedBytes || 0) : 0;
+    const activeList = Array.from(activeTasks.values());
+    const inFlight = sumInFlightBytes(activeList);
     return {
       activeTab,
       manifest: parseAudioManifest(manifest),
       overview: computeAudioOverviewStats(manifest, surahsMeta, inFlight),
-      activeTask: activeState ? { ...activeState.task, percent: activeState.percent } : null,
-      queue: queue.map((t) => ({ ...t }))
+      activeTask: activeList[0] ? { ...activeList[0].task, percent: activeList[0].percent } : null,
+      activeTasks: activeList.map((a) => ({
+        ...a.task,
+        percent: a.percent,
+        receivedBytes: a.receivedBytes,
+        totalBytes: a.totalBytes,
+        completedUnits: a.completedUnits,
+        totalUnits: a.totalUnits
+      })),
+      queue: queue.map((t) => ({ ...t })),
+      concurrency: {
+        surahs: MAX_PARALLEL_SURAH_DOWNLOADS,
+        words: WORD_AUDIO_CONCURRENCY
+      }
     };
   }
 
   global.AudioDownloadCore = {
+    MAX_PARALLEL_SURAH_DOWNLOADS,
+    MAX_PARALLEL_WORD_SURAH_TASKS,
+    WORD_AUDIO_CONCURRENCY,
     makeTaskId,
+    getParallelTaskLimit,
+    canStartTaskType,
+    pickNextRunnableTask,
+    sumInFlightBytes,
     createEmptyAudioManifest,
     parseAudioManifest,
     computeAudioOverviewStats,
@@ -1722,6 +1852,7 @@
     refresh,
     enqueueSurah,
     removeQueuedTask,
+    stopTask,
     stopActiveTask,
     stopAll,
     toggleBulkDownload,

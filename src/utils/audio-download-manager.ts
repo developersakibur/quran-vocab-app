@@ -93,6 +93,9 @@ export interface CacheScanResult {
 export const AUDIO_MANIFEST_VERSION = 1;
 export const DEFAULT_WORD_AUDIO_BYTES = 16 * 1024;
 export const DEFAULT_SURAH_AUDIO_FALLBACK_BYTES = 2_400_000;
+export const MAX_PARALLEL_SURAH_DOWNLOADS = 3;
+export const MAX_PARALLEL_WORD_SURAH_TASKS = 1;
+export const WORD_AUDIO_CONCURRENCY = 10;
 
 const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
@@ -406,11 +409,59 @@ export function computeAudioOverviewStats(
   };
 }
 
+function normalizeActiveList(
+  active: ActiveDownloadState | ActiveDownloadState[] | null | undefined
+): ActiveDownloadState[] {
+  if (!active) return [];
+  return Array.isArray(active) ? active : [active];
+}
+
+export function getParallelTaskLimit(type: AudioDownloadType): number {
+  return type === 'ayah' ? MAX_PARALLEL_SURAH_DOWNLOADS : MAX_PARALLEL_WORD_SURAH_TASKS;
+}
+
+export function canStartTaskType(
+  active: ActiveDownloadState | ActiveDownloadState[] | null,
+  type: AudioDownloadType
+): boolean {
+  const list = normalizeActiveList(active);
+  const runningForType = list.filter((a) => a.task.type === type).length;
+  return runningForType < getParallelTaskLimit(type);
+}
+
+export function pickNextRunnableTask(
+  queue: DownloadTask[],
+  active: ActiveDownloadState | ActiveDownloadState[] | null
+): { task: DownloadTask | null; queue: DownloadTask[] } {
+  const list = normalizeActiveList(active);
+  for (let i = 0; i < queue.length; i++) {
+    if (canStartTaskType(list, queue[i].type)) {
+      const task = queue[i];
+      const nextQueue = [...queue.slice(0, i), ...queue.slice(i + 1)];
+      return { task, queue: nextQueue };
+    }
+  }
+  return { task: null, queue };
+}
+
+export function sumInFlightBytes(
+  active: ActiveDownloadState | ActiveDownloadState[] | null
+): number {
+  const list = normalizeActiveList(active);
+  let total = 0;
+  for (const item of list) {
+    if (item.task.type === 'ayah' && Number.isFinite(item.receivedBytes) && item.receivedBytes > 0) {
+      total += Math.round(item.receivedBytes);
+    }
+  }
+  return total;
+}
+
 export function computeSurahRowDownloadState(
   surah: SurahMetaLite,
   type: AudioDownloadType,
   manifest: AudioManifest,
-  active: ActiveDownloadState | null,
+  active: ActiveDownloadState | ActiveDownloadState[] | null,
   queue: DownloadTask[]
 ): SurahRowDownloadState {
   const sNum = surah.surah;
@@ -436,13 +487,15 @@ export function computeSurahRowDownloadState(
         ? wordEntry.bytes
         : 0;
 
-  if (active && active.task.id === taskId) {
-    const doneUnits = type === 'ayah' ? 0 : Math.max(savedUnits, active.completedUnits);
+  const activeList = normalizeActiveList(active);
+  const matchedActive = activeList.find((a) => a.task.id === taskId) || null;
+  if (matchedActive) {
+    const doneUnits = type === 'ayah' ? 0 : Math.max(savedUnits, matchedActive.completedUnits);
     const percent =
       type === 'ayah'
-        ? Math.max(0, Math.min(99, Math.round(active.percent || 0)))
+        ? Math.max(0, Math.min(99, Math.round(matchedActive.percent || 0)))
         : Math.max(0, Math.min(99, Math.round((doneUnits / totalUnits) * 100)));
-    const bytes = type === 'ayah' ? active.receivedBytes : savedBytes;
+    const bytes = type === 'ayah' ? matchedActive.receivedBytes : savedBytes;
     return {
       surah: sNum,
       type,
@@ -515,11 +568,12 @@ export function computeSurahRowDownloadState(
 
 export function enqueueDownloadTask(
   queue: DownloadTask[],
-  active: ActiveDownloadState | null,
+  active: ActiveDownloadState | ActiveDownloadState[] | null,
   task: Omit<DownloadTask, 'id'>
 ): { queue: DownloadTask[]; added: boolean } {
   const id = makeTaskId(task.type, task.surah);
-  if (active && active.task.id === id) {
+  const activeList = normalizeActiveList(active);
+  if (activeList.some((a) => a.task.id === id)) {
     return { queue, added: false };
   }
   if (queue.some((t) => t.id === id)) {
@@ -533,7 +587,7 @@ export function enqueueDownloadTask(
 
 export function enqueueBulkDownloadTasks(
   queue: DownloadTask[],
-  active: ActiveDownloadState | null,
+  active: ActiveDownloadState | ActiveDownloadState[] | null,
   type: AudioDownloadType,
   metaList: SurahMetaLite[],
   manifest: AudioManifest
