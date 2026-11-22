@@ -123,6 +123,7 @@ test('computeRecitationWordStates separates active word, recited green words, an
 import {
   computeAutoScrollTargetTop,
   estimateLegacyOpaqueAudioBytes,
+  computeAyahClipBounds,
 } from './recitation-sync.ts';
 
 test('computeAutoScrollTargetTop scrolls immediately when forced after toggle-on or off-screen', () => {
@@ -179,6 +180,125 @@ test('estimateLegacyOpaqueAudioBytes avoids 7MB Chrome opaque padding for word a
     29
   );
   assert.equal(surah1, 46 * 16000);
+});
+
+test('computeAyahClipBounds stops cleanly in inter-ayah silence without bleeding into next ayah', () => {
+  const baqarahSample: SurahSegmentsData = {
+    surah_number: 2,
+    audio_url: 'https://audio-cdn.tarteel.ai/quran/surah/alafasy/murattal/mp3/002.mp3',
+    duration: 7264,
+    ayah_count: 286,
+    ayahs: {
+      '2': {
+        timestamp_from: 7650,
+        timestamp_to: 16640,
+        duration_sec: 8.99,
+        duration_ms: 8990,
+        segments: [
+          [1, 7595, 8495],
+          [7, 12905, 16500],
+        ],
+      },
+      '3': {
+        timestamp_from: 16640,
+        timestamp_to: 28060,
+        duration_sec: 11.42,
+        duration_ms: 11420,
+        segments: [
+          [1, 16555, 17595],
+          [8, 24545, 27920],
+        ],
+      },
+      '255': {
+        timestamp_from: 6153050,
+        timestamp_to: 6205010,
+        duration_sec: 51.96,
+        duration_ms: 51960,
+        segments: [
+          [1, 6152975, 6154085],
+          [50, 6202628, 6204868],
+        ],
+      },
+      '256': {
+        timestamp_from: 6205010,
+        timestamp_to: 6230190,
+        duration_sec: 25.18,
+        duration_ms: 25180,
+        segments: [
+          [1, 6204955, 6207075],
+          [24, 6227905, 6230070],
+        ],
+      },
+    },
+  };
+
+  // Normal ayah (2:2): stops at last word end (16500ms), strictly before next ayah's first word (16555ms)
+  const b2 = computeAyahClipBounds(baqarahSample, 2);
+  assert.ok(b2);
+  assert.equal(b2.startMs, 7650);
+  assert.equal(b2.stopMs, 16500);
+  assert.ok(b2.stopMs < 16555);
+
+  // Long surah Ayah 2:255: stops at 6204868ms (strictly before 2:256's first word at 6204955ms)
+  const b255 = computeAyahClipBounds(baqarahSample, 255);
+  assert.ok(b255);
+  assert.equal(b255.stopMs, 6204868);
+  assert.ok(b255.stopMs < 6204955);
+
+  // Incomplete word segments (like 35:1 where segments ended early at 14815 vs timestamp_to 28160):
+  // Must NOT cut off at 14815, and must still pull back slightly before next ayah's timestamp_from
+  const incompleteSample: SurahSegmentsData = {
+    surah_number: 35,
+    audio_url: 'https://audio-cdn.tarteel.ai/quran/surah/alafasy/murattal/mp3/035.mp3',
+    duration: 965,
+    ayah_count: 45,
+    ayahs: {
+      '1': {
+        timestamp_from: 0,
+        timestamp_to: 28160,
+        duration_sec: 28.16,
+        duration_ms: 28160,
+        segments: [[1, 0, 840], [13, 13160, 14815]],
+      },
+      '2': {
+        timestamp_from: 28160,
+        timestamp_to: 45740,
+        duration_sec: 17.58,
+        duration_ms: 17580,
+        segments: [[1, 14815, 15325]],
+      },
+    },
+  };
+  const b35 = computeAyahClipBounds(incompleteSample, 1);
+  assert.ok(b35);
+  assert.equal(b35.stopMs, 28090); // 28160 - 70ms safety margin, never truncated to 14815
+
+  // Corrupted backward next-ayah segment (like 29:10 -> 29:11): ignores outlier and stops at 29:10's last word end
+  const outlierSample: SurahSegmentsData = {
+    surah_number: 29,
+    audio_url: 'https://audio-cdn.tarteel.ai/quran/surah/alafasy/murattal/mp3/029.mp3',
+    duration: 1357,
+    ayah_count: 69,
+    ayahs: {
+      '10': {
+        timestamp_from: 144530,
+        timestamp_to: 194890,
+        duration_sec: 50.36,
+        duration_ms: 50360,
+        segments: [[1, 144530, 145995], [31, 192029, 194558]],
+      },
+      '11': {
+        timestamp_from: 194890,
+        timestamp_to: 205680,
+        duration_sec: 10.79,
+        duration_ms: 10790,
+        segments: [[1, 144495, 197183]],
+      },
+    },
+  };
+  const b29 = computeAyahClipBounds(outlierSample, 10);
+  assert.ok(b29);
+  assert.equal(b29.stopMs, 194558);
 });
 
 

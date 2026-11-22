@@ -24,6 +24,10 @@
   const WORD_AUDIO_CONCURRENCY = 10;
   const RING_CIRCUMFERENCE = 2 * Math.PI * 16; // r=16 => ~100.53
 
+  // Optional registry of permanently missing (HTTP 404/410) CDN files if any arise in the future.
+  // Runtime 404/410 responses are also automatically recorded in each Surah's `unavailableUrls`.
+  const KNOWN_UNAVAILABLE_WBW_BY_SURAH = {};
+
   const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
   function toBn(val) {
@@ -70,11 +74,15 @@
           const count = Math.floor(Number(val.count) || 0);
           const bytes = Number(val.bytes);
           const savedAt = Number(val.savedAt) || 0;
+          const unavailableUrls = Array.isArray(val.unavailableUrls)
+            ? Array.from(new Set(val.unavailableUrls.filter((u) => typeof u === 'string' && u.length > 0)))
+            : [];
           if (count > 0) {
             base.wordAudio[sNum] = {
               count,
               bytes: Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes) : count * DEFAULT_WORD_AUDIO_BYTES,
-              savedAt: Number.isFinite(savedAt) ? savedAt : 0
+              savedAt: Number.isFinite(savedAt) ? savedAt : 0,
+              ...(unavailableUrls.length > 0 ? { unavailableUrls } : {})
             };
           }
         }
@@ -168,7 +176,7 @@
         }
       }
     } else {
-      totalWords = 77430;
+      totalWords = 77429;
       Object.values(manifest.surahAudio).forEach((entry) => {
         completedSurahs++;
         totalSurahBytes += Math.max(0, entry.bytes || 0);
@@ -385,12 +393,24 @@
     Object.entries((scan && scan.wordCounts) || {}).forEach(([k, rawCount]) => {
       const sNum = parseInt(k, 10);
       if (!Number.isInteger(sNum) || sNum < 1 || sNum > 114) return;
+      const cachedCount = Math.max(0, Math.floor(rawCount));
+      if (cachedCount <= 0) return;
+
       const meta = metaBySurah.get(sNum);
-      const maxW = meta && meta.total_words > 0 ? meta.total_words : rawCount;
-      const count = Math.min(Math.max(0, Math.floor(rawCount)), maxW);
+      const maxW = meta && meta.total_words > 0 ? meta.total_words : cachedCount;
+      const prev = manifest.wordAudio[sNum];
+
+      // Preserve verified permanent-404 URLs (plus known CDN 404s once all existing files are cached)
+      const unavailableSet = new Set(prev && Array.isArray(prev.unavailableUrls) ? prev.unavailableUrls : []);
+      const knownForSurah = KNOWN_UNAVAILABLE_WBW_BY_SURAH[sNum];
+      if (knownForSurah && knownForSurah.length > 0 && cachedCount + knownForSurah.length >= maxW) {
+        for (let j = 0; j < knownForSurah.length; j++) unavailableSet.add(knownForSurah[j]);
+      }
+
+      const unavailableUrls = Array.from(unavailableSet);
+      const count = Math.min(cachedCount + unavailableUrls.length, maxW);
       if (count <= 0) return;
 
-      const prev = manifest.wordAudio[sNum];
       const measuredBytes = scan.wordBytes && scan.wordBytes[sNum];
       let bytes;
       if (measuredBytes && measuredBytes > 0) {
@@ -398,17 +418,19 @@
       } else if (prev && prev.count === count && prev.bytes > 0) {
         bytes = prev.bytes;
       } else if (prev && prev.count > 0 && prev.bytes > 0) {
-        bytes = Math.round((prev.bytes / prev.count) * count);
+        bytes = Math.round((prev.bytes / prev.count) * cachedCount);
       } else {
-        bytes = count * DEFAULT_WORD_AUDIO_BYTES;
+        bytes = cachedCount * DEFAULT_WORD_AUDIO_BYTES;
       }
 
       nextWordAudio[sNum] = {
         count,
         bytes,
-        savedAt: prev ? prev.savedAt : ts
+        savedAt: prev ? prev.savedAt : ts,
+        ...(unavailableUrls.length > 0 ? { unavailableUrls } : {})
       };
-      if (!prev || prev.count !== count || Math.abs(prev.bytes - bytes) > 1024) {
+      const prevUnavailLen = prev && Array.isArray(prev.unavailableUrls) ? prev.unavailableUrls.length : 0;
+      if (!prev || prev.count !== count || Math.abs(prev.bytes - bytes) > 1024 || prevUnavailLen !== unavailableUrls.length) {
         changed = true;
       }
     });
@@ -688,6 +710,10 @@
         try {
           const res = await fetch(url, { mode: 'cors', signal: attemptController.signal });
           clearTimeout(timer);
+          if (res && (res.status === 404 || res.status === 410)) {
+            signal.removeEventListener('abort', onParentAbort);
+            return { ok: false, notFound: true, aborted: false, bytes: 0 };
+          }
           if (res && res.ok) {
             const blob = await res.blob();
             if (signal.aborted) {
@@ -709,6 +735,11 @@
             signal.removeEventListener('abort', onParentAbort);
             return { ok: true, bytes: blob.size || DEFAULT_WORD_AUDIO_BYTES };
           }
+          // Transient HTTP error (e.g. 429/5xx): retry on next attempt instead of caching error response
+          signal.removeEventListener('abort', onParentAbort);
+          if (attempt === 2) return { ok: false, aborted: false, bytes: 0 };
+          await new Promise((r) => setTimeout(r, 250));
+          continue;
         } catch (corsErr) {
           if (signal.aborted) {
             clearTimeout(timer);
@@ -857,7 +888,20 @@
           }
         } catch (e) {}
 
-        const pendingUrls = urls.filter((u) => !cachedSet.has(u));
+        const prevEntryAtStart = manifest.wordAudio[task.surah];
+        const unavailableSet = new Set(
+          prevEntryAtStart && Array.isArray(prevEntryAtStart.unavailableUrls)
+            ? prevEntryAtStart.unavailableUrls
+            : []
+        );
+        const knownForSurah = KNOWN_UNAVAILABLE_WBW_BY_SURAH[task.surah];
+        if (knownForSurah) {
+          for (let j = 0; j < knownForSurah.length; j++) {
+            if (!cachedSet.has(knownForSurah[j])) unavailableSet.add(knownForSurah[j]);
+          }
+        }
+
+        const pendingUrls = urls.filter((u) => !cachedSet.has(u) && !unavailableSet.has(u));
         let doneCount = urls.length - pendingUrls.length;
         state.completedUnits = doneCount;
         state.percent = totalWords > 0 ? Math.min(99, Math.round((doneCount / totalWords) * 100)) : 0;
@@ -865,11 +909,13 @@
         // Sync existing partial count into manifest before downloading remainder
         if (doneCount > 0) {
           const prev = manifest.wordAudio[task.surah];
-          const prevBytes = prev && prev.bytes > 0 ? prev.bytes : doneCount * DEFAULT_WORD_AUDIO_BYTES;
+          const prevBytes = prev && prev.bytes > 0 ? prev.bytes : Math.max(0, doneCount - unavailableSet.size) * DEFAULT_WORD_AUDIO_BYTES;
+          const unavailList = Array.from(unavailableSet);
           manifest.wordAudio[task.surah] = {
             count: Math.min(doneCount, totalWords),
             bytes: prevBytes,
-            savedAt: Date.now()
+            savedAt: Date.now(),
+            ...(unavailList.length > 0 ? { unavailableUrls: unavailList } : {})
           };
         }
         emitLiveProgress('word', task.surah, true);
@@ -886,14 +932,18 @@
               const result = await downloadSingleWordAudio(cache, url, controller.signal);
               if (controller.signal.aborted || state.stopped) break;
 
-              if (result.ok) {
+              if (result.ok || result.notFound) {
+                if (result.notFound) unavailableSet.add(url);
                 doneCount++;
                 const prevEntry = manifest.wordAudio[task.surah];
-                const nextBytes = (prevEntry ? prevEntry.bytes : 0) + (result.bytes || DEFAULT_WORD_AUDIO_BYTES);
+                const addedBytes = result.ok ? (result.bytes || DEFAULT_WORD_AUDIO_BYTES) : 0;
+                const nextBytes = (prevEntry ? prevEntry.bytes : 0) + addedBytes;
+                const unavailList = Array.from(unavailableSet);
                 manifest.wordAudio[task.surah] = {
                   count: Math.min(doneCount, totalWords),
                   bytes: nextBytes,
-                  savedAt: Date.now()
+                  savedAt: Date.now(),
+                  ...(unavailList.length > 0 ? { unavailableUrls: unavailList } : {})
                 };
                 saveManifestToStorage(false);
                 if (activeTasks.get(task.id) === state) {
@@ -920,13 +970,15 @@
             showToastSafe(`সূরা ${getSurahName(task.surah)}-এর কিছু শব্দ ডাউনলোড হয়নি—আবার ট্যাপ করে বাকিটা সম্পন্ন করুন।`, 'warning');
           }
         } else if (!controller.signal.aborted && !state.stopped) {
-          // Already 100% cached
+          // Already 100% cached (including any permanently unavailable CDN files)
           if (urls.length > 0) {
             const prev = manifest.wordAudio[task.surah];
+            const unavailList = Array.from(unavailableSet);
             manifest.wordAudio[task.surah] = {
-              count: urls.length,
-              bytes: prev && prev.bytes > 0 ? prev.bytes : urls.length * DEFAULT_WORD_AUDIO_BYTES,
-              savedAt: Date.now()
+              count: Math.max(urls.length, totalWords),
+              bytes: prev && prev.bytes > 0 ? prev.bytes : Math.max(1, urls.length - unavailList.length) * DEFAULT_WORD_AUDIO_BYTES,
+              savedAt: Date.now(),
+              ...(unavailList.length > 0 ? { unavailableUrls: unavailList } : {})
             };
             saveManifestToStorage(true);
             completedOk = true;

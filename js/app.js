@@ -20,6 +20,9 @@
   const audioPlayer = new Audio();
   let currentPlayingBtn = null;
   let ayahClipStopRaf = null;
+  let ayahClipStopTimer = null;
+  let ayahClipTimeUpdateHandler = null;
+  let ayahClipPlaySeq = 0;
   const offlineBlobUrlMemoryCache = new Map();
 
   async function resolveAudioSrcWithOfflineCache(url) {
@@ -49,6 +52,90 @@
       cancelAnimationFrame(ayahClipStopRaf);
       ayahClipStopRaf = null;
     }
+    if (ayahClipStopTimer) {
+      clearTimeout(ayahClipStopTimer);
+      ayahClipStopTimer = null;
+    }
+    if (ayahClipTimeUpdateHandler) {
+      audioPlayer.removeEventListener('timeupdate', ayahClipTimeUpdateHandler);
+      ayahClipTimeUpdateHandler = null;
+    }
+  }
+
+  function computeAyahClipBounds(segData, ayahNumber) {
+    if (!segData || !segData.ayahs) return null;
+    const aData = segData.ayahs[String(ayahNumber)];
+    if (!aData || typeof aData.timestamp_from !== 'number') return null;
+
+    const startMs = Math.max(0, aData.timestamp_from);
+    const rawEndMs = typeof aData.timestamp_to === 'number' && aData.timestamp_to > startMs
+      ? aData.timestamp_to
+      : startMs;
+
+    if (rawEndMs <= startMs) {
+      return { startMs, stopMs: startMs, rawEndMs };
+    }
+
+    let lastSegEndMs = null;
+    if (Array.isArray(aData.segments) && aData.segments.length > 0) {
+      for (let i = 0; i < aData.segments.length; i++) {
+        const seg = aData.segments[i];
+        if (Array.isArray(seg) && typeof seg[2] === 'number' && seg[2] > startMs && seg[2] <= rawEndMs + 100) {
+          if (lastSegEndMs === null || seg[2] > lastSegEndMs) {
+            lastSegEndMs = seg[2];
+          }
+        }
+      }
+    }
+
+    const nextAyah = segData.ayahs[String(ayahNumber + 1)];
+    const nextFromMs = nextAyah && typeof nextAyah.timestamp_from === 'number' && nextAyah.timestamp_from > startMs
+      ? nextAyah.timestamp_from
+      : null;
+
+    let nextFirstWordStartMs = null;
+    if (nextAyah && Array.isArray(nextAyah.segments) && nextAyah.segments.length > 0) {
+      const candidate = nextAyah.segments[0] && nextAyah.segments[0][1];
+      if (typeof candidate === 'number' && candidate > startMs && Math.abs(candidate - rawEndMs) <= 600) {
+        nextFirstWordStartMs = candidate;
+      }
+    }
+
+    let stopMs;
+    if (lastSegEndMs !== null && rawEndMs - lastSegEndMs <= 600) {
+      stopMs = lastSegEndMs;
+      if (nextFirstWordStartMs !== null) {
+        stopMs = Math.min(stopMs, nextFirstWordStartMs - 40);
+      }
+    } else {
+      stopMs = nextFromMs !== null ? Math.min(rawEndMs, nextFromMs) - 70 : rawEndMs - 60;
+      if (nextFirstWordStartMs !== null) {
+        stopMs = Math.min(stopMs, nextFirstWordStartMs - 40);
+      }
+    }
+
+    stopMs = Math.max(startMs + 120, Math.min(rawEndMs, Math.round(stopMs)));
+    return { startMs, stopMs, rawEndMs };
+  }
+
+  function waitForAudioMetadata(audioEl, timeoutMs = 4500) {
+    if (audioEl.readyState >= 1) return Promise.resolve();
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        audioEl.removeEventListener('loadedmetadata', done);
+        audioEl.removeEventListener('canplay', done);
+        audioEl.removeEventListener('error', done);
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      audioEl.addEventListener('loadedmetadata', done, { once: true });
+      audioEl.addEventListener('canplay', done, { once: true });
+      audioEl.addEventListener('error', done, { once: true });
+    });
   }
 
   // Bengali Numerals Converter
@@ -80,6 +167,7 @@
 
   // Audio Playback Helpers
   async function playAudioUrl(url, triggerBtn) {
+    ayahClipPlaySeq++;
     clearAyahClipWatcher();
     if (currentPlayingBtn && currentPlayingBtn !== triggerBtn) {
       currentPlayingBtn.classList.remove('playing');
@@ -99,6 +187,8 @@
       triggerBtn.classList.add('playing');
     }
 
+    audioPlayer.muted = false;
+    audioPlayer.dataset.clipKey = '';
     audioPlayer.dataset.rawUrl = url;
     audioPlayer.src = resolvedSrc;
     audioPlayer.play().catch((err) => {
@@ -112,15 +202,18 @@
     };
   }
 
-  // Plays a single ayah slice directly from the Tarteel Full Surah Audio using segment timestamps
+  // Plays a single ayah slice directly from the Tarteel Full Surah Audio with zero-bleed silence-gap stopping
   async function playAyahAudio(surah, ayah, triggerBtn) {
+    const seq = ++ayahClipPlaySeq;
     clearAyahClipWatcher();
     const sNum = parseInt(surah, 10);
     const aNum = parseInt(ayah, 10);
     const clipKey = `tarteel-ayah-${sNum}:${aNum}`;
 
     if (!audioPlayer.paused && audioPlayer.dataset.clipKey === clipKey) {
+      audioPlayer.muted = true;
       audioPlayer.pause();
+      audioPlayer.muted = false;
       if (triggerBtn) triggerBtn.classList.remove('playing');
       currentPlayingBtn = null;
       audioPlayer.dataset.clipKey = '';
@@ -135,60 +228,144 @@
       triggerBtn.classList.add('playing');
     }
 
+    const stopAyahClipNow = () => {
+      // Mute synchronously BEFORE pause() to kill any remaining audio hardware buffer immediately
+      audioPlayer.muted = true;
+      audioPlayer.pause();
+      clearAyahClipWatcher();
+      audioPlayer.dataset.clipKey = '';
+      if (currentPlayingBtn) currentPlayingBtn.classList.remove('playing');
+      currentPlayingBtn = null;
+    };
+
     try {
       const segData = await QuranDB.getSurahSegments(sNum);
+      if (seq !== ayahClipPlaySeq) return;
+
       const sPad = String(sNum).padStart(3, '0');
       const surahAudioUrl = (segData && segData.audio_url)
         ? segData.audio_url
         : `${SURAH_AUDIO_BASE}/${sPad}.mp3`;
       const resolvedSrc = await resolveAudioSrcWithOfflineCache(surahAudioUrl);
-      const aData = segData && segData.ayahs ? segData.ayahs[String(aNum)] : null;
+      if (seq !== ayahClipPlaySeq) return;
 
+      const bounds = computeAyahClipBounds(segData, aNum);
+      const startMs = bounds ? bounds.startMs : 0;
+      const stopMs = bounds && bounds.stopMs > startMs ? bounds.stopMs : null;
+      const startSec = startMs / 1000;
+
+      // Pause quietly while seeking to target ayah so zero stray audio plays during seek
+      audioPlayer.pause();
+      audioPlayer.muted = true;
       if (audioPlayer.src !== resolvedSrc) {
         audioPlayer.src = resolvedSrc;
+        await waitForAudioMetadata(audioPlayer);
+        if (seq !== ayahClipPlaySeq) return;
       }
+
       audioPlayer.dataset.rawUrl = surahAudioUrl;
       audioPlayer.dataset.clipKey = clipKey;
 
-      const startSec = aData ? Math.max(0, aData.timestamp_from / 1000) : 0;
-      const endMs = aData ? aData.timestamp_to : null;
-      audioPlayer.currentTime = startSec;
+      try {
+        audioPlayer.currentTime = startSec;
+      } catch (_seekErr) {}
+
+      // Wait briefly for seeked if browser jumped across a large surah MP3
+      if (Math.abs(audioPlayer.currentTime - startSec) > 0.25 && audioPlayer.readyState >= 1) {
+        await new Promise((resolve) => {
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(t);
+            audioPlayer.removeEventListener('seeked', finish);
+            resolve();
+          };
+          const t = setTimeout(finish, 900);
+          audioPlayer.addEventListener('seeked', finish, { once: true });
+        });
+        if (seq !== ayahClipPlaySeq) return;
+      }
+
+      audioPlayer.muted = false;
       await audioPlayer.play();
+      if (seq !== ayahClipPlaySeq) {
+        audioPlayer.muted = true;
+        audioPlayer.pause();
+        return;
+      }
 
       if (window.ReadingHistory && typeof window.ReadingHistory.recordAyahListen === 'function') {
-        const clipSec = endMs && endMs > startSec * 1000
-          ? Math.max(1, Math.min(180, Math.round((endMs - startSec * 1000) / 1000)))
+        const clipSec = stopMs && stopMs > startMs
+          ? Math.max(1, Math.min(180, Math.round((stopMs - startMs) / 1000)))
           : 4;
         window.ReadingHistory.recordAyahListen(sNum, aNum, clipSec);
       }
 
-      if (endMs) {
+      if (stopMs) {
+        const leadMs = 20; // Compensate for JS timer + mobile audio hardware output pipeline
+        const checkShouldStop = () => {
+          if (seq !== ayahClipPlaySeq || audioPlayer.paused || audioPlayer.dataset.clipKey !== clipKey) {
+            clearAyahClipWatcher();
+            return true;
+          }
+          if (audioPlayer.currentTime * 1000 >= stopMs - leadMs) {
+            stopAyahClipNow();
+            return true;
+          }
+          return false;
+        };
+
+        const scheduleStopTimer = () => {
+          if (ayahClipStopTimer) {
+            clearTimeout(ayahClipStopTimer);
+            ayahClipStopTimer = null;
+          }
+          if (seq !== ayahClipPlaySeq || audioPlayer.paused || audioPlayer.dataset.clipKey !== clipKey) return;
+          const rate = audioPlayer.playbackRate > 0 ? audioPlayer.playbackRate : 1;
+          const remainingMs = ((stopMs - leadMs) - audioPlayer.currentTime * 1000) / rate;
+          if (remainingMs <= 0) {
+            stopAyahClipNow();
+            return;
+          }
+          ayahClipStopTimer = setTimeout(() => {
+            if (!checkShouldStop()) {
+              scheduleStopTimer();
+            }
+          }, Math.max(10, Math.min(remainingMs, 15000)));
+        };
+
+        // 1. Precision timer (immune to rAF throttling / mobile dim screen)
+        scheduleStopTimer();
+
+        // 2. timeupdate listener (guaranteed fallback even if timers are clamped in background)
+        ayahClipTimeUpdateHandler = () => {
+          if (!checkShouldStop()) {
+            scheduleStopTimer();
+          }
+        };
+        audioPlayer.addEventListener('timeupdate', ayahClipTimeUpdateHandler);
+
+        // 3. 60fps rAF loop for tightest foreground cut
         const watchEnd = () => {
-          if (audioPlayer.paused || audioPlayer.dataset.clipKey !== clipKey) {
-            ayahClipStopRaf = null;
-            return;
-          }
-          if (audioPlayer.currentTime * 1000 >= endMs) {
-            audioPlayer.pause();
-            audioPlayer.dataset.clipKey = '';
-            if (currentPlayingBtn) currentPlayingBtn.classList.remove('playing');
-            currentPlayingBtn = null;
-            ayahClipStopRaf = null;
-            return;
-          }
+          if (checkShouldStop()) return;
           ayahClipStopRaf = requestAnimationFrame(watchEnd);
         };
         ayahClipStopRaf = requestAnimationFrame(watchEnd);
       }
 
       audioPlayer.onended = () => {
+        if (seq !== ayahClipPlaySeq) return;
         clearAyahClipWatcher();
         audioPlayer.dataset.clipKey = '';
         if (currentPlayingBtn) currentPlayingBtn.classList.remove('playing');
         currentPlayingBtn = null;
       };
     } catch (err) {
+      if (seq !== ayahClipPlaySeq) return;
       console.warn('Tarteel ayah audio play notice:', err);
+      clearAyahClipWatcher();
+      audioPlayer.muted = false;
       if (triggerBtn) triggerBtn.classList.remove('playing');
       currentPlayingBtn = null;
     }

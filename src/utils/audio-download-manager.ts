@@ -23,6 +23,7 @@ export interface WordAudioEntry {
   count: number;
   bytes: number;
   savedAt: number;
+  unavailableUrls?: string[];
 }
 
 export interface AudioManifest {
@@ -97,6 +98,10 @@ export const MAX_PARALLEL_SURAH_DOWNLOADS = 3;
 export const MAX_PARALLEL_WORD_SURAH_TASKS = 1;
 export const WORD_AUDIO_CONCURRENCY = 10;
 
+// Optional registry of permanently missing (HTTP 404/410) CDN files if any arise in the future.
+// Runtime 404/410 responses are also automatically recorded in each Surah's `unavailableUrls`.
+export const KNOWN_UNAVAILABLE_WBW_BY_SURAH: Readonly<Record<number, readonly string[]>> = {};
+
 const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
 export function toBnDigits(val: string | number): string {
@@ -146,11 +151,15 @@ export function parseAudioManifest(raw: unknown): AudioManifest {
         const count = Math.floor(Number(entry.count) || 0);
         const bytes = Number(entry.bytes);
         const savedAt = Number(entry.savedAt) || 0;
+        const unavailableUrls = Array.isArray(entry.unavailableUrls)
+          ? Array.from(new Set(entry.unavailableUrls.filter((u): u is string => typeof u === 'string' && u.length > 0)))
+          : undefined;
         if (count > 0) {
           base.wordAudio[sNum] = {
             count,
             bytes: Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes) : count * DEFAULT_WORD_AUDIO_BYTES,
-            savedAt: Number.isFinite(savedAt) ? savedAt : 0
+            savedAt: Number.isFinite(savedAt) ? savedAt : 0,
+            ...(unavailableUrls && unavailableUrls.length > 0 ? { unavailableUrls } : {})
           };
         }
       }
@@ -295,12 +304,24 @@ export function reconcileManifestWithCacheScan(
   for (const [k, rawCount] of Object.entries(scan.wordCounts || {})) {
     const sNum = parseInt(k, 10);
     if (!Number.isInteger(sNum) || sNum < 1 || sNum > 114) continue;
+    const cachedCount = Math.max(0, Math.floor(rawCount));
+    if (cachedCount <= 0) continue;
+
     const meta = metaBySurah.get(sNum);
-    const maxW = meta && meta.total_words > 0 ? meta.total_words : rawCount;
-    const count = Math.min(Math.max(0, Math.floor(rawCount)), maxW);
+    const maxW = meta && meta.total_words > 0 ? meta.total_words : cachedCount;
+    const prev = manifest.wordAudio[sNum];
+
+    // Preserve verified permanent-404 URLs (plus known CDN 404s when all other words are cached)
+    const unavailableSet = new Set<string>(prev && Array.isArray(prev.unavailableUrls) ? prev.unavailableUrls : []);
+    const knownForSurah = KNOWN_UNAVAILABLE_WBW_BY_SURAH[sNum];
+    if (knownForSurah && knownForSurah.length > 0 && cachedCount + knownForSurah.length >= maxW) {
+      for (const u of knownForSurah) unavailableSet.add(u);
+    }
+
+    const unavailableUrls = Array.from(unavailableSet);
+    const count = Math.min(cachedCount + unavailableUrls.length, maxW);
     if (count <= 0) continue;
 
-    const prev = manifest.wordAudio[sNum];
     const measuredBytes = scan.wordBytes && scan.wordBytes[sNum];
     let bytes: number;
     if (measuredBytes && measuredBytes > 0) {
@@ -309,17 +330,19 @@ export function reconcileManifestWithCacheScan(
       bytes = prev.bytes;
     } else if (prev && prev.count > 0 && prev.bytes > 0) {
       const avgPerWord = prev.bytes / prev.count;
-      bytes = Math.round(avgPerWord * count);
+      bytes = Math.round(avgPerWord * cachedCount);
     } else {
-      bytes = count * DEFAULT_WORD_AUDIO_BYTES;
+      bytes = cachedCount * DEFAULT_WORD_AUDIO_BYTES;
     }
 
     nextWordAudio[sNum] = {
       count,
       bytes,
-      savedAt: prev ? prev.savedAt : nowMs
+      savedAt: prev ? prev.savedAt : nowMs,
+      ...(unavailableUrls.length > 0 ? { unavailableUrls } : {})
     };
-    if (!prev || prev.count !== count || Math.abs(prev.bytes - bytes) > 1024) {
+    const prevUnavailLen = prev && Array.isArray(prev.unavailableUrls) ? prev.unavailableUrls.length : 0;
+    if (!prev || prev.count !== count || Math.abs(prev.bytes - bytes) > 1024 || prevUnavailLen !== unavailableUrls.length) {
       changed = true;
     }
   }
@@ -380,7 +403,7 @@ export function computeAudioOverviewStats(
       }
     }
   } else {
-    totalWords = 77430;
+    totalWords = 77429;
     for (const entry of Object.values(manifest.surahAudio)) {
       completedSurahs++;
       totalSurahBytes += Math.max(0, entry.bytes || 0);

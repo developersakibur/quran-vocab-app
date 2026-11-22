@@ -14,7 +14,7 @@
   'use strict';
 
   const DB_NAME = 'QuranVocabDB';
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
   let dbPromise = null;
 
   // Ultra-fast In-Memory Caches
@@ -99,6 +99,44 @@
           const histStore = db.createObjectStore('reading_history', { keyPath: 'id' });
           histStore.createIndex('activity_date', 'activity_date', { unique: false });
           histStore.createIndex('surah', 'surah', { unique: false });
+        }
+
+        // v4 migration: repair the 4 ayahs where a compound Quranic token (e.g. بَعۡدَ مَا / إِلۡ يَاسِينَ)
+        // was split into 2 Arabic tokens while meanings/roots/summaries/audio stayed at the true token count.
+        if (event.oldVersion > 0 && event.oldVersion < 4 && db.objectStoreNames.contains('words')) {
+          try {
+            const tx = event.target.transaction;
+            const wordStore = tx.objectStore('words');
+            const verseIdx = wordStore.index('verse_key');
+            const repairs = [
+              { verseKey: '2:181', mergePos: 3, oldLen: 14 },
+              { verseKey: '8:6', mergePos: 4, oldLen: 12 },
+              { verseKey: '13:37', mergePos: 8, oldLen: 20 },
+              { verseKey: '37:130', mergePos: 3, oldLen: 4 }
+            ];
+            for (const r of repairs) {
+              const req = verseIdx.getAll(IDBKeyRange.only(r.verseKey));
+              req.onsuccess = () => {
+                const list = (req.result || []).sort((a, b) => a.position - b.position);
+                if (list.length !== r.oldLen) return;
+                const tail = list[list.length - 1];
+                if (tail && tail.meaning_bn) return;
+                const mIdx = r.mergePos - 1;
+                list[mIdx].arabic = `${list[mIdx].arabic} ${list[mIdx + 1].arabic}`;
+                for (let i = mIdx + 1; i < list.length - 1; i++) {
+                  list[i].arabic = list[i + 1].arabic;
+                }
+                for (let i = mIdx; i < list.length - 1; i++) {
+                  wordStore.put(list[i]);
+                }
+                if (tail && tail.key) {
+                  wordStore.delete(tail.key);
+                }
+              };
+            }
+          } catch (migErr) {
+            console.warn('[QuranDB] v4 compound-word repair warning:', migErr);
+          }
         }
       };
 

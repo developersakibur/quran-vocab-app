@@ -304,4 +304,59 @@ describe('audio-download-manager parallel concurrency (3 surahs, 10 words)', () 
     assert.equal(nextPick.task?.id, 'ayah:114');
     assert.equal(nextPick.queue.length, 0);
   });
+
+  it('completes Surah Al-Baqarah at 6116/6116 and also handles generic runtime 404 unavailableUrls cleanly', () => {
+    const baqarahMeta: SurahMetaLite[] = [
+      { surah: 2, total_words: 6116, name_bn_script: 'আল-বাকারা' }
+    ];
+    const initial = createEmptyAudioManifest();
+
+    // All 6,116 words of Surah Al-Baqarah exist on QuranCDN after fixing 2:181 compound word alignment
+    const { manifest: reconciled, changed } = reconcileManifestWithCacheScan(
+      initial,
+      { surahCounts: {}, wordCounts: { 2: 6116 } },
+      baqarahMeta,
+      1000
+    );
+
+    assert.equal(changed, true);
+    assert.equal(reconciled.wordAudio[2]?.count, 6116);
+    const row = computeSurahRowDownloadState(baqarahMeta[0], 'word', reconciled, null, []);
+    assert.equal(row.status, 'completed');
+    assert.equal(row.doneUnits, 6116);
+    assert.equal(row.totalUnits, 6116);
+    assert.equal(row.percent, 100);
+
+    // Defensive safety net: if any Surah ever encounters a runtime HTTP 404, unavailableUrls persists and resolves cleanly
+    const withRuntime404 = createEmptyAudioManifest();
+    withRuntime404.wordAudio[112] = {
+      count: 15,
+      bytes: 14 * 16384,
+      savedAt: 1000,
+      unavailableUrls: ['https://audio.qurancdn.com/wbw/112_004_005.mp3']
+    };
+    const ikhlasMeta: SurahMetaLite[] = [{ surah: 112, total_words: 15, name_bn_script: 'আল-ইখলাস' }];
+    const parsed = parseAudioManifest(JSON.parse(JSON.stringify(withRuntime404)));
+    assert.deepEqual(parsed.wordAudio[112]?.unavailableUrls, [
+      'https://audio.qurancdn.com/wbw/112_004_005.mp3'
+    ]);
+
+    const { manifest: rec112 } = reconcileManifestWithCacheScan(
+      parsed,
+      { surahCounts: {}, wordCounts: { 112: 14 } },
+      ikhlasMeta,
+      1500
+    );
+    assert.equal(rec112.wordAudio[112]?.count, 15);
+    assert.equal(computeSurahRowDownloadState(ikhlasMeta[0], 'word', rec112, null, []).status, 'completed');
+
+    // Deleting all cached files clears the entry completely (never stuck at 1/15)
+    const { manifest: afterDelete } = reconcileManifestWithCacheScan(
+      rec112,
+      { surahCounts: {}, wordCounts: {} },
+      ikhlasMeta,
+      2000
+    );
+    assert.equal(afterDelete.wordAudio[112], undefined);
+  });
 });

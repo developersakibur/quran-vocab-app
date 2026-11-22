@@ -6,7 +6,7 @@
    ============================================================ */
 
 export const PRODUCTION_APP_BASE_URL = 'https://developersakibur.github.io/quran-vocab-app/';
-export const TOTAL_QURAN_WORDS = 77433;
+export const TOTAL_QURAN_WORDS = 77429;
 export const SHARE_TEMPLATE_STORAGE_KEY = 'quran-word-share-template-v1';
 
 export type ShareTemplateId = 'emerald' | 'cream' | 'midnight';

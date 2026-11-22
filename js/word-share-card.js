@@ -9,7 +9,7 @@
   'use strict';
 
   const PRODUCTION_APP_BASE_URL = 'https://developersakibur.github.io/quran-vocab-app/';
-  const DEFAULT_TOTAL_QURAN_WORDS = 77433;
+  const DEFAULT_TOTAL_QURAN_WORDS = 77429;
   const TEMPLATE_STORAGE_KEY = 'quran-word-share-template-v1';
   const CARD_SIZE = 1080;
 

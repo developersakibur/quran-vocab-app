@@ -159,6 +159,89 @@ export function getWordSeekSeconds(
   return Math.max(0, segment[1] / 1000);
 }
 
+export interface AyahClipBounds {
+  startMs: number;
+  stopMs: number;
+  rawEndMs: number;
+}
+
+/**
+ * Computes tight, zero-bleed millisecond start/stop bounds for playing a single ayah
+ * slice from a full-surah recitation MP3.
+ *
+ * In Tarteel segment manifests, `timestamp_to` typically equals the next ayah's
+ * `timestamp_from` (and often sits 50-150ms AFTER the next ayah's first word starts).
+ * Stopping at the ayah's final word segment end (`lastSegEndMs`, clamped strictly
+ * before the next ayah's first word) lands cleanly in the inter-ayah silence gap so
+ * zero words of the following ayah bleed through.
+ */
+export function computeAyahClipBounds(
+  data: SurahSegmentsData | null,
+  ayahNumber: number
+): AyahClipBounds | null {
+  if (!data || !data.ayahs) return null;
+  const aData = data.ayahs[String(ayahNumber)];
+  if (!aData || typeof aData.timestamp_from !== 'number') return null;
+
+  const startMs = Math.max(0, aData.timestamp_from);
+  const rawEndMs = typeof aData.timestamp_to === 'number' && aData.timestamp_to > startMs
+    ? aData.timestamp_to
+    : startMs;
+
+  if (rawEndMs <= startMs) {
+    return { startMs, stopMs: startMs, rawEndMs };
+  }
+
+  // 1. Find the latest valid word end within this ayah's segment array
+  let lastSegEndMs: number | null = null;
+  if (Array.isArray(aData.segments) && aData.segments.length > 0) {
+    for (const seg of aData.segments) {
+      if (Array.isArray(seg) && typeof seg[2] === 'number' && seg[2] > startMs && seg[2] <= rawEndMs + 100) {
+        if (lastSegEndMs === null || seg[2] > lastSegEndMs) {
+          lastSegEndMs = seg[2];
+        }
+      }
+    }
+  }
+
+  // 2. Inspect next ayah start & first word start (guarding against corrupted backward outliers)
+  const nextAyah = data.ayahs[String(ayahNumber + 1)];
+  const nextFromMs = nextAyah && typeof nextAyah.timestamp_from === 'number' && nextAyah.timestamp_from > startMs
+    ? nextAyah.timestamp_from
+    : null;
+
+  let nextFirstWordStartMs: number | null = null;
+  if (nextAyah && Array.isArray(nextAyah.segments) && nextAyah.segments.length > 0) {
+    const candidate = nextAyah.segments[0]?.[1];
+    if (
+      typeof candidate === 'number' &&
+      candidate > startMs &&
+      Math.abs(candidate - rawEndMs) <= 600
+    ) {
+      nextFirstWordStartMs = candidate;
+    }
+  }
+
+  let stopMs: number;
+  // Normal ayah: lastSegEndMs is within a normal inter-ayah pause (<= 600ms) of timestamp_to
+  if (lastSegEndMs !== null && rawEndMs - lastSegEndMs <= 600) {
+    stopMs = lastSegEndMs;
+    if (nextFirstWordStartMs !== null) {
+      stopMs = Math.min(stopMs, nextFirstWordStartMs - 40);
+    }
+  } else {
+    // Fallback for ayahs with incomplete word segments (e.g., 35:1): pull back into silence before next ayah
+    stopMs = nextFromMs !== null ? Math.min(rawEndMs, nextFromMs) - 70 : rawEndMs - 60;
+    if (nextFirstWordStartMs !== null) {
+      stopMs = Math.min(stopMs, nextFirstWordStartMs - 40);
+    }
+  }
+
+  // Never collapse ultra-short ayahs below a minimal valid clip window
+  stopMs = Math.max(startMs + 120, Math.min(rawEndMs, Math.round(stopMs)));
+  return { startMs, stopMs, rawEndMs };
+}
+
 export interface RecitationWordStates {
   surahNumber: number;
   activeAyahNumber: number | null;
