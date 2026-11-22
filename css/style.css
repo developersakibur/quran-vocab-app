@@ -9098,6 +9098,383 @@ body.share-modal-open {
   }
 }
 
+/* ============================================================
+   PRACTICE HUB (4-ENGINE GRID), SMART FLASHCARDS, LEARNED WORDS
+   & SIMPLIFIED SIDEBAR BOOKMARKS
+   ============================================================ */
 
+.practice-scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
 
+.practice-scope-label {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
 
+.practice-scope-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+  font-family: var(--font-bangla);
+}
+
+.practice-hub-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .practice-hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+button.practice-engine-card {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  min-height: 92px;
+}
+
+.engine-icon-ayah {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.engine-meta-line {
+  margin-top: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  font-family: var(--font-bangla);
+}
+
+[data-theme='dark'] .engine-meta-line {
+  color: #6ee7b7;
+}
+
+/* Smart Flashcard Unboxed Tally & 3-Button Rating */
+.flashcard-tally-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  padding: 4px 8px;
+}
+
+.flashcard-tally-line strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.flashcard-meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
+
+.flashcard-meta-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
+
+.flashcard-meta-inline strong {
+  color: var(--text-primary);
+}
+
+.flashcard-rating-grid.flashcard-rating-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 420px) {
+  .flashcard-rating-grid.flashcard-rating-grid-3 {
+    gap: 6px;
+  }
+  .flashcard-rating-grid.flashcard-rating-grid-3 .flashcard-rate-btn {
+    padding: 10px 6px;
+    min-height: 58px;
+  }
+  .flashcard-rating-grid.flashcard-rating-grid-3 .rate-btn-top strong {
+    font-size: 0.78rem;
+  }
+  .flashcard-rating-grid.flashcard-rating-grid-3 .rate-btn-sub {
+    font-size: 0.66rem;
+  }
+}
+
+.flashcard-summary-breakdown.flashcard-summary-breakdown-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* Learned Words Revision Table (শেখা শব্দ Tab) */
+.learned-summary-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.learned-summary-info {
+  flex: 1 1 210px;
+  min-width: 0;
+}
+
+.learned-summary-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
+
+.learned-summary-meta strong {
+  color: var(--color-primary);
+}
+
+[data-theme='dark'] .learned-summary-meta strong {
+  color: #6ee7b7;
+}
+
+.learned-summary-title {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 3px;
+  font-family: var(--font-bangla);
+}
+
+.learned-controls-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.learned-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.learned-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.learned-search-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.learned-search-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px 10px 38px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.learned-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.learned-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 440px) {
+  .learned-filter-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.learned-filter-btn {
+  min-height: 38px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.learned-filter-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.learned-list-header,
+.learned-row-card {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+}
+
+.learned-list-header {
+  padding: 7px 12px;
+  font-family: var(--font-bangla);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-muted);
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+}
+
+.learned-row-card {
+  padding: 10px 12px;
+  margin-bottom: 0;
+  cursor: pointer;
+  min-height: 64px;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.learned-row-card:hover {
+  border-color: var(--color-primary);
+}
+
+.learned-col-bn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.learned-status-line {
+  font-family: var(--font-bangla);
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.learned-status-line.tier-1 {
+  color: var(--color-primary);
+}
+
+.learned-status-line.tier-2 {
+  color: #b45309;
+}
+
+.learned-status-line.tier-4 {
+  color: #059669;
+}
+
+[data-theme='dark'] .learned-status-line.tier-1 {
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .learned-status-line.tier-2 {
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .learned-status-line.tier-4 {
+  color: #34d399;
+}
+
+.learned-col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Simplified Sidebar-Only Bookmarks View */
+.bookmarks-simple-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 2px 10px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+}
+
+.bookmarks-simple-header strong {
+  color: var(--text-primary);
+}
+
+.bookmark-list-header-simple,
+.bookmark-row-simple {
+  grid-template-columns: 104px minmax(0, 1fr) 88px;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .learned-summary-strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .learned-summary-info {
+    flex: none;
+    width: 100%;
+  }
+  .learned-summary-strip .bookmarks-flash-cta {
+    width: 100%;
+    min-height: 44px;
+  }
+  .learned-list-header,
+  .learned-row-card {
+    grid-template-columns: 92px minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+  .bookmark-list-header-simple,
+  .bookmark-row-simple {
+    grid-template-columns: 92px minmax(0, 1fr) 82px;
+  }
+}

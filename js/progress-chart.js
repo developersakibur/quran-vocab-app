@@ -183,68 +183,9 @@
     };
   }
 
-  // --- Generate Demo Data ---
-  function getDemoData(days = 30) {
-    const points = [];
-    const today = new Date();
-    // Realistic curve with variation
-    const baseCounts = [
-      4, 6, 5, 8, 7, 9, 6,
-      10, 12, 9, 14, 11, 15, 13,
-      14, 18, 15, 17, 20, 16, 19,
-      18, 22, 20, 25, 21, 23, 27, 24, 28
-    ];
-
-    let cumulative = 0;
-    let totalLearned = 0;
-    let totalReviews = 0;
-    let maxCount = 0;
-    let peakDay = null;
-    let activeDays = 0;
-
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
-      const patternIdx = (days - 1 - i) % baseCounts.length;
-      const count = baseCounts[patternIdx];
-      const reviews = count + Math.floor(count * 0.45);
-
-      cumulative += count;
-      totalLearned += count;
-      totalReviews += reviews;
-      if (count > 0) activeDays++;
-
-      const dayLabel = formatBnDateLabel(dateStr);
-      if (count > maxCount) {
-        maxCount = count;
-        peakDay = { date: dateStr, count, dayLabel };
-      }
-
-      points.push({
-        date: dateStr,
-        dayLabel,
-        count,
-        reviewsCount: reviews,
-        cumulativeCount: cumulative,
-      });
-    }
-
-    return {
-      points,
-      totalWordsLearned: totalLearned,
-      totalReviews,
-      dailyAverage: Number((totalLearned / days).toFixed(1)),
-      activeDaysCount: activeDays,
-      peakDay,
-      isDemo: true,
-    };
-  }
-
   // Internal state
   let currentDays = 30;
   let chartType = 'bar'; // 'bar' or 'curve'
-  let showDemoMode = false;
 
   // --- Render Chart to DOM ---
   async function render(mountElement) {
@@ -257,13 +198,7 @@
       return;
     }
 
-    let data;
-    if (showDemoMode) {
-      data = getDemoData(currentDays);
-    } else {
-      data = await fetchLearningData(currentDays);
-      // If user has 0 words learned yet, we can default show real data with a demo preview trigger
-    }
+    const data = await fetchLearningData(currentDays);
 
     // Build Component Shell
     mountElement.innerHTML = `
@@ -273,7 +208,6 @@
             <div class="chart-eyebrow">
               <span class="icon">${Icons.target}</span>
               <span>দৈনিক শব্দ শেখার ফ্রিকোয়েন্সি</span>
-              <span class="chart-badge">${showDemoMode ? 'নমুনা প্রিভিউ' : 'ক্লাউড সিঙ্ক'}</span>
             </div>
             <h3 class="chart-main-title">গত ${toBnDigits(currentDays)} দিনের অগ্রগতি চার্ট</h3>
           </div>
@@ -321,21 +255,15 @@
         <!-- D3 SVG Viewport -->
         <div class="chart-canvas-wrap" id="d3-chart-canvas"></div>
 
-        <!-- Empty state or Demo switcher hint -->
+        <!-- Real-data status / empty state -->
         <div class="chart-footer-meta">
           ${
-            data.totalWordsLearned === 0 && !showDemoMode
+            data.totalWordsLearned === 0
               ? `<div class="chart-empty-notice">
-                  <span style="display:flex;align-items:center;gap:6px"><span class="icon">${Icons.lightbulb}</span><span>গত ${toBnDigits(currentDays)} দিনে এখনও কোনো শব্দ শেখার হিস্ট্রি নেই। কুইজ অনুশীলন করলেই আপনার চার্ট তৈরি হবে!</span></span>
-                  <button type="button" class="chart-demo-btn" id="btn-toggle-demo">
-                    <span class="icon">${Icons.repeat}</span> নমুনা চার্ট প্রিভিউ দেখুন
-                  </button>
+                  <span style="display:flex;align-items:center;gap:6px"><span class="icon">${Icons.lightbulb}</span><span>গত ${toBnDigits(currentDays)} দিনে এখনো কোনো শব্দ শেখার হিস্ট্রি নেই। কুইজ অনুশীলন করলেই আপনার দৈনিক অগ্রগতির গ্রাফ এখানে দেখা যাবে।</span></span>
                 </div>`
               : `<div class="chart-source-sync">
                   <span>ক্লাউড স্টোরেজ ও লোকাল মেমরির সাথে সিঙ্ককৃত।</span>
-                  <button type="button" class="chart-demo-toggle-link" id="btn-toggle-demo">
-                    ${showDemoMode ? 'আমার রিয়েল ডেটায় ফিরুন' : 'নমুনা ডেমো দেখুন'}
-                  </button>
                 </div>`
           }
         </div>
@@ -365,14 +293,6 @@
           currentDays = parseInt(btn.dataset.days, 10);
           render(mountElement);
         }
-      };
-    }
-
-    const demoBtn = mountElement.querySelector('#btn-toggle-demo');
-    if (demoBtn) {
-      demoBtn.onclick = () => {
-        showDemoMode = !showDemoMode;
-        render(mountElement);
       };
     }
 
@@ -697,7 +617,6 @@
   // Expose ProgressChart
   global.ProgressChart = {
     fetchLearningData,
-    getDemoData,
     render,
     toBnDigits,
     formatBnDateLabel,

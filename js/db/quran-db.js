@@ -946,12 +946,14 @@
   // ============================================================
 
   /**
-   * SuperMemo SM-2 Spaced Repetition Algorithm
+   * SuperMemo SM-2 Spaced Repetition Algorithm + Smart Flashcard Rotation + Weak Words Rules
    * grade: 0-5 (0-2: Fail/Hard, 3: Pass with effort, 4: Good, 5: Perfect/Easy)
+   * options.source: 'quiz' | 'flashcard' | 'weak' (defaults to 'quiz')
    */
-  async function recordSpacedRepetition(wordKey, grade, wordMeta = {}) {
+  async function recordSpacedRepetition(wordKey, grade, wordMeta = {}, options = {}) {
     const db = await openDatabase();
     const today = new Date().toISOString().slice(0, 10);
+    const source = (options && options.source) || (wordMeta && wordMeta.practiceSource) || 'quiz';
 
     const tx = db.transaction(['word_progress', 'weak_words', 'activity'], 'readwrite');
     const progStore = tx.objectStore('word_progress');
@@ -973,6 +975,7 @@
     let correctCount = Math.max(0, Number(curProg.correctCount || 0));
     let wrongCount = Math.max(0, Number(curProg.wrongCount || 0));
     const isSuccess = grade >= 3;
+    const nowMs = Date.now();
 
     if (isSuccess) {
       correctCount += 1;
@@ -986,8 +989,12 @@
       repetitions += 1;
     } else {
       wrongCount += 1;
-      repetitions = 0;
-      interval = 1;
+      if (source !== 'flashcard') {
+        repetitions = 0;
+        interval = 1;
+      } else {
+        interval = 1;
+      }
     }
 
     // Update ease factor: EF' = EF + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02))
@@ -998,8 +1005,30 @@
     nextDate.setDate(nextDate.getDate() + interval);
 
     const newStatus = repetitions >= 5 ? 'mastered' : repetitions >= 2 ? 'review' : 'learning';
-    const nowMs = Date.now();
     const boxVal = newStatus === 'mastered' ? 5 : Math.min(repetitions + 1, 5);
+
+    const wasLearnedInQuiz = Boolean(
+      curProg.learnedInQuiz === true ||
+      Number(curProg.correctCount || 0) >= 1 ||
+      Number(curProg.repetitions || 0) >= 1
+    );
+    const learnedInQuiz = wasLearnedInQuiz || ((source === 'quiz' || source === 'weak') && isSuccess);
+    const learnedAt = curProg.learnedAt || (learnedInQuiz ? nowMs : null);
+
+    let flashcardRating = curProg.flashcardRating !== undefined ? curProg.flashcardRating : null;
+    let flashcardLastReviewed = curProg.flashcardLastReviewed || null;
+    let flashcardReviewCount = Math.max(0, Number(curProg.flashcardReviewCount || 0));
+
+    if (source === 'flashcard') {
+      flashcardRating = grade;
+      flashcardLastReviewed = nowMs;
+      flashcardReviewCount += 1;
+    }
+
+    const cachedArabic = wordMeta.arabic || curProg.arabic || '';
+    const cachedMeaning = wordMeta.meaning_bn || curProg.meaning_bn || '';
+    const cachedRoot = wordMeta.root || curProg.root || '';
+    const cachedVerseKey = wordMeta.verse_key || curProg.verse_key || '';
 
     const updatedProgressRec = {
       word_id: wordKey,
@@ -1014,7 +1043,16 @@
       lastGrade: grade,
       lastReviewed: nowMs,
       nextReview: nextDate.getTime(),
-      nextReviewDate: nextDate.toISOString().slice(0, 10)
+      nextReviewDate: nextDate.toISOString().slice(0, 10),
+      learnedInQuiz,
+      learnedAt,
+      flashcardRating,
+      flashcardLastReviewed,
+      flashcardReviewCount,
+      arabic: cachedArabic,
+      meaning_bn: cachedMeaning,
+      root: cachedRoot,
+      verse_key: cachedVerseKey
     };
 
     const rememberResult = computeRememberPoint(updatedProgressRec, null, nowMs);
@@ -1037,7 +1075,16 @@
           correctCount,
           wrongCount,
           lastGrade: grade,
-          rememberScore: rememberResult.score
+          rememberScore: rememberResult.score,
+          learnedInQuiz,
+          learnedAt,
+          flashcardRating,
+          flashcardLastReviewed,
+          flashcardReviewCount,
+          arabic: cachedArabic,
+          meaning_bn: cachedMeaning,
+          root: cachedRoot,
+          verse_key: cachedVerseKey
         };
         global.StorageManager.set('progress-v1', localP);
       } catch (e) {
@@ -1045,33 +1092,54 @@
       }
     }
 
-    // Update Weak Words Deck
+    // Update Weak Words Deck via SmartFlashcardEngine rules:
+    // - Quiz wrong => add/increment weak word
+    // - Flashcard => NEVER adds or removes weak words
+    // - Weak Words MCQ correct => immediately remove from weak words
     const curWeakReq = weakStore.get(wordKey);
     const curWeak = await wrapRequest(curWeakReq);
 
-    if (!isSuccess) {
-      const mistakeCount = curWeak ? curWeak.mistakeCount + 1 : 1;
-      weakStore.put({
-        word_id: wordKey,
-        mistakeCount,
-        consecutiveCorrect: 0,
-        lastMistakeAt: Date.now(),
-        arabic: wordMeta.arabic || (curWeak && curWeak.arabic) || '',
-        meaning_bn: wordMeta.meaning_bn || (curWeak && curWeak.meaning_bn) || '',
-        root: wordMeta.root || (curWeak && curWeak.root) || '',
-        verse_key: wordMeta.verse_key || (curWeak && curWeak.verse_key) || ''
-      });
-    } else if (curWeak) {
-      const consecutive = (curWeak.consecutiveCorrect || 0) + 1;
-      if (consecutive >= 2) {
-        // Successfully rehabilitated! Remove from weak words
-        weakStore.delete(wordKey);
-      } else {
-        weakStore.put({
-          ...curWeak,
-          consecutiveCorrect: consecutive
-        });
-      }
+    let weakTransition;
+    if (global.SmartFlashcardEngine && typeof global.SmartFlashcardEngine.computeWeakWordTransition === 'function') {
+      weakTransition = global.SmartFlashcardEngine.computeWeakWordTransition(
+        curWeak,
+        isSuccess,
+        source,
+        {
+          word_id: wordKey,
+          arabic: cachedArabic,
+          meaning_bn: cachedMeaning,
+          root: cachedRoot,
+          verse_key: cachedVerseKey
+        },
+        nowMs
+      );
+    } else if (source === 'flashcard') {
+      weakTransition = { action: 'none' };
+    } else if (source === 'weak' && isSuccess) {
+      weakTransition = curWeak ? { action: 'delete' } : { action: 'none' };
+    } else if (!isSuccess) {
+      weakTransition = {
+        action: 'upsert',
+        record: {
+          word_id: wordKey,
+          mistakeCount: curWeak ? (curWeak.mistakeCount || 0) + 1 : 1,
+          consecutiveCorrect: 0,
+          lastMistakeAt: nowMs,
+          arabic: cachedArabic || (curWeak && curWeak.arabic) || '',
+          meaning_bn: cachedMeaning || (curWeak && curWeak.meaning_bn) || '',
+          root: cachedRoot || (curWeak && curWeak.root) || '',
+          verse_key: cachedVerseKey || (curWeak && curWeak.verse_key) || ''
+        }
+      };
+    } else {
+      weakTransition = { action: 'none' };
+    }
+
+    if (weakTransition.action === 'upsert' && weakTransition.record) {
+      weakStore.put(weakTransition.record);
+    } else if (weakTransition.action === 'delete') {
+      weakStore.delete(wordKey);
     }
 
     // Update Activity & Streak
@@ -1080,14 +1148,14 @@
       date: today,
       wordsLearnedCount: 0,
       reviewsCount: 0,
-      lastActiveAt: Date.now()
+      lastActiveAt: nowMs
     };
 
     curAct.reviewsCount += 1;
-    if (isSuccess && curProg.repetitions === 0) {
+    if (isSuccess && !wasLearnedInQuiz && source !== 'flashcard') {
       curAct.wordsLearnedCount += 1;
     }
-    curAct.lastActiveAt = Date.now();
+    curAct.lastActiveAt = nowMs;
     actStore.put(curAct);
 
     await new Promise((resolve, reject) => {
@@ -1108,7 +1176,11 @@
       status: newStatus,
       rememberScore: rememberResult.score,
       correctCount,
-      wrongCount
+      wrongCount,
+      learnedInQuiz,
+      flashcardRating,
+      flashcardReviewCount,
+      weakAction: weakTransition.action
     };
   }
 
@@ -1246,17 +1318,93 @@
               lastReviewed: itemLast,
               nextReview: Number(item.nextReview || 0),
               correctCount: Math.max(Number(item.correctCount || 0), Number(existing?.correctCount || 0)),
-              wrongCount: Math.max(Number(item.wrongCount || 0), Number(existing?.wrongCount || 0))
+              wrongCount: Math.max(Number(item.wrongCount || 0), Number(existing?.wrongCount || 0)),
+              learnedInQuiz: Boolean(item.learnedInQuiz || existing?.learnedInQuiz),
+              learnedAt: item.learnedAt || existing?.learnedAt || null,
+              flashcardRating: item.flashcardRating !== undefined ? item.flashcardRating : (existing?.flashcardRating ?? null),
+              flashcardLastReviewed: Math.max(Number(item.flashcardLastReviewed || 0), Number(existing?.flashcardLastReviewed || 0)) || null,
+              flashcardReviewCount: Math.max(Number(item.flashcardReviewCount || 0), Number(existing?.flashcardReviewCount || 0)),
+              arabic: item.arabic || existing?.arabic || '',
+              meaning_bn: item.meaning_bn || existing?.meaning_bn || '',
+              root: item.root || existing?.root || '',
+              verse_key: item.verse_key || existing?.verse_key || ''
             };
           } else if (existing) {
             existing.correctCount = Math.max(Number(existing.correctCount || 0), Number(item.correctCount || 0));
             existing.wrongCount = Math.max(Number(existing.wrongCount || 0), Number(item.wrongCount || 0));
+            existing.learnedInQuiz = Boolean(existing.learnedInQuiz || item.learnedInQuiz);
+            if (!existing.learnedAt && item.learnedAt) existing.learnedAt = item.learnedAt;
+            if ((item.flashcardLastReviewed || 0) > (existing.flashcardLastReviewed || 0)) {
+              existing.flashcardRating = item.flashcardRating;
+              existing.flashcardLastReviewed = item.flashcardLastReviewed;
+            }
+            existing.flashcardReviewCount = Math.max(Number(existing.flashcardReviewCount || 0), Number(item.flashcardReviewCount || 0));
+            if (!existing.arabic && item.arabic) existing.arabic = item.arabic;
+            if (!existing.meaning_bn && item.meaning_bn) existing.meaning_bn = item.meaning_bn;
+            if (!existing.root && item.root) existing.root = item.root;
+            if (!existing.verse_key && item.verse_key) existing.verse_key = item.verse_key;
           }
         }
       } catch (e) {}
     }
 
     return map;
+  }
+
+  /**
+   * Resolves all learned words (from Ayah Quiz + MCQ Quiz) with full Arabic, Bengali meaning,
+   * root, and verse context hydrated from cached progress or surah data.
+   */
+  async function getLearnedWordsDetails() {
+    const progressMap = await getAllWordProgressMap();
+    const isLearned = (rec) => {
+      if (global.SmartFlashcardEngine && typeof global.SmartFlashcardEngine.isWordLearnedInQuiz === 'function') {
+        return global.SmartFlashcardEngine.isWordLearnedInQuiz(rec);
+      }
+      if (!rec || !rec.word_id || isNonWordProgressKey(rec.word_id)) return false;
+      return Boolean(rec.learnedInQuiz || Number(rec.correctCount || 0) >= 1 || Number(rec.repetitions || 0) >= 1);
+    };
+
+    const learnedRecords = [];
+    const missingKeys = [];
+
+    for (const [key, rec] of Object.entries(progressMap || {})) {
+      const normalized = rec && rec.word_id ? rec : rec ? { ...rec, word_id: key } : null;
+      if (!normalized || !isLearned(normalized)) continue;
+      learnedRecords.push(normalized);
+      if (!normalized.arabic || !normalized.meaning_bn) {
+        missingKeys.push(normalized.word_id);
+      }
+    }
+
+    const hydratedMap = new Map();
+    if (missingKeys.length > 0 && typeof getOccurrencesDetails === 'function') {
+      try {
+        const resolved = await getOccurrencesDetails(missingKeys);
+        for (const item of resolved) {
+          if (item && item.key) hydratedMap.set(item.key, item);
+        }
+      } catch (e) {
+        console.warn('[QuranDB] Learned words hydration notice:', e);
+      }
+    }
+
+    return learnedRecords.map((rec) => {
+      const h = hydratedMap.get(rec.word_id);
+      const parts = String(rec.word_id).split(':');
+      const sNum = parseInt(parts[0], 10) || 1;
+      const aNum = parseInt(parts[1], 10) || 1;
+      return {
+        word_id: rec.word_id,
+        arabic: rec.arabic || (h && h.arabic) || '',
+        meaning_bn: rec.meaning_bn || (h && h.meaning_bn) || '—',
+        root: rec.root || (h && h.root) || '',
+        verse_key: rec.verse_key || `${sNum}:${aNum}`,
+        surah: sNum,
+        ayah: aNum,
+        progress: rec
+      };
+    }).filter((item) => item.arabic);
   }
 
   async function mergeCloudWordProgress(cloudRows) {
@@ -1287,8 +1435,17 @@
             lastReviewed: cloudLast,
             nextReview: nextMs,
             nextReviewDate: nextMs > 0 ? new Date(nextMs).toISOString().slice(0, 10) : null,
-            correctCount: Number(cur?.correctCount || 0),
-            wrongCount: Number(cur?.wrongCount || 0)
+            correctCount: Math.max(Number(cur?.correctCount || 0), cloudReps > 0 ? 1 : 0),
+            wrongCount: Number(cur?.wrongCount || 0),
+            learnedInQuiz: Boolean(cur?.learnedInQuiz || cloudReps > 0),
+            learnedAt: cur?.learnedAt || (cloudReps > 0 ? (cloudLast || Date.now()) : null),
+            flashcardRating: cur?.flashcardRating ?? null,
+            flashcardLastReviewed: cur?.flashcardLastReviewed ?? null,
+            flashcardReviewCount: Number(cur?.flashcardReviewCount || 0),
+            arabic: cur?.arabic || '',
+            meaning_bn: cur?.meaning_bn || '',
+            root: cur?.root || '',
+            verse_key: cur?.verse_key || ''
           });
         }
       }
@@ -2330,6 +2487,7 @@
     recordSpacedRepetition,
     computeRememberPoint,
     getAllWordProgressMap,
+    getLearnedWordsDetails,
     mergeCloudWordProgress,
     isMcqPassKey,
     getMcqPassedListsMap,

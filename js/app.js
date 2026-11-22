@@ -1255,7 +1255,10 @@
     lastRegisteredEmail: '',
     accountAuthNotice: '',
     historyActivityFilter: 'all', // 'all' | 'read' | 'listen'
-    historyRangeFilter: '30d' // '7d' | '30d' | 'all'
+    historyRangeFilter: '30d', // '7d' | '30d' | 'all'
+    learnedQuery: '',
+    learnedFilter: 'all', // 'all' | 'new' | 'review' | 'mastered'
+    learnedVisibleLimit: 60
   };
 
   // ============================================================
@@ -1298,7 +1301,8 @@
       if (state.practiceSubGroup) qp.push(`sub=${encodeURIComponent(state.practiceSubGroup)}`);
       if (state.practiceList) qp.push(`list=${state.practiceList}`);
       hash = qp.length > 0 ? `#practice?${qp.join('&')}` : '#practice';
-    } else if (viewName === 'bookmarks') hash = '#bookmarks';
+    } else if (viewName === 'learned') hash = '#learned';
+    else if (viewName === 'bookmarks') hash = '#bookmarks';
     else if (viewName === 'account') hash = '#account';
     else if (viewName === 'downloads') hash = '#downloads';
     else hash = '#';
@@ -1366,6 +1370,8 @@
       const sub = urlParams.get('sub');
       const list = urlParams.get('list');
       navigateTo('practice', { surah, ayah, engine, group, sub, list }, pushState);
+    } else if (hash === '#learned') {
+      navigateTo('learned', {}, pushState);
     } else if (hash === '#bookmarks') {
       navigateTo('bookmarks', {}, pushState);
     } else if (hash === '#account') {
@@ -1400,14 +1406,14 @@
     // Hide all view containers
     document.querySelectorAll('.app-view').forEach((el) => el.classList.remove('active'));
 
-    // Update bottom nav tabs
+    // Update bottom nav tabs (4 tabs: শিখুন, অনুশীলন, শেখা শব্দ, একাউন্ট)
     document.querySelectorAll('.bottom-tab').forEach((tab) => {
       const target = tab.dataset.tab;
       if (target === 'learn' && (state.currentView === 'surahs' || state.currentView === 'ayahs' || state.currentView === 'word')) {
         tab.classList.add('active');
       } else if (target === 'practice' && state.currentView === 'practice') {
         tab.classList.add('active');
-      } else if (target === 'bookmarks' && state.currentView === 'bookmarks') {
+      } else if (target === 'learned' && state.currentView === 'learned') {
         tab.classList.add('active');
       } else if (target === 'account' && state.currentView === 'account') {
         tab.classList.add('active');
@@ -1485,10 +1491,18 @@
         renderPracticeHubView();
         break;
 
-      case 'bookmarks':
+      case 'learned':
         if (backBtn) backBtn.style.display = 'none';
+        if (titleEl) titleEl.textContent = 'শেখা শব্দ';
+        if (eyebrowEl) eyebrowEl.textContent = 'কুইজে আয়ত্তকৃত শব্দভাণ্ডার';
+        document.getElementById('view-learned').classList.add('active');
+        renderLearnedWordsView();
+        break;
+
+      case 'bookmarks':
+        if (backBtn) backBtn.style.display = 'grid';
         if (titleEl) titleEl.textContent = 'সংরক্ষিত শব্দ';
-        if (eyebrowEl) eyebrowEl.textContent = 'বুকমার্ক সংগ্রহ';
+        if (eyebrowEl) eyebrowEl.textContent = 'বুকমার্ক ও ব্যক্তিগত নোট';
         document.getElementById('view-bookmarks').classList.add('active');
         renderBookmarksView();
         break;
@@ -2710,6 +2724,13 @@
       return;
     }
 
+    // Gracefully redirect legacy deep-links (fill removed, saved-flashcard merged into smart flashcard)
+    if (state.practiceEngine === 'fill') {
+      state.practiceEngine = null;
+    } else if (state.practiceEngine === 'saved-flashcard') {
+      state.practiceEngine = 'flashcard';
+    }
+
     // If an engine is actively selected, show drill stage
     if (state.practiceEngine) {
       container.style.display = 'none';
@@ -2722,20 +2743,32 @@
     stage.style.display = 'none';
     stage.innerHTML = '';
 
-    const [weakList, bookmarksList] = await Promise.all([
+    const [weakList, progressMap] = await Promise.all([
       QuranDB.getWeakWordsList(),
-      QuranDB.getBookmarksList()
+      typeof QuranDB.getAllWordProgressMap === 'function' ? QuranDB.getAllWordProgressMap() : Promise.resolve({})
     ]);
+
+    const learnedSummary = window.SmartFlashcardEngine
+      ? window.SmartFlashcardEngine.summarizeLearnedWords(progressMap)
+      : { totalLearned: 0, unreviewedNewCount: 0, hardCount: 0, mediumCount: 0, easyCount: 0 };
 
     const surahLabel = state.practiceSurah
       ? `নির্বাচিত সূরা: ${toBnNumber(state.practiceSurah)}`
-      : 'সকল সূরা (সর্বাধিক ব্যবহৃত শব্দ আগে)';
+      : 'সকল সূরা ও ফ্রিকোয়েন্সি গ্রুপ';
+
+    const flashcardMeta = learnedSummary.totalLearned > 0
+      ? `মোট ${formatBnInt(learnedSummary.totalLearned)}টি শেখা শব্দ${learnedSummary.unreviewedNewCount > 0 ? ` · ${formatBnInt(learnedSummary.unreviewedNewCount)}টি নতুন` : ' · ১০টি করে স্মার্ট রিভিশন'}`
+      : 'আয়াত বা বহুনির্বাচনী কুইজ সম্পন্ন করলেই চালু হবে';
+
+    const weakMeta = weakList.length > 0
+      ? `${formatBnInt(weakList.length)}টি শব্দ বাকি · MCQ অনুশীলন`
+      : 'কোনো দুর্বল শব্দ নেই · সব ঠিক আছে';
 
     container.innerHTML = `
-      <div class="detail-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px">
+      <div class="detail-card practice-scope-bar">
         <div>
-          <div style="font-size:0.74rem;color:var(--text-secondary)">অনুশীলন পরিসর</div>
-          <div style="font-size:0.95rem;font-weight:700;color:var(--text-primary);margin-top:2px">${surahLabel}</div>
+          <div class="practice-scope-label">অনুশীলন পরিসর</div>
+          <div class="practice-scope-value">${surahLabel}</div>
         </div>
         <button type="button" id="btn-goto-account-progress" class="btn-ayah-context-audio">
           <span class="icon">${Icons.user}</span>
@@ -2743,63 +2776,46 @@
         </button>
       </div>
 
-      <!-- Featured Engine: Saved Vocabulary Interactive Flashcards -->
-      <div class="practice-engine-card saved-vocab-flashcard-entry" id="card-engine-saved-flashcard" data-engine="saved-flashcard" role="button" tabindex="0" aria-label="সংরক্ষিত শব্দের ফ্ল্যাশকার্ড ডেক">
-        <div class="engine-icon-wrap engine-icon-saved-flash">
-          <span class="icon">${Icons.starFilled}</span>
-        </div>
-        <div class="engine-info">
-          <div class="engine-title-row">
-            <h3>সংরক্ষিত ফ্ল্যাশকার্ড (${toBnNumber(bookmarksList.length)}টি)</h3>
-            <span class="engine-featured-pill">বুকমার্ক</span>
+      <div class="practice-hub-grid" id="practice-hub-grid">
+        <!-- Engine 1: Ayah Word Quiz -->
+        <button type="button" class="practice-engine-card" id="card-engine-ayah-select">
+          <div class="engine-icon-wrap engine-icon-ayah"><span class="icon">${Icons.book}</span></div>
+          <div class="engine-info">
+            <h3>আয়াত শব্দ কুইজ</h3>
+            <p>সূরা ও আয়াত ধরে ধাপে ধাপে শব্দের অর্থ অনুশীলন ও আনলক করুন।</p>
+            <div class="engine-meta-line tabular-nums">১১৪টি সূরা · আয়াতভিত্তিক রোডম্যাপ</div>
           </div>
-          <p>ফ্লিপ করে অর্থ দেখুন ও স্মরণশক্তি যাচাই করুন।</p>
-        </div>
-      </div>
+        </button>
 
-      <!-- Engine 1: Ayah by Ayah Quiz -->
-      <div class="practice-engine-card" id="card-engine-ayah-select" role="button" tabindex="0">
-        <div class="engine-icon-wrap" style="background:var(--color-primary);color:#fff"><span class="icon">${Icons.book}</span></div>
-        <div class="engine-info">
-          <h3>আয়াত শব্দ কুইজ</h3>
-          <p>সূরা ও আয়াত ধরে ধাপে ধাপে শব্দের অর্থ অনুশীলন ও আনলক করুন।</p>
-        </div>
-      </div>
+        <!-- Engine 2: Smart MCQ -->
+        <button type="button" class="practice-engine-card" id="card-engine-mcq" data-engine="mcq">
+          <div class="engine-icon-wrap engine-icon-2"><span class="icon">${Icons.target}</span></div>
+          <div class="engine-info">
+            <h3>বহুনির্বাচনী কুইজ</h3>
+            <p>${state.practiceSurah ? 'অপশন থেকে সঠিক বাংলা অর্থ চিহ্নিত করুন।' : '১০টি ফ্রিকোয়েন্সি গ্রুপ ও ১০-শব্দের ধাপে পূর্ণ কুরআন অনুশীলন করুন।'}</p>
+            <div class="engine-meta-line tabular-nums">ফ্রিকোয়েন্সি গ্রুপ · ১০-শব্দের ধাপ</div>
+          </div>
+        </button>
 
-      <!-- Engine 2: Smart MCQ -->
-      <div class="practice-engine-card" id="card-engine-mcq" data-engine="mcq" role="button" tabindex="0">
-        <div class="engine-icon-wrap engine-icon-2"><span class="icon">${Icons.target}</span></div>
-        <div class="engine-info">
-          <h3>বহুনির্বাচনী কুইজ</h3>
-          <p>${state.practiceSurah ? 'অপশন থেকে সঠিক বাংলা অর্থ চিহ্নিত করুন।' : '১০টি ফ্রিকোয়েন্সি গ্রুপ ও ১০-শব্দের ধাপে পূর্ণ কুরআন অনুশীলন করুন।'}</p>
-        </div>
-      </div>
+        <!-- Engine 3: Smart 10-Card Learned-Words Flashcards -->
+        <button type="button" class="practice-engine-card" id="card-engine-flashcard" data-engine="flashcard">
+          <div class="engine-icon-wrap engine-icon-3"><span class="icon">${Icons.repeat}</span></div>
+          <div class="engine-info">
+            <h3>স্মার্ট ফ্ল্যাশকার্ড</h3>
+            <p>কুইজে শেখা সব শব্দ থেকে স্মার্টভাবে ১০টি করে কার্ড রিভিশন করুন।</p>
+            <div class="engine-meta-line tabular-nums">${flashcardMeta}</div>
+          </div>
+        </button>
 
-      <!-- Engine 3: Fill in the Blank -->
-      <div class="practice-engine-card" data-engine="fill" role="button" tabindex="0">
-        <div class="engine-icon-wrap engine-icon-1"><span class="icon">${Icons.search}</span></div>
-        <div class="engine-info">
-          <h3>শূন্যস্থান পূরণ</h3>
-          <p>আয়াতে সঠিক আরবী শব্দ বসিয়ে পূর্ণ করুন।</p>
-        </div>
-      </div>
-
-      <!-- Engine 4: General Surah Flashcards -->
-      <div class="practice-engine-card" data-engine="flashcard" role="button" tabindex="0">
-        <div class="engine-icon-wrap engine-icon-3"><span class="icon">${Icons.repeat}</span></div>
-        <div class="engine-info">
-          <h3>সূরা ফ্ল্যাশকার্ড</h3>
-          <p>দ্রুত ফ্লিপ করে সূরার শব্দ মনে রাখুন।</p>
-        </div>
-      </div>
-
-      <!-- Engine 5: Weak Words -->
-      <div class="practice-engine-card" data-engine="weak" role="button" tabindex="0">
-        <div class="engine-icon-wrap engine-icon-4"><span class="icon">${Icons.warning}</span></div>
-        <div class="engine-info">
-          <h3>দুর্বল শব্দ (${toBnNumber(weakList.length)}টি)</h3>
-          <p>ভুল হওয়া শব্দগুলো পুনরায় রিভিশন দিন।</p>
-        </div>
+        <!-- Engine 4: Weak Words MCQ -->
+        <button type="button" class="practice-engine-card" id="card-engine-weak" data-engine="weak">
+          <div class="engine-icon-wrap engine-icon-4"><span class="icon">${Icons.warning}</span></div>
+          <div class="engine-info">
+            <h3>দুর্বল শব্দ</h3>
+            <p>কুইজে ভুল হওয়া শব্দগুলো বহুনির্বাচনী (MCQ) কুইজে ঝালিয়ে নিন।</p>
+            <div class="engine-meta-line tabular-nums">${weakMeta}</div>
+          </div>
+        </button>
       </div>
     `;
 
@@ -2824,6 +2840,15 @@
         const engine = card.dataset.engine;
         if (engine === 'mcq' && !state.practiceSurah && window.McqFrequencyGroups) {
           navigateTo('practice', { engine: 'mcq-groups' });
+          return;
+        }
+        if (engine === 'flashcard') {
+          // Always draw smart 10-card batch across ALL learned words (no surah filter)
+          navigateTo('practice', { engine: 'flashcard' });
+          return;
+        }
+        if (engine === 'weak') {
+          navigateTo('practice', { engine: 'weak' });
           return;
         }
         navigateTo('practice', { surah: state.practiceSurah, engine });
@@ -5027,9 +5052,12 @@
     let words = [];
     let globalDistractorPool = Array.isArray(customDistractorPool) ? customDistractorPool.slice() : [];
     let drillHeaderTitle = '';
-    const isFlashcardMode = engine === 'saved-flashcard' || engine === 'flashcard';
+    const isFlashcardMode = engine === 'flashcard' || engine === 'saved-flashcard';
+    const isWeakMode = engine === 'weak';
     const isGlobalFrequencyMode = !surahNumber && !ayahNumber && !Array.isArray(customDeckWords) && !mcqListMeta && !ayahQuizMeta
-      && (engine === 'mcq' || engine === 'fill' || engine === 'flashcard');
+      && engine === 'mcq';
+    let flashcardPoolTotal = 0;
+    let flashcardNewRemaining = 0;
 
     if (Array.isArray(customDeckWords) && customDeckWords.length > 0) {
       words = customDeckWords.slice();
@@ -5037,28 +5065,40 @@
         ? `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • ${mcqListMeta.isDirectGroup ? mcqListMeta.groupTitleBn : mcqListMeta.subGroupTitleBn}`
         : ayahQuizMeta
           ? `${ayahQuizMeta.surahNameBn} • আয়াত ${toBnNumber(ayahQuizMeta.ayah)}`
-          : (engine === 'saved-flashcard' ? 'সংরক্ষিত শব্দের ফ্ল্যাশকার্ড' : 'ফ্ল্যাশকার্ড অনুশীলন');
-    } else if (engine === 'saved-flashcard') {
-      const bookmarks = await QuranDB.getBookmarksList();
-      if (bookmarks.length === 0) {
+          : (isFlashcardMode ? 'স্মার্ট ফ্ল্যাশকার্ড রিভিশন' : 'অনুশীলন');
+    } else if (isFlashcardMode) {
+      // Smart 10-Card Learned-Words Flashcard Rotation across ALL learned words (no surah filter)
+      const progressMap = typeof QuranDB.getAllWordProgressMap === 'function'
+        ? await QuranDB.getAllWordProgressMap()
+        : {};
+      const SFE = window.SmartFlashcardEngine;
+      const summary = SFE ? SFE.summarizeLearnedWords(progressMap) : { totalLearned: 0, unreviewedNewCount: 0 };
+      flashcardPoolTotal = summary.totalLearned;
+      flashcardNewRemaining = summary.unreviewedNewCount;
+
+      const selectedRecords = SFE
+        ? SFE.selectSmartFlashcardBatch(progressMap, SFE.DEFAULT_FLASHCARD_BATCH_SIZE || 10)
+        : [];
+
+      if (selectedRecords.length === 0) {
         stage.innerHTML = `
           <div class="practice-container">
             <div class="card saved-flashcard-empty-card">
               <div class="saved-flashcard-empty-icon">
-                <span class="icon">${Icons.starFilled}</span>
+                <span class="icon">${Icons.bookCheck || Icons.book}</span>
               </div>
-              <h3 class="saved-flashcard-empty-title">সংরক্ষিত শব্দের ফ্ল্যাশকার্ড ডেক খালি</h3>
+              <h3 class="saved-flashcard-empty-title">এখনো কোনো শেখা শব্দ জমা হয়নি</h3>
               <p class="saved-flashcard-empty-desc">
-                আপনি এখনো কোনো শব্দ বুকমার্ক করেননি। যেকোনো শব্দের তারকা চিহ্নে চাপ দিয়ে সংরক্ষণ করুন, অথবা নিচের বাটনে ট্যাপ করে সূরা ফাতিহার ৫টি মৌলিক শব্দ সংরক্ষিত ডেকে যোগ করে এখনই অনুশীলন শুরু করুন।
+                আয়াত শব্দ কুইজ অথবা বহুনির্বাচনী কুইজে যেসব শব্দের সঠিক উত্তর দেবেন, সেগুলো স্বয়ংক্রিয়ভাবে আপনার শেখা শব্দের ভাণ্ডারে যুক্ত হবে এবং এখানে স্মার্ট ১০টি করে ফ্ল্যাশকার্ডে রিভিশন করতে পারবেন।
               </p>
               <div class="saved-flashcard-empty-actions">
-                <button type="button" class="btn-primary" id="btn-seed-saved-vocab">
-                  <span class="icon">${Icons.starFilled}</span>
-                  <span>৫টি মৌলিক শব্দ যোগ করে ফ্ল্যাশকার্ড শুরু করুন</span>
-                </button>
-                <button type="button" class="btn-secondary" id="btn-goto-surahs-bm">
+                <button type="button" class="btn-primary" id="btn-fc-start-ayah-quiz">
                   <span class="icon">${Icons.book}</span>
-                  <span>সূরা তালিকা থেকে শব্দ বুকমার্ক করুন</span>
+                  <span>আয়াত শব্দ কুইজ শুরু করুন</span>
+                </button>
+                <button type="button" class="btn-secondary" id="btn-fc-start-mcq-quiz">
+                  <span class="icon">${Icons.target}</span>
+                  <span>বহুনির্বাচনী কুইজ শুরু করুন</span>
                 </button>
                 <button type="button" class="btn-secondary" id="btn-back-hub">
                   <span class="icon">${Icons.arrowLeft}</span>
@@ -5069,64 +5109,27 @@
           </div>
         `;
 
-        const seedBtn = stage.querySelector('#btn-seed-saved-vocab');
-        if (seedBtn) {
-          seedBtn.onclick = async () => {
-            seedBtn.disabled = true;
-            try {
-              const s1 = await QuranDB.loadSurah(1);
-              const picks = [];
-              if (s1 && Array.isArray(s1.ayahs)) {
-                s1.ayahs.forEach((a) => {
-                  (a.words || []).forEach((w) => {
-                    if (w.meaning_bn && picks.length < 5) {
-                      picks.push({
-                        key: w.key,
-                        arabic: w.arabic,
-                        meaning_bn: w.meaning_bn,
-                        root: w.root || '',
-                        verse_key: a.verse_key || `1:${a.ayah}`
-                      });
-                    }
-                  });
-                });
-              }
-              for (const item of picks) {
-                const already = await QuranDB.isBookmarked(item.key);
-                if (!already) {
-                  await QuranDB.toggleBookmark(item.key, item);
-                }
-              }
-              UIOverlay.toast({ message: '৫টি মৌলিক শব্দ সংরক্ষিত ডেকে যোগ করা হয়েছে!', type: 'success' });
-              startPracticeDrill('saved-flashcard', surahNumber, ayahNumber);
-            } catch (e) {
-              seedBtn.disabled = false;
-            }
-          };
-        }
-
-        const gotoSurahsBtn = stage.querySelector('#btn-goto-surahs-bm');
-        if (gotoSurahsBtn) {
-          gotoSurahsBtn.onclick = () => navigateTo('surahs');
-        }
-
+        const ayahBtn = stage.querySelector('#btn-fc-start-ayah-quiz');
+        if (ayahBtn) ayahBtn.onclick = () => navigateTo('practice', { engine: 'ayah-surahs' });
+        const mcqBtn = stage.querySelector('#btn-fc-start-mcq-quiz');
+        if (mcqBtn) mcqBtn.onclick = () => navigateTo('practice', { engine: 'mcq-groups' });
         const backHubBtn = stage.querySelector('#btn-back-hub');
-        if (backHubBtn) {
-          backHubBtn.onclick = () => navigateTo('practice', { surah: surahNumber, engine: null });
-        }
+        if (backHubBtn) backHubBtn.onclick = () => navigateTo('practice', { engine: null });
         return;
       }
 
-      drillHeaderTitle = 'সংরক্ষিত শব্দের ফ্ল্যাশকার্ড';
+      drillHeaderTitle = 'স্মার্ট ফ্ল্যাশকার্ড রিভিশন';
       const surahCacheMap = new Map();
-      for (const bm of bookmarks) {
-        const refStr = bm.verse_key || bm.word_id || '1:1:1';
-        const parts = refStr.split(':').map((n) => parseInt(n, 10));
+      for (const rec of selectedRecords) {
+        const parts = String(rec.word_id || '1:1:1').split(':').map((n) => parseInt(n, 10));
         const sNum = parts[0] || 1;
         const aNum = parts[1] || 1;
+        let arabic = rec.arabic || '';
+        let meaningBn = rec.meaning_bn || '';
+        let rootVal = rec.root || '';
         let ayahArabic = '';
         let ayahTransBn = '';
-        let rootVal = bm.root || '';
+
         try {
           if (!surahCacheMap.has(sNum)) {
             surahCacheMap.set(sNum, await QuranDB.loadSurah(sNum));
@@ -5137,45 +5140,65 @@
             if (foundAyah) {
               ayahArabic = foundAyah.arabic || '';
               ayahTransBn = foundAyah.translation_bn || '';
-              const foundWord = (foundAyah.words || []).find((w) => w.key === bm.word_id);
-              if (foundWord && foundWord.root && !rootVal) {
-                rootVal = foundWord.root;
+              const foundWord = (foundAyah.words || []).find((w) => w.key === rec.word_id);
+              if (foundWord) {
+                if (!arabic) arabic = foundWord.arabic || '';
+                if (!meaningBn) meaningBn = foundWord.meaning_bn || '';
+                if (!rootVal) rootVal = foundWord.root || '';
               }
             }
           }
         } catch (e) {}
 
+        if (!arabic) continue;
+        const tier = SFE ? SFE.getFlashcardPriorityTier(rec) : 1;
         words.push({
-          key: bm.word_id,
-          arabic: bm.arabic,
-          meaning_bn: bm.meaning_bn || '—',
+          key: rec.word_id,
+          arabic,
+          meaning_bn: meaningBn || '—',
           root: rootVal,
-          verse_key: bm.verse_key || `${sNum}:${aNum}`,
+          verse_key: rec.verse_key || `${sNum}:${aNum}`,
           surah: sNum,
           ayah: aNum,
           ayah_arabic: ayahArabic,
           ayah_translation_bn: ayahTransBn,
-          isSavedVocab: true
+          priorityTier: tier
         });
       }
-    } else if (engine === 'weak') {
+    } else if (isWeakMode) {
       const weakList = await QuranDB.getWeakWordsList();
       if (weakList.length === 0) {
         stage.innerHTML = `
-          <div class="card" style="text-align:center;padding:40px 20px">
-            <span class="icon" style="font-size:3rem;color:var(--color-success)">${Icons.checkCircle}</span>
-            <h3 style="margin:16px 0 8px">মাশাআল্লাহ! কোনো দুর্বল শব্দ নেই!</h3>
-            <p style="color:var(--text-secondary);font-size:0.88rem">আপনি সব শব্দের অনুশীলনে সফল হয়েছেন।</p>
-            <button class="surah-practice-cta" style="margin-top:16px" id="btn-back-hub">অনুশীলন তালিকায় ফিরুন</button>
+          <div class="practice-container">
+            <div class="card saved-flashcard-empty-card">
+              <div class="saved-flashcard-empty-icon" style="color:var(--color-success)">
+                <span class="icon">${Icons.checkCircle}</span>
+              </div>
+              <h3 class="saved-flashcard-empty-title">মাশাআল্লাহ! কোনো দুর্বল শব্দ নেই</h3>
+              <p class="saved-flashcard-empty-desc">
+                কুইজে ভুল হওয়া কোনো শব্দ বাকি নেই। নতুন শব্দ অনুশীলন করতে আয়াত কুইজ বা বহুনির্বাচনী কুইজ শুরু করুন।
+              </p>
+              <div class="saved-flashcard-empty-actions">
+                <button type="button" class="btn-primary" id="btn-back-hub">অনুশীলন তালিকায় ফিরুন</button>
+              </div>
+            </div>
           </div>
         `;
         stage.querySelector('#btn-back-hub').onclick = () => {
-          navigateTo('practice', { surah: surahNumber, engine: null });
+          navigateTo('practice', { engine: null });
         };
         return;
       }
-      drillHeaderTitle = 'দুর্বল শব্দ নিবিড় রিভিশন';
-      words = weakList.map((w) => {
+
+      drillHeaderTitle = 'দুর্বল শব্দ (MCQ)';
+      const surahCacheMap = new Map();
+      // Sort most-mistaken & most-recent mistakes first, cap to 10 per session for crisp focus
+      const sortedWeak = weakList
+        .slice()
+        .sort((a, b) => (Number(b.mistakeCount || 0) - Number(a.mistakeCount || 0)) || (Number(b.lastMistakeAt || 0) - Number(a.lastMistakeAt || 0)))
+        .slice(0, 10);
+
+      for (const w of sortedWeak) {
         let sNum = 1, aNum = 1;
         if (w.verse_key) {
           const parts = w.verse_key.split(':').map((n) => parseInt(n, 10));
@@ -5186,16 +5209,55 @@
           sNum = parts[0] || 1;
           aNum = parts[1] || 1;
         }
-        return {
+
+        let arabic = w.arabic || '';
+        let meaningBn = w.meaning_bn || '';
+        let rootVal = w.root || '';
+        let ayahArabic = '';
+        let ayahTransBn = '';
+
+        try {
+          if (!surahCacheMap.has(sNum)) {
+            surahCacheMap.set(sNum, await QuranDB.loadSurah(sNum));
+          }
+          const sData = surahCacheMap.get(sNum);
+          if (sData && Array.isArray(sData.ayahs)) {
+            const foundAyah = sData.ayahs.find((a) => parseInt(a.ayah, 10) === aNum);
+            if (foundAyah) {
+              ayahArabic = foundAyah.arabic || '';
+              ayahTransBn = foundAyah.translation_bn || '';
+              const foundWord = (foundAyah.words || []).find((wd) => wd.key === w.word_id);
+              if (foundWord) {
+                if (!arabic) arabic = foundWord.arabic || '';
+                if (!meaningBn) meaningBn = foundWord.meaning_bn || '';
+                if (!rootVal) rootVal = foundWord.root || '';
+              }
+            }
+            // Also seed distractors from loaded surah words for high-quality MCQ options
+            for (const ay of sData.ayahs) {
+              for (const wd of (ay.words || [])) {
+                if (wd.meaning_bn && wd.meaning_bn.trim()) {
+                  globalDistractorPool.push(wd);
+                }
+                if (globalDistractorPool.length >= 60) break;
+              }
+              if (globalDistractorPool.length >= 60) break;
+            }
+          }
+        } catch (e) {}
+
+        words.push({
           key: w.word_id,
-          arabic: w.arabic,
-          meaning_bn: w.meaning_bn,
-          root: w.root,
+          arabic,
+          meaning_bn: meaningBn,
+          root: rootVal,
           verse_key: w.verse_key || `${sNum}:${aNum}`,
           surah: sNum,
-          ayah: aNum
-        };
-      });
+          ayah: aNum,
+          ayah_arabic: ayahArabic,
+          ayah_translation_bn: ayahTransBn
+        });
+      }
     } else if (isGlobalFrequencyMode && typeof QuranDB.getGlobalFrequentQuizWords === 'function') {
       drillHeaderTitle = 'সর্বাধিক ব্যবহৃত শব্দের কুইজ';
       try {
@@ -5290,11 +5352,11 @@
       } catch (e) {}
     }
 
-    // Build drillSet: keep global frequency order intact, sequential for ayah/saved/custom, shuffled for surah/weak
+    // Build drillSet: preserve priority queue order for Smart Flashcards & Weak Words, sequential for ayah/custom, shuffled for surah MCQ
     let drillSet;
     if (isGlobalFrequencyMode) {
       drillSet = words.slice(0, 10);
-    } else if (ayahNumber || engine === 'saved-flashcard' || Array.isArray(customDeckWords)) {
+    } else if (isFlashcardMode || isWeakMode || ayahNumber || Array.isArray(customDeckWords)) {
       drillSet = words.slice();
     } else {
       words.sort(() => Math.random() - 0.5);
@@ -5319,7 +5381,7 @@
 
     let currentIndex = 0;
     let score = 0;
-    const ratingCounts = { again: 0, hard: 0, good: 0, easy: 0 };
+    const ratingCounts = { hard: 0, medium: 0, easy: 0 };
     const missedFlashcards = [];
     const missedMcqWords = [];
 
@@ -5337,10 +5399,10 @@
         titleText = `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • প্রশ্ন ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
       } else if (ayahQuizMeta) {
         titleText = `আয়াত ${toBnNumber(ayahQuizMeta.surah)}:${toBnNumber(ayahQuizMeta.ayah)} • শব্দ ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
-      } else if (engine === 'saved-flashcard') {
-        titleText = `সংরক্ষিত ফ্ল্যাশকার্ড ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
-      } else if (engine === 'flashcard') {
-        titleText = `ফ্ল্যাশকার্ড ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
+      } else if (isFlashcardMode) {
+        titleText = `স্মার্ট ফ্ল্যাশকার্ড ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
+      } else if (isWeakMode) {
+        titleText = `দুর্বল শব্দ (MCQ) ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
       } else if (ayahNumber) {
         titleText = `আয়াত ${toBnNumber(surahNumber)}:${toBnNumber(ayahNumber)} • শব্দ ${toBnNumber(currentIndex + 1)}/${toBnNumber(drillSet.length)}`;
       } else {
@@ -5349,11 +5411,11 @@
 
       stage.innerHTML = `
         <div class="drill-header">
-          <button class="topbar-btn" id="drill-exit-btn" aria-label="অনুশীলন ত্যাগ করুন"><span class="icon">${Icons.close}</span></button>
+          <button type="button" class="topbar-btn" id="drill-exit-btn" aria-label="অনুশীলন ত্যাগ করুন"><span class="icon">${Icons.close}</span></button>
           <span style="font-family:var(--font-bangla);font-size:0.85rem;font-weight:600">
             ${titleText}
           </span>
-          <span class="tabular-nums" style="font-size:0.85rem;font-weight:700;color:var(--color-primary)">${toBnNumber(score)} আয়ত্ত</span>
+          <span class="tabular-nums" style="font-size:0.85rem;font-weight:700;color:var(--color-primary)">${toBnNumber(score)} ${isWeakMode ? 'সঠিক' : 'আয়ত্ত'}</span>
         </div>
         <div class="drill-progress-bar">
           <div class="drill-progress-fill" style="width:${progressPercent}%"></div>
@@ -5384,37 +5446,41 @@
 
       if (isFlashcardMode) {
         renderFlashcardQuestion(cardArea, q);
-      } else if (engine === 'fill') {
-        renderFillBlankQuestion(cardArea, q);
       } else {
         renderMcqQuestion(cardArea, q);
       }
     }
 
-    // Interactive Flip-to-Reveal Flashcard & 4-Level Knowledge Rating System
+    // Smart 10-Card Flip-to-Reveal Flashcard & 3-Button Priority Rotation Rating
     function renderFlashcardQuestion(area, q) {
       let isFlipped = false;
 
       const sNum = q.surah || (q.verse_key ? parseInt(q.verse_key.split(':')[0], 10) : (q.key ? parseInt(q.key.split(':')[0], 10) : 1));
       const aNum = q.ayah || (q.verse_key ? parseInt(q.verse_key.split(':')[1], 10) : (q.key ? parseInt(q.key.split(':')[1], 10) : 1));
-      const deckBadgeLabel = engine === 'saved-flashcard' ? 'সংরক্ষিত শব্দ ডেক' : 'সূরা ফ্ল্যাশকার্ড ডেক';
+      const tierLabel = q.priorityTier === 1
+        ? 'নতুন শেখা'
+        : q.priorityTier === 2
+          ? 'কঠিন রিভিশন'
+          : q.priorityTier === 3
+            ? 'মোটামুটি রিভিশন'
+            : 'নিয়মিত রিভিশন';
 
       const wrapper = document.createElement('div');
       wrapper.className = 'flashcard-system-wrap';
 
       wrapper.innerHTML = `
-        <!-- Session Live Tally Strip -->
-        <div class="flashcard-tally-strip" aria-label="চলমান রেটিং পরিসংখ্যান">
-          <span class="tally-chip tally-again">আবার: ${toBnNumber(ratingCounts.again)}</span>
-          <span class="tally-chip tally-hard">কঠিন: ${toBnNumber(ratingCounts.hard)}</span>
-          <span class="tally-chip tally-good">ভালো: ${toBnNumber(ratingCounts.good)}</span>
-          <span class="tally-chip tally-easy">সহজ: ${toBnNumber(ratingCounts.easy)}</span>
+        <!-- Unboxed Session Tally Strip -->
+        <div class="flashcard-tally-line tabular-nums" aria-label="চলমান রেটিং পরিসংখ্যান">
+          <span>কঠিন: <strong>${toBnNumber(ratingCounts.hard)}</strong></span>
+          <span aria-hidden="true">·</span>
+          <span>মোটামুটি: <strong>${toBnNumber(ratingCounts.medium)}</strong></span>
+          <span aria-hidden="true">·</span>
+          <span>মনে আছে: <strong>${toBnNumber(ratingCounts.easy)}</strong></span>
         </div>
 
         <!-- 3D Flip-to-Reveal Card Container -->
         <div class="flashcard-3d-scene" id="flashcard-scene">
           <div class="flashcard-3d-card" id="flashcard-interactive-card" data-flipped="false">
-            <!-- Card Top Controls (Shared Header) -->
             <div class="flashcard-top-controls">
               <div class="drill-audio-group">
                 <button type="button" class="drill-audio-btn" id="flash-word-audio-btn" aria-label="শব্দের উচ্চারণ শুনুন">
@@ -5426,18 +5492,16 @@
                   <span>আয়াতের অডিও</span>
                 </button>
               </div>
-              <div class="flashcard-badges-right">
-                <span class="flashcard-deck-pill">
-                  <span class="icon">${Icons.starFilled}</span>
-                  <span>${deckBadgeLabel}</span>
-                </span>
-                ${q.verse_key ? `<span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>` : ''}
+              <div class="flashcard-meta-right tabular-nums">
+                <span>${tierLabel}</span>
+                <span aria-hidden="true">·</span>
+                <span>আয়াত ${toBnNumber(q.verse_key || `${sNum}:${aNum}`)}</span>
               </div>
             </div>
 
             <!-- FRONT FACE: Arabic Word & Context Prompt -->
             <div class="flashcard-face-front" id="flashcard-front-content">
-              <div class="flashcard-side-label">প্রশ্ন পৃষ্ঠা • আরবী শব্দ</div>
+              <div class="flashcard-side-label">প্রশ্ন পৃষ্ঠা · আরবী শব্দ</div>
               <div class="flashcard-arabic-hero" dir="rtl">${q.arabic}</div>
               ${q.ayah_arabic ? `<div class="drill-ayah-context" style="margin-top:12px">${q.ayah_arabic.replace(q.arabic, `<span class="drill-ayah-highlight">${q.arabic}</span>`)}</div>` : ''}
               <button type="button" class="flashcard-flip-cta-btn" id="btn-flip-to-reveal" aria-label="কার্ড ফ্লিপ করে অর্থ দেখুন">
@@ -5448,19 +5512,19 @@
 
             <!-- BACK FACE: Revealed Bengali Meaning, Root & Ayah Translation -->
             <div class="flashcard-face-back" id="flashcard-back-content" style="display:none">
-              <div class="flashcard-side-label revealed">উত্তর পৃষ্ঠা • বাংলা অর্থ ও বিশ্লেষণ</div>
+              <div class="flashcard-side-label revealed">উত্তর পৃষ্ঠা · বাংলা অর্থ ও বিশ্লেষণ</div>
               <div class="flashcard-arabic-sub" dir="rtl">${q.arabic}</div>
               <div class="flashcard-meaning-bn" id="flashcard-revealed-meaning">${q.meaning_bn}</div>
-              <div class="flashcard-meta-pills">
-                ${q.root ? `<span class="pill-badge root">মূল ধাতু: ${q.root}</span>` : ''}
-                <span class="pill-badge">সূরা ${toBnNumber(sNum)} • আয়াত ${toBnNumber(aNum)}</span>
+              <div class="flashcard-meta-inline tabular-nums">
+                ${q.root ? `<span>মূল ধাতু: <strong>${q.root}</strong></span><span aria-hidden="true">·</span>` : ''}
+                <span>সূরা ${toBnNumber(sNum)} · আয়াত ${toBnNumber(aNum)}</span>
               </div>
               ${q.ayah_arabic ? `<div class="drill-ayah-context" style="margin-top:12px">${q.ayah_arabic.replace(q.arabic, `<span class="drill-ayah-highlight">${q.arabic}</span>`)}</div>` : ''}
               ${q.ayah_translation_bn ? `<div class="flashcard-ayah-bn-trans">${q.ayah_translation_bn}</div>` : ''}
               <div class="flashcard-back-actions">
                 <button type="button" class="flashcard-flip-back-btn" id="btn-flip-to-front" aria-label="প্রশ্ন পৃষ্ঠায় ফিরে যান">
                   <span class="icon">${Icons.repeat}</span>
-                  <span>প্রশ্ন পৃষ্ঠা দেখুন</span>
+                  <span>প্রশ্ন পৃষ্ঠা</span>
                 </button>
                 <button type="button" class="flashcard-flip-back-btn" id="btn-open-word-detail" aria-label="শব্দের বিস্তারিত ব্যাকরণ দেখুন">
                   <span class="icon">${Icons.book}</span>
@@ -5471,39 +5535,32 @@
           </div>
         </div>
 
-        <!-- Knowledge Rating Section (4-Button Spaced Repetition Grading) -->
+        <!-- 3-Button Thumb-Zone Knowledge Rating Panel -->
         <div class="flashcard-rating-panel" id="flashcard-rating-panel" data-ready="false">
           <div class="flashcard-rating-header" id="flashcard-rating-prompt">
-            শব্দটি আপনার কতটুকু মনে ছিল? নিচের বাটনে রেটিং দিন:
+            শব্দটির অর্থ মনে থাকলে নিচের বাটনে রেটিং দিন:
           </div>
-          <div class="flashcard-rating-grid" role="group" aria-label="স্মরণশক্তি রেটিং বাটনসমূহ">
-            <button type="button" class="flashcard-rate-btn rate-again" id="btn-rate-again" data-rate="again" data-grade="1">
+          <div class="flashcard-rating-grid flashcard-rating-grid-3" role="group" aria-label="স্মরণশক্তি রেটিং বাটনসমূহ">
+            <button type="button" class="flashcard-rate-btn rate-again" id="btn-rate-hard" data-rate="hard" data-grade="1">
               <span class="rate-btn-top">
                 <span class="icon">${Icons.xCircle}</span>
-                <strong>আবার</strong>
+                <strong>ভুলে গেছি / কঠিন</strong>
               </span>
-              <span class="rate-btn-sub">মনে নেই • ১ দিন</span>
+              <span class="rate-btn-sub">আবার দ্রুত আসবে</span>
             </button>
-            <button type="button" class="flashcard-rate-btn rate-hard" id="btn-rate-hard" data-rate="hard" data-grade="3">
+            <button type="button" class="flashcard-rate-btn rate-hard" id="btn-rate-medium" data-rate="medium" data-grade="3">
               <span class="rate-btn-top">
                 <span class="icon">${Icons.warning}</span>
-                <strong>কঠিন</strong>
+                <strong>মোটামুটি</strong>
               </span>
-              <span class="rate-btn-sub">কষ্টে • ২ দিন</span>
-            </button>
-            <button type="button" class="flashcard-rate-btn rate-good" id="btn-rate-good" data-rate="good" data-grade="4">
-              <span class="rate-btn-top">
-                <span class="icon">${Icons.check}</span>
-                <strong>ভালো</strong>
-              </span>
-              <span class="rate-btn-sub">পেরেছি • ৪ দিন</span>
+              <span class="rate-btn-sub">মাঝারি অগ্রাধিকার</span>
             </button>
             <button type="button" class="flashcard-rate-btn rate-easy" id="btn-rate-easy" data-rate="easy" data-grade="5">
               <span class="rate-btn-top">
                 <span class="icon">${Icons.checkCircle}</span>
-                <strong>সহজ</strong>
+                <strong>ভালো মনে আছে</strong>
               </span>
-              <span class="rate-btn-sub">মাস্টারড • ৭ দিন</span>
+              <span class="rate-btn-sub">তালিকার নিচে যাবে</span>
             </button>
           </div>
         </div>
@@ -5571,7 +5628,6 @@
         };
       }
 
-      // Clicking the card body also toggles flip
       if (cardEl) {
         cardEl.onclick = (e) => {
           if (e.target.closest('button')) return;
@@ -5579,14 +5635,12 @@
         };
       }
 
-      // Wire the 4 Knowledge Rating buttons
       wrapper.querySelectorAll('.flashcard-rate-btn').forEach((btn) => {
         btn.onclick = async (e) => {
           e.stopPropagation();
-          const rateId = btn.getAttribute('data-rate') || 'good';
-          const grade = parseInt(btn.getAttribute('data-grade') || '4', 10);
+          const rateId = btn.getAttribute('data-rate') || 'medium';
+          const grade = parseInt(btn.getAttribute('data-grade') || '3', 10);
 
-          // Disable rating buttons while recording SRS
           wrapper.querySelectorAll('.flashcard-rate-btn').forEach((b) => { b.disabled = true; });
 
           ratingCounts[rateId] = (ratingCounts[rateId] || 0) + 1;
@@ -5596,116 +5650,14 @@
             missedFlashcards.push(q);
           }
 
-          await QuranDB.recordSpacedRepetition(q.key, grade, q);
+          // Source: 'flashcard' — updates 4-tier priority queue WITHOUT adding to Weak Words
+          await QuranDB.recordSpacedRepetition(q.key, grade, q, { source: 'flashcard' });
           currentIndex++;
           renderQuestion();
         };
       });
 
       area.appendChild(wrapper);
-    }
-
-    // Fill in the Blank Render
-    function renderFillBlankQuestion(area, q) {
-      const card = document.createElement('div');
-      const ayahText = q.ayah_arabic || q.arabic;
-      const blanked = ayahText.replace(q.arabic, '<span class="drill-ayah-highlight" style="padding:0 8px">____?____</span>');
-
-      const sNum = q.surah || (q.verse_key ? parseInt(q.verse_key.split(':')[0], 10) : (q.key ? parseInt(q.key.split(':')[0], 10) : 1));
-      const aNum = q.ayah || (q.verse_key ? parseInt(q.verse_key.split(':')[1], 10) : (q.key ? parseInt(q.key.split(':')[1], 10) : 1));
-
-      card.innerHTML = `
-        <div class="drill-word-card">
-          <div class="drill-card-topbar">
-            <div class="drill-audio-group">
-              <button class="drill-audio-btn" id="drill-blank-word-audio" aria-label="শব্দের উচ্চারণ শুনুন" title="শব্দটির অডিও শুনুন">
-                <span class="icon">${Icons.volume2 || Icons.speaker}</span> <span>শব্দের অডিও</span>
-              </button>
-              <button class="drill-audio-btn ayah-audio" id="drill-blank-ayah-audio" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন" title="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
-                <span class="icon">${Icons.speaker}</span> <span>আয়াতের অডিও</span>
-              </button>
-            </div>
-            ${q.verse_key ? `<span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>` : ''}
-          </div>
-          <div class="drill-ayah-context" style="font-size:1.5rem;line-height:2.2">${blanked}</div>
-          <div class="drill-question-prompt">
-            অনুবাদ: <strong>"${q.meaning_bn}"</strong> — কোন শব্দটি বসবে?
-          </div>
-        </div>
-        <div class="options-grid" id="drill-options"></div>
-      `;
-
-      const wordAudioBtn = card.querySelector('#drill-blank-word-audio');
-      if (wordAudioBtn) {
-        wordAudioBtn.onclick = (e) => {
-          e.stopPropagation();
-          playWordAudio(q.key, wordAudioBtn);
-        };
-      }
-
-      const ayahAudioBtn = card.querySelector('#drill-blank-ayah-audio');
-      if (ayahAudioBtn) {
-        ayahAudioBtn.onclick = (e) => {
-          e.stopPropagation();
-          playAyahAudio(sNum, aNum, ayahAudioBtn);
-        };
-      }
-
-      const optionsGrid = card.querySelector('#drill-options');
-      const options = generateOptions(q, distractorPool);
-
-      options.forEach((opt) => {
-        const btn = document.createElement('button');
-        btn.className = 'option-btn';
-        btn.dataset.key = opt.key;
-        btn.innerHTML = `
-          <span class="option-radio">${Icons.radioUnchecked}</span>
-          <span class="option-text-wrap">
-            <span class="option-text-arabic">${opt.arabic}</span>
-          </span>
-        `;
-
-        btn.onclick = async () => {
-          const allBtns = optionsGrid.querySelectorAll('.option-btn');
-          allBtns.forEach((b) => (b.disabled = true));
-
-          const isCorrect = opt.key === q.key;
-          if (window.QuizSoundEffects) {
-            if (isCorrect) window.QuizSoundEffects.playCorrect();
-            else window.QuizSoundEffects.playWrong();
-          }
-          if (isCorrect) {
-            score++;
-            btn.classList.add('correct');
-            const radio = btn.querySelector('.option-radio');
-            if (radio) radio.innerHTML = Icons.checkCircle;
-            await QuranDB.recordSpacedRepetition(q.key, 5, q);
-          } else {
-            btn.classList.add('wrong');
-            const radio = btn.querySelector('.option-radio');
-            if (radio) radio.innerHTML = Icons.xCircle;
-
-            allBtns.forEach((b) => {
-              if (b.dataset.key === q.key) {
-                b.classList.add('correct');
-                const cr = b.querySelector('.option-radio');
-                if (cr) cr.innerHTML = Icons.checkCircle;
-              }
-            });
-
-            await QuranDB.recordSpacedRepetition(q.key, 1, q);
-          }
-
-          setTimeout(() => {
-            currentIndex++;
-            renderQuestion();
-          }, isCorrect ? 750 : 1300);
-        };
-
-        optionsGrid.appendChild(btn);
-      });
-
-      area.appendChild(card);
     }
 
     // MCQ Question Render
@@ -5785,12 +5737,14 @@
             else window.QuizSoundEffects.playWrong();
           }
 
+          const recordSource = isWeakMode ? 'weak' : 'quiz';
+
           if (isCorrect) {
             score++;
             btn.classList.add('correct');
             const radio = btn.querySelector('.option-radio');
             if (radio) radio.innerHTML = Icons.checkCircle;
-            await QuranDB.recordSpacedRepetition(q.key, 5, q);
+            await QuranDB.recordSpacedRepetition(q.key, 5, q, { source: recordSource });
           } else {
             btn.classList.add('wrong');
             const radio = btn.querySelector('.option-radio');
@@ -5805,7 +5759,7 @@
             });
 
             missedMcqWords.push(q);
-            await QuranDB.recordSpacedRepetition(q.key, 1, q);
+            await QuranDB.recordSpacedRepetition(q.key, 1, q, { source: recordSource });
           }
 
           setTimeout(() => {
@@ -6117,65 +6071,112 @@
         return;
       }
 
-      const flashcardBreakdownHtml = isFlashcardMode ? `
-        <div class="flashcard-summary-breakdown">
-          <div class="summary-rate-box rate-easy">
-            <strong>${toBnNumber(ratingCounts.easy)}</strong>
-            <span>সহজ</span>
+      // Dedicated Weak Words MCQ Graduation Summary
+      if (isWeakMode) {
+        const remainingWeak = await QuranDB.getWeakWordsList();
+        const remainingCount = remainingWeak.length;
+
+        stage.innerHTML = `
+          <div class="practice-container mcq-summary-stage">
+            <div class="card mcq-summary-card ${remainingCount === 0 ? 'is-passed' : 'is-incomplete'}">
+              <div class="mcq-summary-icon ${remainingCount === 0 ? 'passed' : 'incomplete'}" aria-hidden="true">
+                ${remainingCount === 0 ? Icons.checkCircle : Icons.warning}
+              </div>
+              <span class="mcq-summary-context">দুর্বল শব্দ · MCQ রিভিশন</span>
+              <h2 class="mcq-summary-title">
+                ${remainingCount === 0
+                  ? 'মাশাআল্লাহ! সব দুর্বল শব্দ আয়ত্ত হয়েছে!'
+                  : `${toBnNumber(finalScore)}টি দুর্বল শব্দ তালিকা থেকে বাদ পড়েছে`}
+              </h2>
+              <div class="mcq-summary-score tabular-nums">
+                ${toBnNumber(finalScore)} / ${toBnNumber(total)} <span>(${toBnNumber(percent)}%)</span>
+              </div>
+              <p class="mcq-summary-desc">
+                ${remainingCount === 0
+                  ? 'সঠিক উত্তর দেওয়া শব্দগুলো আপনার শেখা শব্দের ভাণ্ডারে যুক্ত হয়েছে।'
+                  : `এখনো ${toBnNumber(remainingCount)}টি দুর্বল শব্দ বাকি আছে — সঠিক উত্তর দিলেই সেগুলো বাদ পড়ে যাবে।`}
+              </p>
+
+              <div class="mcq-summary-actions">
+                ${remainingCount > 0 ? `
+                  <button type="button" class="btn-primary mcq-summary-btn" id="btn-drill-again">
+                    <span class="icon" aria-hidden="true">${Icons.repeat}</span>
+                    <span>বাকি দুর্বল শব্দ অনুশীলন করুন (${toBnNumber(remainingCount)}টি)</span>
+                  </button>
+                ` : ''}
+                <button type="button" class="btn-secondary mcq-summary-btn" id="btn-goto-learned">
+                  <span class="icon" aria-hidden="true">${Icons.bookCheck || Icons.book}</span>
+                  <span>শেখা শব্দ দেখুন</span>
+                </button>
+                <button type="button" class="btn-secondary mcq-summary-btn" id="btn-drill-finish">
+                  <span class="icon" aria-hidden="true">${Icons.arrowLeft}</span>
+                  <span>অনুশীলন তালিকায় ফিরুন</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="summary-rate-box rate-good">
-            <strong>${toBnNumber(ratingCounts.good)}</strong>
-            <span>ভালো</span>
+        `;
+
+        const againBtn = stage.querySelector('#btn-drill-again');
+        if (againBtn) {
+          againBtn.onclick = () => startPracticeDrill('weak', null, null);
+        }
+        const learnedBtn = stage.querySelector('#btn-goto-learned');
+        if (learnedBtn) {
+          learnedBtn.onclick = () => navigateTo('learned');
+        }
+        const finishBtn = stage.querySelector('#btn-drill-finish');
+        if (finishBtn) {
+          finishBtn.onclick = () => navigateTo('practice', { engine: null });
+        }
+        return;
+      }
+
+      const flashcardBreakdownHtml = isFlashcardMode ? `
+        <div class="flashcard-summary-breakdown flashcard-summary-breakdown-3">
+          <div class="summary-rate-box rate-easy">
+            <strong class="tabular-nums">${toBnNumber(ratingCounts.easy)}</strong>
+            <span>ভালো মনে আছে</span>
           </div>
           <div class="summary-rate-box rate-hard">
-            <strong>${toBnNumber(ratingCounts.hard)}</strong>
-            <span>কঠিন</span>
+            <strong class="tabular-nums">${toBnNumber(ratingCounts.medium)}</strong>
+            <span>মোটামুটি</span>
           </div>
           <div class="summary-rate-box rate-again">
-            <strong>${toBnNumber(ratingCounts.again)}</strong>
-            <span>আবার</span>
+            <strong class="tabular-nums">${toBnNumber(ratingCounts.hard)}</strong>
+            <span>কঠিন</span>
           </div>
         </div>
       ` : '';
 
-      const retryMissedBtnHtml = (isFlashcardMode && missedFlashcards.length > 0) ? `
-        <button type="button" class="btn-primary" id="btn-drill-missed" style="width:100%;margin-top:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px">
-          <span class="icon">${Icons.warning}</span>
-          <span>না পারা শব্দগুলো আবার অনুশীলন করুন (${toBnNumber(missedFlashcards.length)}টি)</span>
-        </button>
-      ` : '';
-
       stage.innerHTML = `
-        <div class="practice-container" style="text-align:center;padding-top:28px">
-          <div class="card" style="padding:32px 18px">
-            <span class="icon" style="font-size:3.5rem;color:var(--color-primary)">${Icons.checkCircle}</span>
-            <h2 style="font-family:var(--font-bangla);margin:14px 0 6px">${isFlashcardMode ? 'ফ্ল্যাশকার্ড অনুশীলন সম্পন্ন!' : 'অনুশীলন সম্পন্ন!'}</h2>
-            <div style="font-size:1.8rem;font-weight:700;color:var(--color-primary);margin:8px 0">
-              ${toBnNumber(finalScore)} / ${toBnNumber(total)} (${toBnNumber(percent)}%)
+        <div class="practice-container mcq-summary-stage">
+          <div class="card mcq-summary-card is-passed">
+            <div class="mcq-summary-icon passed" aria-hidden="true">${Icons.checkCircle}</div>
+            <span class="mcq-summary-context tabular-nums">${isFlashcardMode ? `মোট শেখা ভাণ্ডার: ${formatBnInt(flashcardPoolTotal)} শব্দ` : 'অনুশীলন সম্পন্ন'}</span>
+            <h2 class="mcq-summary-title">${isFlashcardMode ? '১০টি ফ্ল্যাশকার্ড রিভিশন সম্পন্ন!' : 'অনুশীলন সম্পন্ন!'}</h2>
+            <div class="mcq-summary-score tabular-nums">
+              ${toBnNumber(finalScore)} / ${toBnNumber(total)} <span>(${toBnNumber(percent)}%)</span>
             </div>
-            <p style="color:var(--text-secondary);font-size:0.88rem;font-family:var(--font-bangla)">
-              ${percent >= 80 ? 'আলহামদুলিল্লাহ! অসাধারণ স্মরণশক্তি ও অগ্রগতি!' : 'নিয়মিত ফ্ল্যাশকার্ড অনুশীলনে শব্দগুলো আরও দ্রুত আয়ত্তে আসবে ইনশাআল্লাহ।'}
+            <p class="mcq-summary-desc">
+              ${isFlashcardMode
+                ? 'ভালো মনে থাকা শব্দগুলো তালিকার নিচে চলে গেছে এবং নতুন ও কঠিন শব্দগুলো পরবর্তী সেটে অগ্রাধিকার পাবে।'
+                : 'আলহামদুলিল্লাহ! আপনার অনুশীলনের অগ্রগতি সংরক্ষিত হয়েছে।'}
             </p>
             ${flashcardBreakdownHtml}
-            ${retryMissedBtnHtml}
-            <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;flex-wrap:wrap">
-              <button type="button" class="surah-practice-cta" id="btn-drill-again">
-                <span class="icon">${Icons.repeat}</span> পুনরায় অনুশীলন করুন
+            <div class="mcq-summary-actions">
+              <button type="button" class="btn-primary mcq-summary-btn" id="btn-drill-again">
+                <span class="icon" aria-hidden="true">${Icons.repeat}</span>
+                <span>${isFlashcardMode ? 'পরবর্তী ১০টি কার্ড শুরু করুন' : 'পুনরায় অনুশীলন করুন'}</span>
               </button>
-              <button type="button" class="surah-practice-cta" style="background:var(--bg-muted);color:var(--text-primary);box-shadow:none" id="btn-drill-finish">
-                অনুশীলন তালিকায় ফিরুন
+              <button type="button" class="btn-secondary mcq-summary-btn" id="btn-drill-finish">
+                <span class="icon" aria-hidden="true">${Icons.arrowLeft}</span>
+                <span>অনুশীলন তালিকায় ফিরুন</span>
               </button>
             </div>
           </div>
         </div>
       `;
-
-      const missedBtn = stage.querySelector('#btn-drill-missed');
-      if (missedBtn) {
-        missedBtn.onclick = () => {
-          startPracticeDrill(engine, surahNumber, ayahNumber, missedFlashcards);
-        };
-      }
 
       stage.querySelector('#btn-drill-again').onclick = () => {
         startPracticeDrill(engine, surahNumber, ayahNumber);
@@ -6190,18 +6191,243 @@
   }
 
   // ============================================================
-  // BOOKMARKS VIEW
+  // LEARNED WORDS REVISION TABLE VIEW (শেখা শব্দ — ৩য় ট্যাব)
+  // ============================================================
+
+  async function renderLearnedWordsView() {
+    const container = document.getElementById('learned-words-container');
+    if (!container) return;
+    container.innerHTML = '<div class="loading-spinner" style="margin:40px auto"></div>';
+
+    const allItems = typeof QuranDB.getLearnedWordsDetails === 'function'
+      ? await QuranDB.getLearnedWordsDetails()
+      : [];
+
+    const SFE = window.SmartFlashcardEngine;
+    const progressMap = {};
+    allItems.forEach((it) => {
+      if (it && it.word_id && it.progress) progressMap[it.word_id] = it.progress;
+    });
+    const summary = SFE
+      ? SFE.summarizeLearnedWords(progressMap)
+      : { totalLearned: allItems.length, unreviewedNewCount: allItems.length, hardCount: 0, mediumCount: 0, easyCount: 0 };
+
+    if (allItems.length === 0) {
+      container.innerHTML = `
+        <div class="card bookmarks-empty-card">
+          <span class="icon bookmarks-empty-icon">${Icons.bookCheck || Icons.book}</span>
+          <h3 class="bookmarks-empty-title">এখনো কোনো শেখা শব্দ জমা হয়নি</h3>
+          <p class="bookmarks-empty-desc">
+            আয়াত শব্দ কুইজ বা বহুনির্বাচনী কুইজে সঠিক উত্তর দেওয়া প্রতিটি শব্দ স্বয়ংক্রিয়ভাবে এখানে টেবিল আকারে জমা হবে এবং আপনি দ্রুত রিভিশন করতে পারবেন।
+          </p>
+          <div class="saved-flashcard-empty-actions" style="margin-top:16px">
+            <button type="button" class="btn-primary" id="btn-learned-start-ayah">
+              <span class="icon">${Icons.book}</span>
+              <span>আয়াত শব্দ কুইজ শুরু করুন</span>
+            </button>
+            <button type="button" class="btn-secondary" id="btn-learned-start-mcq">
+              <span class="icon">${Icons.target}</span>
+              <span>বহুনির্বাচনী কুইজ শুরু করুন</span>
+            </button>
+          </div>
+        </div>
+      `;
+      const ayahBtn = container.querySelector('#btn-learned-start-ayah');
+      if (ayahBtn) ayahBtn.onclick = () => navigateTo('practice', { engine: 'ayah-surahs' });
+      const mcqBtn = container.querySelector('#btn-learned-start-mcq');
+      if (mcqBtn) mcqBtn.onclick = () => navigateTo('practice', { engine: 'mcq-groups' });
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="detail-card learned-summary-strip">
+        <div class="learned-summary-info">
+          <div class="learned-summary-meta tabular-nums">
+            <span>মোট শেখা: <strong>${formatBnInt(summary.totalLearned)}টি</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>নতুন: <strong>${formatBnInt(summary.unreviewedNewCount)}টি</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>মনে আছে: <strong>${formatBnInt(summary.easyCount)}টি</strong></span>
+          </div>
+          <div class="learned-summary-title">কুইজে আয়ত্তকৃত শব্দের রিভিশন তালিকা</div>
+        </div>
+        <button type="button" class="bookmarks-flash-cta" id="btn-learned-launch-flashcards">
+          <span class="icon">${Icons.repeat}</span>
+          <span>১০টি ফ্ল্যাশকার্ড</span>
+        </button>
+      </div>
+
+      <div class="learned-controls-bar">
+        <div class="learned-search-wrap">
+          <span class="learned-search-icon" aria-hidden="true">${Icons.search}</span>
+          <input
+            type="text"
+            class="learned-search-input"
+            id="learned-search-input"
+            placeholder="শেখা শব্দ খুঁজুন (আরবী, বাংলা অর্থ বা সূরা:আয়াত)…"
+            value="${String(state.learnedQuery || '').replace(/"/g, '&quot;')}"
+            autocomplete="off"
+            aria-label="শেখা শব্দ খুঁজুন"
+          >
+        </div>
+        <div class="learned-filter-tabs" role="tablist" aria-label="রিভিশন অবস্থা ফিল্টার">
+          <button type="button" class="learned-filter-btn ${state.learnedFilter === 'all' ? 'active' : ''}" data-filter="all" role="tab" aria-selected="${state.learnedFilter === 'all'}">সব (${formatBnInt(summary.totalLearned)})</button>
+          <button type="button" class="learned-filter-btn ${state.learnedFilter === 'new' ? 'active' : ''}" data-filter="new" role="tab" aria-selected="${state.learnedFilter === 'new'}">নতুন (${formatBnInt(summary.unreviewedNewCount)})</button>
+          <button type="button" class="learned-filter-btn ${state.learnedFilter === 'review' ? 'active' : ''}" data-filter="review" role="tab" aria-selected="${state.learnedFilter === 'review'}">রিভিশন (${formatBnInt(summary.hardCount + summary.mediumCount)})</button>
+          <button type="button" class="learned-filter-btn ${state.learnedFilter === 'mastered' ? 'active' : ''}" data-filter="mastered" role="tab" aria-selected="${state.learnedFilter === 'mastered'}">মনে আছে (${formatBnInt(summary.easyCount)})</button>
+        </div>
+      </div>
+
+      <div id="learned-table-mount"></div>
+    `;
+
+    const flashBtn = container.querySelector('#btn-learned-launch-flashcards');
+    if (flashBtn) {
+      flashBtn.onclick = () => navigateTo('practice', { engine: 'flashcard' });
+    }
+
+    const tableMount = container.querySelector('#learned-table-mount');
+
+    function drawLearnedTable() {
+      if (!tableMount) return;
+      const filtered = SFE
+        ? SFE.filterAndSortLearnedWords(allItems, state.learnedQuery, state.learnedFilter)
+        : allItems;
+
+      tableMount.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tableMount.innerHTML = `
+          <div class="card bookmarks-empty-card" style="padding:28px 18px">
+            <h3 class="bookmarks-empty-title" style="font-size:0.98rem">কোনো শব্দ পাওয়া যায়নি</h3>
+            <p class="bookmarks-empty-desc">অন্য ফিল্টার বা সার্চ শব্দ দিয়ে চেষ্টা করুন।</p>
+          </div>
+        `;
+        return;
+      }
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'bookmarks-table-wrap learned-table-wrap';
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'learned-list-header';
+      headerRow.innerHTML = `
+        <span class="bm-hdr-ar">আরবী</span>
+        <span class="bm-hdr-bn">বাংলা অর্থ ও অবস্থা</span>
+        <span class="bm-hdr-actions">অডিও</span>
+      `;
+      tableWrap.appendChild(headerRow);
+
+      const visibleSlice = filtered.slice(0, state.learnedVisibleLimit || 60);
+
+      visibleSlice.forEach((item) => {
+        const statusInfo = SFE
+          ? SFE.getFlashcardStatusLabelBn(item.progress)
+          : { tier: 1, labelBn: 'নতুন · কুইজে শেখা' };
+        const [s, a, w = '1'] = String(item.word_id || '1:1:1').split(':');
+
+        const row = document.createElement('div');
+        row.className = 'card learned-row-card';
+        row.dataset.wordId = item.word_id;
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+
+        row.innerHTML = `
+          <div class="bookmark-col-ar">
+            <div class="bookmark-word-ar" dir="rtl" title="চেপে ধরে রাখুন অডিও শুনতে">${item.arabic}</div>
+            <div class="bookmark-ref-meta tabular-nums">সূরা ${toBnNumber(s)} · ${toBnNumber(a)}:${toBnNumber(w)}</div>
+          </div>
+          <div class="learned-col-bn">
+            <div class="bookmark-meaning-text">${item.meaning_bn || '—'}</div>
+            <div class="learned-status-line tier-${statusInfo.tier}">${statusInfo.labelBn}</div>
+          </div>
+          <div class="learned-col-actions">
+            <button type="button" class="topbar-btn btn-bm-audio" aria-label="${item.arabic} উচ্চারণ শুনুন" title="উচ্চারণ শুনুন">
+              <span class="icon">${Icons.speaker}</span>
+            </button>
+          </div>
+        `;
+
+        const arEl = row.querySelector('.bookmark-word-ar');
+        if (arEl) {
+          attachWordTokenHoldAndClick(arEl, item.word_id, () => {
+            navigateTo('word', { wordId: item.word_id });
+          });
+        }
+
+        const audioBtn = row.querySelector('.btn-bm-audio');
+        if (audioBtn) {
+          audioBtn.onclick = (e) => {
+            e.stopPropagation();
+            playWordAudio(item.word_id, audioBtn);
+          };
+        }
+
+        row.onclick = (e) => {
+          if (e.target.closest('button') || e.target.closest('.bookmark-word-ar')) return;
+          navigateTo('word', { wordId: item.word_id });
+        };
+
+        row.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            navigateTo('word', { wordId: item.word_id });
+          }
+        };
+
+        tableWrap.appendChild(row);
+      });
+
+      if (filtered.length > visibleSlice.length) {
+        const remaining = filtered.length - visibleSlice.length;
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.type = 'button';
+        loadMoreBtn.className = 'mcq-horizon-toggle-btn';
+        loadMoreBtn.innerHTML = `<span>আরও দেখুন (+${formatBnInt(remaining)}টি শব্দ)</span><span class="icon" aria-hidden="true">${Icons.chevronDown}</span>`;
+        loadMoreBtn.onclick = () => {
+          state.learnedVisibleLimit = (state.learnedVisibleLimit || 60) + 60;
+          drawLearnedTable();
+        };
+        tableWrap.appendChild(loadMoreBtn);
+      }
+
+      tableMount.appendChild(tableWrap);
+    }
+
+    const searchInput = container.querySelector('#learned-search-input');
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        state.learnedQuery = e.target.value || '';
+        state.learnedVisibleLimit = 60;
+        drawLearnedTable();
+      };
+    }
+
+    container.querySelectorAll('.learned-filter-btn').forEach((btn) => {
+      btn.onclick = () => {
+        state.learnedFilter = btn.dataset.filter || 'all';
+        state.learnedVisibleLimit = 60;
+        container.querySelectorAll('.learned-filter-btn').forEach((b) => {
+          const isAct = b === btn;
+          b.classList.toggle('active', isAct);
+          b.setAttribute('aria-selected', isAct ? 'true' : 'false');
+        });
+        drawLearnedTable();
+      };
+    });
+
+    drawLearnedTable();
+  }
+
+  // ============================================================
+  // BOOKMARKS VIEW (SIDEBAR-ONLY — TAPPING OPENS SINGLE WORD PAGE)
   // ============================================================
 
   async function renderBookmarksView() {
     const listEl = document.getElementById('bookmarks-list');
     listEl.innerHTML = '<div class="loading-spinner" style="margin:40px auto"></div>';
 
-    const [bookmarks, progressMap, weakList] = await Promise.all([
-      QuranDB.getBookmarksList(),
-      typeof QuranDB.getAllWordProgressMap === 'function' ? QuranDB.getAllWordProgressMap() : Promise.resolve({}),
-      typeof QuranDB.getWeakWordsList === 'function' ? QuranDB.getWeakWordsList() : Promise.resolve([])
-    ]);
+    const bookmarks = await QuranDB.getBookmarksList();
     listEl.innerHTML = '';
 
     if (bookmarks.length === 0) {
@@ -6217,97 +6443,49 @@
       return;
     }
 
-    const weakMap = {};
-    for (const w of (weakList || [])) {
-      if (w && w.word_id) weakMap[w.word_id] = w;
-    }
-
-    const nowMs = Date.now();
-    const enrichedBookmarks = bookmarks.map((bm) => {
-      const progRec = progressMap ? progressMap[bm.word_id] : null;
-      const weakRec = weakMap[bm.word_id] || null;
-      const remember = typeof QuranDB.computeRememberPoint === 'function'
-        ? QuranDB.computeRememberPoint(progRec, weakRec, nowMs)
-        : { score: 0, tier: 'new', labelBn: 'নতুন' };
-      return { bm, remember };
-    });
-
-    const avgRemember = enrichedBookmarks.length > 0
-      ? Math.round(enrichedBookmarks.reduce((acc, item) => acc + (item.remember.score || 0), 0) / enrichedBookmarks.length)
-      : 0;
-
-    const currentUser = window.SupabaseSync && typeof window.SupabaseSync.getUser === 'function'
-      ? window.SupabaseSync.getUser()
-      : null;
-
-    const launchFlashBanner = document.createElement('div');
-    launchFlashBanner.className = 'detail-card bookmarks-summary-banner';
-    launchFlashBanner.innerHTML = `
-      <div class="bookmarks-summary-info">
-        <div class="bookmarks-summary-meta">
-          <span>সংরক্ষিত: ${toBnNumber(bookmarks.length)}টি</span>
-          <span aria-hidden="true">·</span>
-          <span class="bookmarks-avg-score">গড় স্মরণ পয়েন্ট: <strong>${toBnNumber(avgRemember)}%</strong></span>
-        </div>
-        <div class="bookmarks-summary-title">ফ্ল্যাশকার্ড দিয়ে মেমোরি অনুশীলন করুন</div>
-        <div class="bookmarks-sync-note ${currentUser ? 'synced' : ''}">
-          <span class="icon">${currentUser ? Icons.cloud : Icons.user}</span>
-          <span>${currentUser ? 'স্মরণ পয়েন্ট ও বুকমার্ক আপনার একাউন্টে সংরক্ষিত' : 'লগইন করলে স্মরণ পয়েন্ট আপনার একাউন্টে সেভ থাকবে'}</span>
-        </div>
-      </div>
-      <button type="button" class="bookmarks-flash-cta" id="btn-bookmarks-start-flashcards">
-        <span class="icon">${Icons.repeat}</span>
-        <span>ফ্ল্যাশকার্ড শুরু</span>
-      </button>
+    const summaryBar = document.createElement('div');
+    summaryBar.className = 'bookmarks-simple-header tabular-nums';
+    summaryBar.innerHTML = `
+      <span>মোট সংরক্ষিত: <strong>${formatBnInt(bookmarks.length)}টি শব্দ</strong></span>
+      <span aria-hidden="true">·</span>
+      <span>বিস্তারিত দেখতে শব্দে ট্যাপ করুন</span>
     `;
-    const startFlashBtn = launchFlashBanner.querySelector('#btn-bookmarks-start-flashcards');
-    if (startFlashBtn) {
-      startFlashBtn.onclick = () => {
-        navigateTo('practice', { engine: 'saved-flashcard' });
-      };
-    }
-    listEl.appendChild(launchFlashBanner);
+    listEl.appendChild(summaryBar);
 
     const tableWrap = document.createElement('div');
-    tableWrap.className = 'bookmarks-table-wrap';
+    tableWrap.className = 'bookmarks-table-wrap bookmarks-table-simple';
 
     const headerRow = document.createElement('div');
-    headerRow.className = 'bookmark-list-header';
+    headerRow.className = 'bookmark-list-header bookmark-list-header-simple';
     headerRow.innerHTML = `
       <span class="bm-hdr-ar">আরবী</span>
       <span class="bm-hdr-bn">বাংলা অর্থ</span>
-      <span class="bm-hdr-score">স্মরণ পয়েন্ট</span>
       <span class="bm-hdr-actions">অ্যাকশন</span>
     `;
     tableWrap.appendChild(headerRow);
 
-    enrichedBookmarks.forEach(({ bm, remember }) => {
+    bookmarks.forEach((bm) => {
       const card = document.createElement('div');
-      card.className = 'card bookmark-row-card';
+      card.className = 'card bookmark-row-card bookmark-row-simple';
       card.dataset.wordId = bm.word_id;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
 
       const [s, a, w = '1'] = String(bm.word_id || '1:1:1').split(':');
 
       card.innerHTML = `
         <div class="bookmark-col-ar">
-          <div class="bookmark-word-ar" title="চেপে ধরে রাখুন অডিও শুনতে">${bm.arabic}</div>
-          <div class="bookmark-ref-meta">সূরা ${toBnNumber(s)} · শব্দ ${toBnNumber(a)}:${toBnNumber(w)}</div>
+          <div class="bookmark-word-ar" dir="rtl" title="চেপে ধরে রাখুন অডিও শুনতে">${bm.arabic}</div>
+          <div class="bookmark-ref-meta tabular-nums">সূরা ${toBnNumber(s)} · ${toBnNumber(a)}:${toBnNumber(w)}</div>
         </div>
         <div class="bookmark-col-bn">
           <div class="bookmark-meaning-text">${bm.meaning_bn || '—'}</div>
         </div>
-        <div class="bookmark-col-score tier-${remember.tier}" title="স্মরণশক্তি (SM-2 ও ভুলে যাওয়ার বক্ররেখা ভিত্তিক)">
-          <span class="remember-score-value">${toBnNumber(remember.score)}%</span>
-          <span class="remember-score-tier">${remember.labelBn}</span>
-          <span class="remember-score-track" aria-hidden="true">
-            <span class="remember-score-fill" style="width:${remember.score}%"></span>
-          </span>
-        </div>
         <div class="bookmark-col-actions">
-          <button type="button" class="topbar-btn btn-bm-audio" aria-label="উচ্চারণ শুনুন" title="উচ্চারণ শুনুন">
+          <button type="button" class="topbar-btn btn-bm-audio" aria-label="${bm.arabic} উচ্চারণ শুনুন" title="উচ্চারণ শুনুন">
             <span class="icon">${Icons.speaker}</span>
           </button>
-          <button type="button" class="topbar-btn btn-bm-delete" aria-label="বুকমার্ক মুছুন" title="বুকমার্ক মুছুন">
+          <button type="button" class="topbar-btn btn-bm-delete" aria-label="${bm.arabic} বুকমার্ক মুছুন" title="বুকমার্ক মুছুন">
             <span class="icon bookmark-star-icon">${Icons.starFilled}</span>
           </button>
         </div>
@@ -6331,6 +6509,13 @@
       card.onclick = (e) => {
         if (e.target.closest('button') || e.target.closest('.bookmark-word-ar')) return;
         navigateTo('word', { wordId: bm.word_id });
+      };
+
+      card.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          navigateTo('word', { wordId: bm.word_id });
+        }
       };
 
       const delBtn = card.querySelector('.btn-bm-delete');
@@ -6411,13 +6596,13 @@
       };
     }
 
-    // Bottom Navigation Bar tabs
+    // Bottom Navigation Bar tabs (4 tabs: শিখুন, অনুশীলন, শেখা শব্দ, একাউন্ট)
     document.querySelectorAll('.bottom-tab').forEach((tab) => {
       tab.onclick = () => {
         const target = tab.dataset.tab;
         if (target === 'learn') navigateTo('surahs');
         else if (target === 'practice') navigateTo('practice');
-        else if (target === 'bookmarks') navigateTo('bookmarks');
+        else if (target === 'learned') navigateTo('learned');
         else if (target === 'account') navigateTo('account');
       };
     });
@@ -6460,9 +6645,11 @@
       }
     }, { passive: true });
 
-    // Refresh active account, bookmarks, or MCQ roadmap view after cloud sync completes
+    // Refresh active account, learned words, bookmarks, or MCQ roadmap view after cloud sync completes
     window.addEventListener('quran-cloud-synced', () => {
-      if (state.currentView === 'bookmarks') {
+      if (state.currentView === 'learned') {
+        renderLearnedWordsView();
+      } else if (state.currentView === 'bookmarks') {
         renderBookmarksView();
       } else if (state.currentView === 'account') {
         renderAccountDashboardView();

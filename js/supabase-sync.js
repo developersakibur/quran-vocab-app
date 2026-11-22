@@ -265,6 +265,7 @@
           wordKeys.forEach((k) => {
             const item = progressMap[k];
             if (!item) return;
+            const prev = localP[k] || {};
             localP[k] = {
               word_id: k,
               box: item.box || 1,
@@ -274,8 +275,17 @@
               nextReview: item.nextReview || 0,
               lastReviewed: item.lastReviewed || 0,
               status: item.status || 'learning',
-              correctCount: item.correctCount || 0,
-              wrongCount: item.wrongCount || 0
+              correctCount: item.correctCount || prev.correctCount || 0,
+              wrongCount: item.wrongCount || prev.wrongCount || 0,
+              learnedInQuiz: Boolean(item.learnedInQuiz || prev.learnedInQuiz),
+              learnedAt: item.learnedAt || prev.learnedAt || null,
+              flashcardRating: item.flashcardRating !== undefined ? item.flashcardRating : (prev.flashcardRating ?? null),
+              flashcardLastReviewed: item.flashcardLastReviewed || prev.flashcardLastReviewed || null,
+              flashcardReviewCount: item.flashcardReviewCount || prev.flashcardReviewCount || 0,
+              arabic: item.arabic || prev.arabic || '',
+              meaning_bn: item.meaning_bn || prev.meaning_bn || '',
+              root: item.root || prev.root || '',
+              verse_key: item.verse_key || prev.verse_key || ''
             };
           });
           global.StorageManager.set('progress-v1', localP);

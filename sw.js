@@ -8,7 +8,7 @@
    - Bypasses non-GET and cross-origin APIs (e.g., Supabase sync).
    ============================================================ */
 
-const APP_SHELL_CACHE = 'quran-app-shell-v42';
+const APP_SHELL_CACHE = 'quran-app-shell-v43';
 const AUDIO_CACHE = 'quran-audio-v1';
 const SOUND_CACHE = 'quran-sound-effects-v1';
 
@@ -32,6 +32,7 @@ const CORE_SHELL_FILES = [
   './js/pwa-install.js',
   './js/config.js',
   './js/data/surahs-meta-data.js',
+  './js/smart-flashcard-engine.js',
   './js/db/quran-db.js',
   './js/storage/storage-manager.js',
   './js/reading-history.js',
