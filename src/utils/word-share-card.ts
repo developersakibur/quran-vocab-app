@@ -165,6 +165,28 @@ export function formatCoveragePercentBn(percent: number): string {
 }
 
 /**
+ * Normalize Bengali text to canonical precomposed Bengali Unicode so external
+ * mobile/desktop apps (Facebook, WhatsApp, Messenger, Notes) never break
+ * conjuncts, split vowel signs (ো/ৌ), or detach nukta letters (য়/ড়/ঢ়).
+ */
+export function normalizeBengaliUnicode(input: string): string {
+  const raw = String(input ?? '');
+  if (!raw) return '';
+  const nfc = typeof raw.normalize === 'function' ? raw.normalize('NFC') : raw;
+  return nfc
+    // Recompose Unicode Composition-Excluded Bengali nukta letters to standard single codepoints
+    .replace(/\u09A1\u09BC/g, '\u09DC') // ড + ় -> ড়
+    .replace(/\u09A2\u09BC/g, '\u09DD') // ঢ + ় -> ঢ়
+    .replace(/\u09AF\u09BC/g, '\u09DF') // য + ় -> য়
+    // Compose any stray split two-part Bengali vowel signs
+    .replace(/\u09C7\u09BE/g, '\u09CB') // ে + া -> ো
+    .replace(/\u09C7\u09D7/g, '\u09CC') // ে + ৗ -> ৌ
+    // Remove zero-width/BOM/directional artifacts that break mobile share sheets
+    .replace(/[\u200B\u200E\u200F\uFEFF]/g, '')
+    .replace(/\r\n?/g, '\n');
+}
+
+/**
  * Build the curiosity-hook Bengali caption + deep-link (deliberately omits Bengali meaning).
  */
 export function buildWordShareCaption(
@@ -176,15 +198,17 @@ export function buildWordShareCaption(
   const pctBn = formatCoveragePercentBn(pct);
   const shareUrl = buildWordShareUrl(payload.wordKey, baseUrl);
 
-  return [
-    'আপনি কি এই শব্দের অর্থ জানেন?',
-    '',
-    `পবিত্র কুরআনে এই শব্দটি ${countBn} বার এসেছে।`,
-    `এই শব্দটির অর্থ জানলে কুরআনের ${pctBn}% বাংলা অর্থ আপনি জানবেন।`,
-    '',
-    'অর্থ জানতে লিংকে ক্লিক করুন:',
-    shareUrl,
-  ].join('\n');
+  return normalizeBengaliUnicode(
+    [
+      'আপনি কি এই শব্দের অর্থ জানেন?',
+      '',
+      `পবিত্র কুরআনে এই শব্দটি ${countBn} বার এসেছে।`,
+      `এই শব্দটির অর্থ জানলে কুরআনের ${pctBn}% বাংলা অর্থ আপনি জানবেন।`,
+      '',
+      'অর্থ জানতে লিংকে ক্লিক করুন:',
+      shareUrl,
+    ].join('\n')
+  );
 }
 
 /**

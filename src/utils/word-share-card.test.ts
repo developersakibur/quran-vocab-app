@@ -11,6 +11,7 @@ import {
   buildWordShareUrl,
   computeWordCoveragePercent,
   formatCoveragePercentBn,
+  normalizeBengaliUnicode,
   buildWordShareCaption,
   buildWordShareFilename,
   resolveShareTemplateId,
@@ -123,5 +124,28 @@ describe('word-share-card pure utilities', () => {
     assert.equal(resolveShareTemplateId('midnight'), 'midnight');
     assert.equal(resolveShareTemplateId('unknown'), 'emerald');
     assert.equal(resolveShareTemplateId(null), 'emerald');
+  });
+
+  it('normalizes decomposed Bengali nuktas, split vowel signs, and invisible artifacts to clean precomposed Unicode', () => {
+    // Decomposed য+় (\u09AF\u09BC), ড+় (\u09A1\u09BC), ঢ+় (\u09A2\u09BC)
+    const decomposed = 'আ\u09AF\u09BCাত প\u09A1\u09BCা আষা\u09A2\u09BC ক\u09C7\u09BEরআন ম\u09C7\u09D7ন\u200B\uFEFF';
+    const normalized = normalizeBengaliUnicode(decomposed);
+
+    assert.equal(normalized.includes('\u09BC'), false);
+    assert.equal(normalized.includes('\u200B'), false);
+    assert.equal(normalized.includes('\uFEFF'), false);
+    assert.equal(normalized, 'আ\u09DFাত প\u09DCা আষা\u09DD ক\u09CBরআন ম\u09CCন');
+
+    const caption = buildWordShareCaption({
+      wordKey: '1:1:1',
+      arabic: 'بِسْمِ',
+      surah: 1,
+      ayah: 1,
+      position: 1,
+      surahNameBn: 'আল-ফাতিহা',
+      occurrences: 22,
+    });
+    assert.equal(caption, normalizeBengaliUnicode(caption));
+    assert.equal(caption.includes('\u09BC'), false);
   });
 });

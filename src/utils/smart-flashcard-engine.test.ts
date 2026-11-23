@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isWordLearnedInQuiz,
+  computeNextLearnedInQuiz,
   getFlashcardPriorityTier,
   selectSmartFlashcardBatch,
   summarizeLearnedWords,
@@ -12,11 +13,13 @@ import {
   type WeakWordRecord,
 } from './smart-flashcard-engine';
 
-test('isWordLearnedInQuiz accepts learnedInQuiz and backward-compatible legacy quiz records while skipping meta keys', () => {
+test('isWordLearnedInQuiz accepts learnedInQuiz and legacy records, respects explicit false demotion, and skips meta keys', () => {
   assert.equal(isWordLearnedInQuiz({ word_id: '1:1:1', learnedInQuiz: true }), true);
   assert.equal(isWordLearnedInQuiz({ word_id: '1:1:2', correctCount: 1 }), true);
   assert.equal(isWordLearnedInQuiz({ word_id: '1:1:3', repetitions: 2 }), true);
   assert.equal(isWordLearnedInQuiz({ word_id: '1:1:4', correctCount: 0, repetitions: 0, wrongCount: 1 }), false);
+  // Explicitly demoted via Flashcard Hard/Forgot must return false even if historically answered correctly
+  assert.equal(isWordLearnedInQuiz({ word_id: '1:1:5', learnedInQuiz: false, correctCount: 3, repetitions: 2 }), false);
   assert.equal(isWordLearnedInQuiz({ word_id: 'mcq_pass:g1:main:1', repetitions: 1, correctCount: 10 }), false);
   assert.equal(isWordLearnedInQuiz({ word_id: 'ayah_pass:1:1', repetitions: 1, correctCount: 4 }), false);
 });
@@ -104,7 +107,7 @@ test('Smart 10-card rotation scales cleanly across 2,500 learned words so newly 
   }
 });
 
-test('Weak Words state machine: quiz mistakes add, flashcards never touch weak words, weak MCQ correct deletes immediately', () => {
+test('Weak Words & Learned Words state machine: flashcard hard demotes from Learned to Weak; weak MCQ correct re-graduates immediately', () => {
   const meta = {
     word_id: '1:1:1',
     arabic: 'بِسْمِ',
@@ -120,22 +123,36 @@ test('Weak Words state machine: quiz mistakes add, flashcards never touch weak w
 
   const existingWeak: WeakWordRecord = t1.record!;
 
-  // 2. Flashcard hard/wrong -> NEVER adds or modifies weak words
-  assert.equal(computeWeakWordTransition(null, false, 'flashcard', meta, 2000).action, 'none');
-  assert.equal(computeWeakWordTransition(existingWeak, true, 'flashcard', meta, 2000).action, 'none');
-  assert.equal(computeWeakWordTransition(existingWeak, false, 'flashcard', meta, 2000).action, 'none');
+  // 2. Flashcard Hard/Forgot -> moves word INTO weak words AND demotes out of Learned Words
+  const tFcHardNew = computeWeakWordTransition(null, false, 'flashcard', meta, 2000);
+  assert.equal(tFcHardNew.action, 'upsert');
+  assert.equal(tFcHardNew.record?.mistakeCount, 1);
+
+  const tFcHardExisting = computeWeakWordTransition(existingWeak, false, 'flashcard', meta, 2100);
+  assert.equal(tFcHardExisting.action, 'upsert');
+  assert.equal(tFcHardExisting.record?.mistakeCount, 2);
+
+  // Flashcard Medium/Easy -> keeps weak words untouched and preserves Learned Words status
+  assert.equal(computeWeakWordTransition(existingWeak, true, 'flashcard', meta, 2200).action, 'none');
+
+  const learnedRec: WordProgressRecord = { word_id: '1:1:1', learnedInQuiz: true, correctCount: 2, repetitions: 2 };
+  assert.equal(computeNextLearnedInQuiz(learnedRec, false, 'flashcard'), false);
+  assert.equal(computeNextLearnedInQuiz(learnedRec, true, 'flashcard'), true);
 
   // 3. Regular quiz correct -> does NOT clear weak word (must be cleared inside Weak Words drill)
   assert.equal(computeWeakWordTransition(existingWeak, true, 'quiz', meta, 3000).action, 'none');
 
-  // 4. Weak Words MCQ wrong -> increments mistakeCount
+  // 4. Weak Words MCQ wrong -> increments mistakeCount and stays out of Learned Words
   const t4 = computeWeakWordTransition(existingWeak, false, 'weak', meta, 4000);
   assert.equal(t4.action, 'upsert');
   assert.equal(t4.record?.mistakeCount, 2);
+  const demotedRec: WordProgressRecord = { word_id: '1:1:1', learnedInQuiz: false, correctCount: 2, repetitions: 0 };
+  assert.equal(computeNextLearnedInQuiz(demotedRec, false, 'weak'), false);
 
-  // 5. Weak Words MCQ correct -> immediately deletes from weak words!
+  // 5. Weak Words MCQ correct -> immediately deletes from weak words AND returns word to Learned Words!
   const t5 = computeWeakWordTransition(t4.record!, true, 'weak', meta, 5000);
   assert.equal(t5.action, 'delete');
+  assert.equal(computeNextLearnedInQuiz(demotedRec, true, 'weak'), true);
 });
 
 test('filterAndSortLearnedWords filters by Bengali/Arabic query and recall status accurately', () => {

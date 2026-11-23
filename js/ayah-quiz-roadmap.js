@@ -65,6 +65,32 @@
       .sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
   }
 
+  function shuffleQuizWords(words, rng) {
+    if (!Array.isArray(words) || words.length <= 1) {
+      return Array.isArray(words) ? words.slice() : [];
+    }
+    const randFn = typeof rng === 'function' ? rng : Math.random;
+    const out = words.slice();
+    const n = out.length;
+
+    for (let i = n - 1; i > 0; i--) {
+      const raw = Number(randFn());
+      const clamped = Number.isFinite(raw) ? Math.min(0.999999999, Math.max(0, raw)) : 0;
+      const j = Math.floor(clamped * (i + 1));
+      const tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+
+    const isIdenticalOrder = out.every((item, idx) => item === words[idx]);
+    if (isIdenticalOrder && n > 1) {
+      const first = out.shift();
+      out.push(first);
+    }
+
+    return out;
+  }
+
   function computeSurahAyahStates(surahNumber, ayahs, progressMap, passedMap) {
     const pMap = progressMap || {};
     const passMap = passedMap || {};
@@ -382,6 +408,7 @@
     didPassAyahQuiz,
     isWordLearned,
     getQuizEligibleWords,
+    shuffleQuizWords,
     computeSurahAyahStates,
     computeSurahAyahSummary,
     buildAyahQuizSurahRows,

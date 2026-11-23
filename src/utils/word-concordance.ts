@@ -150,3 +150,56 @@ export function groupKeysBySurah(wordKeys: string[]): SurahKeyGroup[] {
 
   return Array.from(map.entries()).map(([surah, keys]) => ({ surah, keys }));
 }
+
+export interface WordDetailCounters {
+  exactCount: number;
+  rootTotalCount: number;
+  rootDifferentCount: number;
+  hasRoot: boolean;
+}
+
+/**
+ * Compute deduplicated exact-word and same-root word totals for the Single Word Detail Hero Card.
+ */
+export function computeWordDetailCounters(
+  exactKeysRaw: readonly string[] | null | undefined,
+  rootKeysRaw: readonly string[] | null | undefined,
+  currentWordKey: string,
+  root: string | null | undefined
+): WordDetailCounters {
+  const exactSet = new Set<string>();
+  for (const k of exactKeysRaw || []) {
+    if (k) exactSet.add(k);
+  }
+  if (currentWordKey) exactSet.add(currentWordKey);
+
+  const hasRoot = Boolean(root && String(root).trim().length > 0);
+  if (!hasRoot) {
+    return {
+      exactCount: Math.max(1, exactSet.size),
+      rootTotalCount: 0,
+      rootDifferentCount: 0,
+      hasRoot: false
+    };
+  }
+
+  const rootTotalSet = new Set<string>();
+  const rootDifferentSet = new Set<string>();
+  for (const k of rootKeysRaw || []) {
+    if (!k) continue;
+    rootTotalSet.add(k);
+    if (!exactSet.has(k)) {
+      rootDifferentSet.add(k);
+    }
+  }
+  for (const k of exactSet) {
+    rootTotalSet.add(k);
+  }
+
+  return {
+    exactCount: Math.max(1, exactSet.size),
+    rootTotalCount: rootTotalSet.size,
+    rootDifferentCount: rootDifferentSet.size,
+    hasRoot: true
+  };
+}

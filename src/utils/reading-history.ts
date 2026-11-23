@@ -515,3 +515,56 @@ export function groupHistoryByDateAndSurah(
     };
   });
 }
+
+export interface HistoryPaginationResult {
+  visibleGroups: HistoryDateGroup[];
+  totalItems: number;
+  shownItems: number;
+  remainingItems: number;
+  hasMore: boolean;
+}
+
+/**
+ * Paginate date-grouped reading history so only the latest `limit` items
+ * (default 10) are rendered initially, preserving date group boundaries.
+ */
+export function paginateHistoryGroups(
+  groups: HistoryDateGroup[],
+  limit: number = 10,
+): HistoryPaginationResult {
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const safeLimit = Math.max(1, Math.floor(Number(limit) || 10));
+
+  let totalItems = 0;
+  for (const g of safeGroups) {
+    totalItems += Array.isArray(g.items) ? g.items.length : 0;
+  }
+
+  const visibleGroups: HistoryDateGroup[] = [];
+  let shownItems = 0;
+
+  for (const g of safeGroups) {
+    if (shownItems >= safeLimit) break;
+    const items = Array.isArray(g.items) ? g.items : [];
+    if (items.length === 0) continue;
+
+    const remainingSlot = safeLimit - shownItems;
+    const sliced = items.slice(0, remainingSlot);
+    if (sliced.length > 0) {
+      visibleGroups.push({
+        ...g,
+        items: sliced,
+      });
+      shownItems += sliced.length;
+    }
+  }
+
+  const remainingItems = Math.max(0, totalItems - shownItems);
+  return {
+    visibleGroups,
+    totalItems,
+    shownItems,
+    remainingItems,
+    hasMore: remainingItems > 0,
+  };
+}

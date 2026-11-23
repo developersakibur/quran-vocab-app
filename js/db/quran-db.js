@@ -1009,11 +1009,14 @@
 
     const wasLearnedInQuiz = Boolean(
       curProg.learnedInQuiz === true ||
-      Number(curProg.correctCount || 0) >= 1 ||
-      Number(curProg.repetitions || 0) >= 1
+      (curProg.learnedInQuiz !== false && (Number(curProg.correctCount || 0) >= 1 || Number(curProg.repetitions || 0) >= 1))
     );
-    const learnedInQuiz = wasLearnedInQuiz || ((source === 'quiz' || source === 'weak') && isSuccess);
-    const learnedAt = curProg.learnedAt || (learnedInQuiz ? nowMs : null);
+    const learnedInQuiz = (global.SmartFlashcardEngine && typeof global.SmartFlashcardEngine.computeNextLearnedInQuiz === 'function')
+      ? global.SmartFlashcardEngine.computeNextLearnedInQuiz({ ...curProg, word_id: wordKey }, isSuccess, source)
+      : (source === 'flashcard' && !isSuccess
+          ? false
+          : ((source === 'quiz' || source === 'weak') && isSuccess ? true : wasLearnedInQuiz));
+    const learnedAt = learnedInQuiz ? (curProg.learnedAt || nowMs) : null;
 
     let flashcardRating = curProg.flashcardRating !== undefined ? curProg.flashcardRating : null;
     let flashcardLastReviewed = curProg.flashcardLastReviewed || null;
@@ -1023,6 +1026,10 @@
       flashcardRating = grade;
       flashcardLastReviewed = nowMs;
       flashcardReviewCount += 1;
+    } else if (!wasLearnedInQuiz && learnedInQuiz && (source === 'weak' || source === 'quiz')) {
+      // Freshly re-graduated from Weak Words MCQ -> re-enter Smart Flashcard queue as fresh Tier 1
+      flashcardRating = null;
+      flashcardLastReviewed = null;
     }
 
     const cachedArabic = wordMeta.arabic || curProg.arabic || '';
@@ -1093,9 +1100,9 @@
     }
 
     // Update Weak Words Deck via SmartFlashcardEngine rules:
-    // - Quiz wrong => add/increment weak word
-    // - Flashcard => NEVER adds or removes weak words
-    // - Weak Words MCQ correct => immediately remove from weak words
+    // - Quiz wrong or Flashcard Hard/Forgot => add/increment weak word (and demote from Learned Words if flashcard)
+    // - Flashcard Medium/Easy => keep weak words untouched
+    // - Weak Words MCQ correct => immediately remove from weak words and return to Learned Words
     const curWeakReq = weakStore.get(wordKey);
     const curWeak = await wrapRequest(curWeakReq);
 
@@ -1114,8 +1121,6 @@
         },
         nowMs
       );
-    } else if (source === 'flashcard') {
-      weakTransition = { action: 'none' };
     } else if (source === 'weak' && isSuccess) {
       weakTransition = curWeak ? { action: 'delete' } : { action: 'none' };
     } else if (!isSuccess) {
@@ -1319,8 +1324,8 @@
               nextReview: Number(item.nextReview || 0),
               correctCount: Math.max(Number(item.correctCount || 0), Number(existing?.correctCount || 0)),
               wrongCount: Math.max(Number(item.wrongCount || 0), Number(existing?.wrongCount || 0)),
-              learnedInQuiz: Boolean(item.learnedInQuiz || existing?.learnedInQuiz),
-              learnedAt: item.learnedAt || existing?.learnedAt || null,
+              learnedInQuiz: item.learnedInQuiz !== undefined ? Boolean(item.learnedInQuiz) : existing?.learnedInQuiz,
+              learnedAt: item.learnedAt !== undefined ? item.learnedAt : (existing?.learnedAt || null),
               flashcardRating: item.flashcardRating !== undefined ? item.flashcardRating : (existing?.flashcardRating ?? null),
               flashcardLastReviewed: Math.max(Number(item.flashcardLastReviewed || 0), Number(existing?.flashcardLastReviewed || 0)) || null,
               flashcardReviewCount: Math.max(Number(item.flashcardReviewCount || 0), Number(existing?.flashcardReviewCount || 0)),
@@ -1332,8 +1337,10 @@
           } else if (existing) {
             existing.correctCount = Math.max(Number(existing.correctCount || 0), Number(item.correctCount || 0));
             existing.wrongCount = Math.max(Number(existing.wrongCount || 0), Number(item.wrongCount || 0));
-            existing.learnedInQuiz = Boolean(existing.learnedInQuiz || item.learnedInQuiz);
-            if (!existing.learnedAt && item.learnedAt) existing.learnedAt = item.learnedAt;
+            if (existing.learnedInQuiz === undefined && item.learnedInQuiz !== undefined) {
+              existing.learnedInQuiz = Boolean(item.learnedInQuiz);
+            }
+            if (!existing.learnedAt && item.learnedAt && existing.learnedInQuiz !== false) existing.learnedAt = item.learnedAt;
             if ((item.flashcardLastReviewed || 0) > (existing.flashcardLastReviewed || 0)) {
               existing.flashcardRating = item.flashcardRating;
               existing.flashcardLastReviewed = item.flashcardLastReviewed;
@@ -1362,6 +1369,7 @@
         return global.SmartFlashcardEngine.isWordLearnedInQuiz(rec);
       }
       if (!rec || !rec.word_id || isNonWordProgressKey(rec.word_id)) return false;
+      if (rec.learnedInQuiz === false) return false;
       return Boolean(rec.learnedInQuiz || Number(rec.correctCount || 0) >= 1 || Number(rec.repetitions || 0) >= 1);
     };
 
@@ -1437,8 +1445,8 @@
             nextReviewDate: nextMs > 0 ? new Date(nextMs).toISOString().slice(0, 10) : null,
             correctCount: Math.max(Number(cur?.correctCount || 0), cloudReps > 0 ? 1 : 0),
             wrongCount: Number(cur?.wrongCount || 0),
-            learnedInQuiz: Boolean(cur?.learnedInQuiz || cloudReps > 0),
-            learnedAt: cur?.learnedAt || (cloudReps > 0 ? (cloudLast || Date.now()) : null),
+            learnedInQuiz: cloudReps > 0 ? true : (cur?.learnedInQuiz === false ? false : Boolean(cur?.learnedInQuiz)),
+            learnedAt: cloudReps > 0 ? (cur?.learnedAt || cloudLast || Date.now()) : (cur?.learnedInQuiz === false ? null : (cur?.learnedAt || null)),
             flashcardRating: cur?.flashcardRating ?? null,
             flashcardLastReviewed: cur?.flashcardLastReviewed ?? null,
             flashcardReviewCount: Number(cur?.flashcardReviewCount || 0),

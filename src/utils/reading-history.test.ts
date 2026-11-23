@@ -15,6 +15,7 @@ import {
   groupHistoryByDateAndSurah,
   isUserActiveForReading,
   mergeHistoryEntries,
+  paginateHistoryGroups,
   summarizeHistoryTotals,
 } from './reading-history.ts';
 
@@ -262,5 +263,40 @@ describe('reading-history summary & date/surah grouping with filters', () => {
     assert.equal(listenOnly.length, 2);
     assert.deepEqual(listenOnly[0].items.map((i) => i.surah), [36]);
     assert.equal(listenOnly[0].dayTotalSeconds, 420);
+  });
+
+  it('paginates date-grouped history to latest 10 items initially and expands on load more', () => {
+    const manyEntries = Array.from({ length: 15 }, (_, idx) => {
+      const day = idx < 6 ? '2026-11-19' : idx < 12 ? '2026-11-18' : '2026-11-17';
+      return {
+        ...createEmptyHistoryEntry(day, idx + 1, 20000 - idx * 100),
+        read_word_keys: [`${idx + 1}:1:1`],
+        read_count: 1,
+        read_seconds: 60,
+        total_seconds: 60,
+      };
+    });
+
+    const groups = groupHistoryByDateAndSurah(manyEntries, {
+      activityFilter: 'all',
+      rangeFilter: '30d',
+      todayKey: '2026-11-19',
+    });
+
+    const page1 = paginateHistoryGroups(groups, 10);
+    assert.equal(page1.totalItems, 15);
+    assert.equal(page1.shownItems, 10);
+    assert.equal(page1.remainingItems, 5);
+    assert.equal(page1.hasMore, true);
+    assert.equal(page1.visibleGroups.length, 2); // 6 from Nov 19 + 4 from Nov 18
+    assert.equal(page1.visibleGroups[0].items.length, 6);
+    assert.equal(page1.visibleGroups[1].items.length, 4);
+
+    const page2 = paginateHistoryGroups(groups, 20);
+    assert.equal(page2.totalItems, 15);
+    assert.equal(page2.shownItems, 15);
+    assert.equal(page2.remainingItems, 0);
+    assert.equal(page2.hasMore, false);
+    assert.equal(page2.visibleGroups.length, 3);
   });
 });

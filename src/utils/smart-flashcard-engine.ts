@@ -65,7 +65,7 @@ export const SMART_FLASHCARD_RATINGS: readonly SmartFlashcardRatingOption[] = [
     id: 'hard',
     grade: 1,
     labelBn: 'ভুলে গেছি / কঠিন',
-    subLabelBn: 'আবার দ্রুত আসবে',
+    subLabelBn: 'দুর্বল শব্দে যুক্ত হবে',
   },
   {
     id: 'medium',
@@ -90,15 +90,38 @@ export function isValidWordKey(key: string): boolean {
 }
 
 /**
- * Determines whether a word has been successfully learned / answered correctly in quizzes.
- * Backward-compatible with existing word_progress records that only have correctCount / repetitions.
+ * Determines whether a word is currently in the Learned Words ("শেখা শব্দ") pool.
+ * Explicit learnedInQuiz === false (e.g., demoted via Flashcard Hard/Forgot) excludes the word
+ * until re-graduated via Weak Words MCQ or Quiz, while remaining backward-compatible with legacy records.
  */
 export function isWordLearnedInQuiz(rec: WordProgressRecord | null | undefined): boolean {
   if (!rec || !isValidWordKey(rec.word_id)) return false;
+  if (rec.learnedInQuiz === false) return false;
   if (rec.learnedInQuiz === true) return true;
   if (Number(rec.correctCount || 0) >= 1) return true;
   if (Number(rec.repetitions || 0) >= 1) return true;
   return false;
+}
+
+/**
+ * Pure Learned-Words membership state transition:
+ * - source === 'flashcard' && !isSuccess (Hard/Forgot) => demote out of Learned Words (false)
+ * - (source === 'quiz' || source === 'weak') && isSuccess => promote/re-graduate into Learned Words (true)
+ * - otherwise => preserve current learned state
+ */
+export function computeNextLearnedInQuiz(
+  curProg: WordProgressRecord | null | undefined,
+  isSuccess: boolean,
+  source: PracticeRecordSource
+): boolean {
+  const wasLearned = isWordLearnedInQuiz(curProg);
+  if (source === 'flashcard' && !isSuccess) {
+    return false;
+  }
+  if ((source === 'quiz' || source === 'weak') && isSuccess) {
+    return true;
+  }
+  return wasLearned;
 }
 
 /**
@@ -244,7 +267,8 @@ export function selectSmartFlashcardBatch(
  *     - wrong (!isCorrect) => add/increment weak word
  *     - correct (isCorrect) => do NOT delete existing weak word (must pass Weak Words drill)
  * - source === 'flashcard':
- *     - NEVER adds or deletes weak words
+ *     - wrong/hard (!isCorrect) => add/increment weak word (demoted from Learned Words)
+ *     - medium/easy (isCorrect) => do NOT modify weak words
  * - source === 'weak':
  *     - correct (isCorrect) => immediately delete from weak words!
  *     - wrong (!isCorrect) => increment mistakeCount and keep in weak words
@@ -257,6 +281,22 @@ export function computeWeakWordTransition(
   nowMs: number = Date.now()
 ): WeakWordTransitionResult {
   if (source === 'flashcard') {
+    if (!isCorrect) {
+      const mistakeCount = curWeak ? Number(curWeak.mistakeCount || 0) + 1 : 1;
+      return {
+        action: 'upsert',
+        record: {
+          word_id: wordMeta.word_id,
+          mistakeCount,
+          consecutiveCorrect: 0,
+          lastMistakeAt: nowMs,
+          arabic: wordMeta.arabic || curWeak?.arabic || '',
+          meaning_bn: wordMeta.meaning_bn || curWeak?.meaning_bn || '',
+          root: wordMeta.root || curWeak?.root || '',
+          verse_key: wordMeta.verse_key || curWeak?.verse_key || '',
+        },
+      };
+    }
     return { action: 'none' };
   }
 

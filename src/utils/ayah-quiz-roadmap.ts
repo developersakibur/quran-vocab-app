@@ -186,6 +186,38 @@ export function getQuizEligibleWords(ayah: AyahRecordLike | null | undefined): A
     .sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
 }
 
+/**
+ * Fisher-Yates shuffle for quiz words so ayah words never appear in predictable
+ * sequential ayah order. Guarantees a non-identical order whenever length > 1
+ * and items are distinct.
+ */
+export function shuffleQuizWords<T>(words: readonly T[], rng: () => number = Math.random): T[] {
+  if (!Array.isArray(words) || words.length <= 1) {
+    return Array.isArray(words) ? words.slice() : [];
+  }
+
+  const out = words.slice();
+  const n = out.length;
+
+  for (let i = n - 1; i > 0; i--) {
+    const raw = Number(rng());
+    const clamped = Number.isFinite(raw) ? Math.min(0.999999999, Math.max(0, raw)) : 0;
+    const j = Math.floor(clamped * (i + 1));
+    const tmp = out[i];
+    out[i] = out[j];
+    out[j] = tmp;
+  }
+
+  // If random draw produced the exact original sequential order, rotate by 1..n-1
+  const isIdenticalOrder = out.every((item, idx) => item === words[idx]);
+  if (isIdenticalOrder && n > 1) {
+    const first = out.shift() as T;
+    out.push(first);
+  }
+
+  return out;
+}
+
 export function computeSurahAyahStates(
   surahNumber: number,
   ayahs: AyahRecordLike[],

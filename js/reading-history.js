@@ -586,6 +586,44 @@
     });
   }
 
+  function paginateHistoryGroups(groups, limit = 10) {
+    const safeGroups = Array.isArray(groups) ? groups : [];
+    const safeLimit = Math.max(1, Math.floor(Number(limit) || 10));
+
+    let totalItems = 0;
+    for (const g of safeGroups) {
+      totalItems += Array.isArray(g.items) ? g.items.length : 0;
+    }
+
+    const visibleGroups = [];
+    let shownItems = 0;
+
+    for (const g of safeGroups) {
+      if (shownItems >= safeLimit) break;
+      const items = Array.isArray(g.items) ? g.items : [];
+      if (items.length === 0) continue;
+
+      const remainingSlot = safeLimit - shownItems;
+      const sliced = items.slice(0, remainingSlot);
+      if (sliced.length > 0) {
+        visibleGroups.push({
+          ...g,
+          items: sliced
+        });
+        shownItems += sliced.length;
+      }
+    }
+
+    const remainingItems = Math.max(0, totalItems - shownItems);
+    return {
+      visibleGroups,
+      totalItems,
+      shownItems,
+      remainingItems,
+      hasMore: remainingItems > 0
+    };
+  }
+
   function init() {
     if (initialized) return;
     initialized = true;
@@ -643,6 +681,7 @@
     flushNow,
     getAllEntries,
     summarizeTotals,
-    groupByDateAndSurah
+    groupByDateAndSurah,
+    paginateHistoryGroups
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -13,6 +13,7 @@ import {
   findRecommendedResumeAyah,
   filterAyahQuizSurahs,
   buildAyahMiniSteps,
+  shuffleQuizWords,
   type AyahRecordLike,
   type SurahMetaLike
 } from './ayah-quiz-roadmap';
@@ -257,4 +258,27 @@ test('buildAyahMiniSteps keeps short surahs flat and chunks long surahs into 20-
   assert.equal(longSteps[2].startAyah, 41);
   assert.equal(longSteps[2].endAyah, 45);
   assert.equal(longSteps[2].items.length, 5);
+});
+
+test('shuffleQuizWords preserves exact word set, never mutates input, and avoids serial ayah order', () => {
+  const original = ['1:1:1', '1:1:2', '1:1:3', '1:1:4'];
+  const snapshot = original.slice();
+
+  // Even if RNG always picks the last index (which would produce an identity Fisher-Yates draw),
+  // shuffleQuizWords guarantees a non-serial order when length > 1.
+  const identityBiasShuffled = shuffleQuizWords(original, () => 0.9999);
+  assert.deepEqual(original, snapshot);
+  assert.deepEqual(identityBiasShuffled.slice().sort(), original.slice().sort());
+  assert.notDeepEqual(identityBiasShuffled, original);
+
+  // Deterministic seeded sequence produces a valid permutation
+  const seq = [0.2, 0.7, 0.4];
+  let idx = 0;
+  const seeded = shuffleQuizWords(original, () => seq[idx++ % seq.length]);
+  assert.deepEqual(seeded.slice().sort(), original.slice().sort());
+  assert.notDeepEqual(seeded, original);
+
+  // Edge cases: 0 and 1 items
+  assert.deepEqual(shuffleQuizWords([]), []);
+  assert.deepEqual(shuffleQuizWords(['1:1:1']), ['1:1:1']);
 });

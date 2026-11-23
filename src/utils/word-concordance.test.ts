@@ -6,7 +6,8 @@ import {
   formatWordLocationBn,
   lookupExactWordKeys,
   splitConcordanceKeys,
-  groupKeysBySurah
+  groupKeysBySurah,
+  computeWordDetailCounters
 } from './word-concordance.ts';
 
 test('normalizeExactArabicKey strips waqf and pause marks but preserves harakat', () => {
@@ -69,4 +70,37 @@ test('parseWordKey and formatWordLocationBn format surah:ayah:word in Bengali di
   assert.equal(parseWordKey('bad-key'), null);
   assert.equal(formatWordLocationBn('1:1:3'), '১:১:৩');
   assert.equal(formatWordLocationBn('114:6:3'), '১১৪:৬:৩');
+});
+
+test('computeWordDetailCounters deduplicates exact and same-root occurrences accurately', () => {
+  const res = computeWordDetailCounters(
+    ['1:1:2', '1:2:2', '1:1:2'],
+    ['1:1:2', '1:2:2', '2:7:2', '2:9:2', '2:7:2'],
+    '1:1:2',
+    'أ ل ه'
+  );
+  assert.deepEqual(res, {
+    exactCount: 2,
+    rootTotalCount: 4,
+    rootDifferentCount: 2,
+    hasRoot: true
+  });
+
+  // Ensures currentWordKey is always counted even if missing from raw arrays
+  const fallbackRes = computeWordDetailCounters([], ['2:1:1'], '1:1:3', 'ر ح م');
+  assert.deepEqual(fallbackRes, {
+    exactCount: 1,
+    rootTotalCount: 2,
+    rootDifferentCount: 1,
+    hasRoot: true
+  });
+
+  // Rootless particles report hasRoot: false and 0 root counts
+  const rootless = computeWordDetailCounters(['1:1:1', '2:1:1'], ['9:9:9'], '1:1:1', '');
+  assert.deepEqual(rootless, {
+    exactCount: 2,
+    rootTotalCount: 0,
+    rootDifferentCount: 0,
+    hasRoot: false
+  });
 });

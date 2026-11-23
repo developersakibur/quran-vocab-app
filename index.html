@@ -17,7 +17,7 @@
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/fonts.css">
-  <link rel="stylesheet" href="css/style.css?v=43">
+  <link rel="stylesheet" href="css/style.css?v=48">
 </head>
 <body>
 
@@ -96,6 +96,14 @@
           <span class="sidebar-item-text">
             <strong>শেখা শব্দ</strong>
             <small>কুইজে আয়ত্তকৃত সব শব্দের তালিকা</small>
+          </span>
+        </button>
+
+        <button type="button" class="sidebar-menu-item" id="sidebar-nav-frequent" data-nav="frequent">
+          <span class="sidebar-item-icon" id="sidebar-icon-frequent"></span>
+          <span class="sidebar-item-text">
+            <strong>সর্বাধিক ব্যবহৃত শব্দ</strong>
+            <small>অধ্যায় ১–৫ · ৩৮২টি মূল শব্দ</small>
           </span>
         </button>
 
@@ -336,6 +344,15 @@
   </main>
 
   <!-- ============================================================
+       VIEW 5C: MOST FREQUENT QURANIC WORDS (অধ্যায় ১–৫ — সাইডবার)
+       ============================================================ -->
+  <main class="app-view" id="view-frequent">
+    <div class="practice-container">
+      <div id="frequent-words-container"></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
        VIEW 6: ACCOUNT & PROGRESS DASHBOARD (একাউন্ট ড্যাশবোর্ড)
        ============================================================ -->
   <main class="app-view" id="view-account">
@@ -443,11 +460,11 @@
   <div class="toast" id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/icons.js?v=43"></script>
+  <script src="js/icons.js?v=44"></script>
   <script src="js/lib/d3.min.js?v=35"></script>
   <script src="js/lib/supabase-bundle.js?v=35"></script>
   <script src="js/supabase-config.js?v=35"></script>
-  <script src="js/supabase-sync.js?v=43"></script>
+  <script src="js/supabase-sync.js?v=44"></script>
   <script src="js/ui/overlay-manager.js?v=35"></script>
   <script src="js/theme.js?v=35"></script>
   <script src="js/font-settings.js?v=35"></script>
@@ -456,16 +473,16 @@
   <script src="js/pwa-install.js?v=35"></script>
   <script src="js/config.js?v=35"></script>
   <script src="js/data/surahs-meta-data.js?v=41"></script>
-  <script src="js/smart-flashcard-engine.js?v=43"></script>
-  <script src="js/db/quran-db.js?v=43"></script>
+  <script src="js/smart-flashcard-engine.js?v=44"></script>
+  <script src="js/db/quran-db.js?v=44"></script>
   <script src="js/storage/storage-manager.js?v=35"></script>
-  <script src="js/reading-history.js?v=35"></script>
-  <script src="js/progress-chart.js?v=43"></script>
-  <script src="js/mcq-frequency-groups.js?v=35"></script>
-  <script src="js/ayah-quiz-roadmap.js?v=35"></script>
+  <script src="js/reading-history.js?v=45"></script>
+  <script src="js/progress-chart.js?v=44"></script>
+  <script src="js/mcq-frequency-groups.js?v=47"></script>
+  <script src="js/ayah-quiz-roadmap.js?v=45"></script>
   <script src="js/audio-download-manager.js?v=41"></script>
-  <script src="js/word-share-card.js?v=41"></script>
-  <script src="js/app.js?v=43"></script>
+  <script charset="UTF-8" src="js/word-share-card.js?v=45"></script>
+  <script charset="UTF-8" src="js/app.js?v=48"></script>
 
   <script>
     // Initialize UI Icons safely (100% solid SVG icons, zero text/emoji icons)
@@ -487,6 +504,7 @@
     setIcon('sidebar-icon-surahs', Icons.book);
     setIcon('sidebar-icon-practice', Icons.target);
     setIcon('sidebar-icon-learned', Icons.bookCheck);
+    setIcon('sidebar-icon-frequent', Icons.flame);
     setIcon('sidebar-icon-bookmarks', Icons.starFilled);
     setIcon('sidebar-icon-account-nav', Icons.user);
     setIcon('sidebar-icon-database', Icons.database);
@@ -556,7 +574,7 @@
     if (sidebarBackdrop) sidebarBackdrop.onclick = closeSidebar;
 
     // Sidebar Navigation Items
-    ['surahs', 'practice', 'learned', 'bookmarks', 'account'].forEach((navTarget) => {
+    ['surahs', 'practice', 'learned', 'frequent', 'bookmarks', 'account'].forEach((navTarget) => {
       const btn = document.getElementById(`sidebar-nav-${navTarget}`);
       if (btn) {
         btn.onclick = () => {

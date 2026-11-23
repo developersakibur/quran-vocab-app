@@ -621,9 +621,133 @@
     return subGroup.lists.find((l) => l.listNumber === num) || subGroup.lists[0] || null;
   }
 
+  const CORE_FREQUENT_GROUP_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
+
+  function stripArabicDiacritics(input) {
+    if (!input) return '';
+    return String(input)
+      .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
+      .replace(/[أإآٱ]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .trim();
+  }
+
+  function getCoreFrequentWords(hierarchy, allowedGroupIds = CORE_FREQUENT_GROUP_IDS) {
+    if (!hierarchy || !Array.isArray(hierarchy.groups)) return [];
+    const allowedSet = new Set(allowedGroupIds);
+    const seen = new Set();
+    const collected = [];
+
+    for (const group of hierarchy.groups) {
+      if (!group || !allowedSet.has(group.id)) continue;
+      for (const sub of group.subGroups || []) {
+        for (const list of sub.lists || []) {
+          for (const w of list.words || []) {
+            if (!w || !w.key || seen.has(w.key)) continue;
+            seen.add(w.key);
+            const parts = String(w.key).split(':');
+            const surah = Number(w.surah) || parseInt(parts[0] || '1', 10) || 1;
+            const ayah = Number(w.ayah) || parseInt(parts[1] || '1', 10) || 1;
+            const position = parseInt(parts[2] || '1', 10) || 1;
+            collected.push({
+              ...w,
+              surah,
+              ayah,
+              position,
+              occurrenceCount: Number(w.occurrenceCount || 0),
+              groupId: group.id,
+              chapterOrder: Number(group.order || 1),
+              chapterTitleBn: group.titleBn || ''
+            });
+          }
+        }
+      }
+    }
+
+    collected.sort((a, b) => {
+      if (b.occurrenceCount !== a.occurrenceCount) return b.occurrenceCount - a.occurrenceCount;
+      if (a.chapterOrder !== b.chapterOrder) return a.chapterOrder - b.chapterOrder;
+      return a.key.localeCompare(b.key);
+    });
+
+    return collected.map((item, idx) => ({
+      ...item,
+      rank: idx + 1
+    }));
+  }
+
+  function filterCoreFrequentWords(items, chapterFilter = 'all', query = '') {
+    if (!Array.isArray(items) || items.length === 0) return [];
+    const trimmed = String(query || '').trim();
+    const normalizedQuery = trimmed.toLowerCase();
+    const normalizedArabic = stripArabicDiacritics(trimmed);
+
+    return items.filter((item) => {
+      if (chapterFilter && chapterFilter !== 'all' && item.groupId !== chapterFilter) {
+        return false;
+      }
+      if (!trimmed) return true;
+      if (String(item.meaning_bn || '').toLowerCase().includes(normalizedQuery)) return true;
+      if (String(item.arabic || '').includes(trimmed)) return true;
+      if (normalizedArabic && stripArabicDiacritics(item.arabic || '').includes(normalizedArabic)) return true;
+      if (String(item.occurrenceCount).includes(normalizedQuery)) return true;
+      return false;
+    });
+  }
+
+  function summarizeCoreFrequentWords(items, hierarchy) {
+    const groups = (hierarchy && hierarchy.groups) || [];
+    const totalTokens = Number(hierarchy && hierarchy.totalTokens) || 77429;
+    const groupMeta = new Map();
+    for (const g of groups) {
+      if (g && g.id) groupMeta.set(g.id, g);
+    }
+    const buckets = new Map();
+    for (const id of CORE_FREQUENT_GROUP_IDS) buckets.set(id, { count: 0, occ: 0 });
+
+    let totalOccurrences = 0;
+    let chapters1To4Words = 0;
+    for (const item of items || []) {
+      const b = buckets.get(item.groupId);
+      if (b) {
+        b.count += 1;
+        b.occ += item.occurrenceCount;
+      }
+      totalOccurrences += item.occurrenceCount;
+      if (item.chapterOrder <= 4) chapters1To4Words += 1;
+    }
+
+    const chapters = CORE_FREQUENT_GROUP_IDS.map((id, idx) => {
+      const meta = groupMeta.get(id);
+      const b = buckets.get(id);
+      return {
+        groupId: id,
+        order: meta ? Number(meta.order) : idx + 1,
+        titleBn: meta ? meta.titleBn : `অধ্যায় ${toBnDigits(idx + 1)}`,
+        rangeLabelBn: (meta && meta.rangeLabelBn) || '',
+        wordCount: b.count,
+        occurrenceSum: b.occ
+      };
+    });
+
+    const coveragePct = totalTokens > 0
+      ? Number(((totalOccurrences / totalTokens) * 100).toFixed(1))
+      : 0;
+
+    return {
+      totalWords: (items || []).length,
+      chapters1To4Words,
+      totalOccurrences,
+      coveragePct,
+      chapters
+    };
+  }
+
   global.McqFrequencyGroups = {
     MCQ_PASS_PREFIX,
     MCQ_MAIN_GROUP_CONFIGS,
+    CORE_FREQUENT_GROUP_IDS,
     toBnDigits,
     isMcqPassKey,
     toMcqPassStorageKey,
@@ -642,6 +766,9 @@
     computeProgressiveHorizon,
     didPassMcqListExam,
     findRecommendedResumeList,
-    buildDistractorPoolForList
+    buildDistractorPoolForList,
+    getCoreFrequentWords,
+    filterCoreFrequentWords,
+    summarizeCoreFrequentWords
   };
 })(window);

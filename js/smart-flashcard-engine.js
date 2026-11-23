@@ -12,7 +12,7 @@
       id: 'hard',
       grade: 1,
       labelBn: 'ভুলে গেছি / কঠিন',
-      subLabelBn: 'আবার দ্রুত আসবে'
+      subLabelBn: 'দুর্বল শব্দে যুক্ত হবে'
     },
     {
       id: 'medium',
@@ -36,10 +36,22 @@
 
   function isWordLearnedInQuiz(rec) {
     if (!rec || !isValidWordKey(rec.word_id)) return false;
+    if (rec.learnedInQuiz === false) return false;
     if (rec.learnedInQuiz === true) return true;
     if (Number(rec.correctCount || 0) >= 1) return true;
     if (Number(rec.repetitions || 0) >= 1) return true;
     return false;
+  }
+
+  function computeNextLearnedInQuiz(curProg, isSuccess, source) {
+    const wasLearned = isWordLearnedInQuiz(curProg);
+    if (source === 'flashcard' && !isSuccess) {
+      return false;
+    }
+    if ((source === 'quiz' || source === 'weak') && isSuccess) {
+      return true;
+    }
+    return wasLearned;
   }
 
   function getFlashcardPriorityTier(rec) {
@@ -152,6 +164,22 @@
 
   function computeWeakWordTransition(curWeak, isCorrect, source, wordMeta, nowMs = Date.now()) {
     if (source === 'flashcard') {
+      if (!isCorrect) {
+        const mistakeCount = curWeak ? Number(curWeak.mistakeCount || 0) + 1 : 1;
+        return {
+          action: 'upsert',
+          record: {
+            word_id: wordMeta.word_id,
+            mistakeCount,
+            consecutiveCorrect: 0,
+            lastMistakeAt: nowMs,
+            arabic: wordMeta.arabic || (curWeak && curWeak.arabic) || '',
+            meaning_bn: wordMeta.meaning_bn || (curWeak && curWeak.meaning_bn) || '',
+            root: wordMeta.root || (curWeak && curWeak.root) || '',
+            verse_key: wordMeta.verse_key || (curWeak && curWeak.verse_key) || ''
+          }
+        };
+      }
       return { action: 'none' };
     }
 
@@ -228,6 +256,7 @@
     SMART_FLASHCARD_RATINGS,
     isValidWordKey,
     isWordLearnedInQuiz,
+    computeNextLearnedInQuiz,
     getFlashcardPriorityTier,
     getFlashcardStatusLabelBn,
     compareSmartFlashcardPriority,

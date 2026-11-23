@@ -1258,7 +1258,10 @@
     historyRangeFilter: '30d', // '7d' | '30d' | 'all'
     learnedQuery: '',
     learnedFilter: 'all', // 'all' | 'new' | 'review' | 'mastered'
-    learnedVisibleLimit: 60
+    learnedVisibleLimit: 60,
+    frequentQuery: '',
+    frequentChapterFilter: 'all', // 'all' | 'g1' | 'g2' | 'g3' | 'g4' | 'g5'
+    frequentVisibleLimit: 60
   };
 
   // ============================================================
@@ -1302,6 +1305,7 @@
       if (state.practiceList) qp.push(`list=${state.practiceList}`);
       hash = qp.length > 0 ? `#practice?${qp.join('&')}` : '#practice';
     } else if (viewName === 'learned') hash = '#learned';
+    else if (viewName === 'frequent') hash = '#frequent';
     else if (viewName === 'bookmarks') hash = '#bookmarks';
     else if (viewName === 'account') hash = '#account';
     else if (viewName === 'downloads') hash = '#downloads';
@@ -1372,6 +1376,8 @@
       navigateTo('practice', { surah, ayah, engine, group, sub, list }, pushState);
     } else if (hash === '#learned') {
       navigateTo('learned', {}, pushState);
+    } else if (hash === '#frequent') {
+      navigateTo('frequent', {}, pushState);
     } else if (hash === '#bookmarks') {
       navigateTo('bookmarks', {}, pushState);
     } else if (hash === '#account') {
@@ -1497,6 +1503,14 @@
         if (eyebrowEl) eyebrowEl.textContent = 'কুইজে আয়ত্তকৃত শব্দভাণ্ডার';
         document.getElementById('view-learned').classList.add('active');
         renderLearnedWordsView();
+        break;
+
+      case 'frequent':
+        if (backBtn) backBtn.style.display = 'grid';
+        if (titleEl) titleEl.textContent = 'সর্বাধিক ব্যবহৃত শব্দ';
+        if (eyebrowEl) eyebrowEl.textContent = 'অধ্যায় ১–৫ · সর্বাধিক থেকে কম ক্রমে';
+        document.getElementById('view-frequent').classList.add('active');
+        renderFrequentWordsView();
         break;
 
       case 'bookmarks':
@@ -2317,6 +2331,16 @@
         ${word.root ? `<span class="pill-badge root" id="pill-root-jump"><span class="icon">${Icons.layers}</span> মূল বর্ণ: ${word.root.split('').join(' - ')}</span>` : ''}
         <span class="pill-badge"><span class="icon">${Icons.book}</span> অবস্থান: আয়াত ${toBnNumber(word.ayah)}, শব্দ ${toBnNumber(word.position)}</span>
       </div>
+      <div class="word-hero-counters" role="group" aria-label="কুরআনে শব্দের পরিসংখ্যান">
+        <button type="button" class="word-hero-counter-item" id="hero-exact-count-btn" aria-label="এই শব্দটি কুরআনে মোট কতবার এসেছে">
+          <span class="word-hero-counter-val tabular-nums" id="hero-exact-count-val">…</span>
+          <span class="word-hero-counter-lbl">এই শব্দটি মোট এসেছে</span>
+        </button>
+        <button type="button" class="word-hero-counter-item" id="hero-root-count-btn" ${!word.root ? 'disabled' : ''} aria-label="একই মূল থেকে কুরআনে মোট কতগুলো শব্দ এসেছে">
+          <span class="word-hero-counter-val tabular-nums" id="hero-root-count-val">${word.root ? '…' : 'প্রযোজ্য নয়'}</span>
+          <span class="word-hero-counter-lbl">একই মূল থেকে মোট শব্দ</span>
+        </button>
+      </div>
     `;
 
     const heroPrevBtn = heroCard.querySelector('#hero-arrow-prev');
@@ -2335,6 +2359,22 @@
       attachWordTokenHoldAndClick(heroAr, wordKey, () => {
         playWordAudio(wordKey, heroAr);
       });
+    }
+
+    const heroExactBtn = heroCard.querySelector('#hero-exact-count-btn');
+    if (heroExactBtn) {
+      heroExactBtn.onclick = () => {
+        const sec = document.getElementById('card-exact-word');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    }
+
+    const heroRootBtn = heroCard.querySelector('#hero-root-count-btn');
+    if (heroRootBtn && word.root) {
+      heroRootBtn.onclick = () => {
+        const sec = document.getElementById('card-root-family');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
     }
 
     if (word.root) {
@@ -2361,16 +2401,20 @@
     }
 
     ayahCard.innerHTML = `
-      <div class="detail-card-header">
-        <span class="icon">${Icons.book}</span> আয়াতে ব্যবহার
+      <div class="detail-card-header detail-card-header-with-action">
+        <div class="detail-card-header-title">
+          <span class="icon">${Icons.book}</span>
+          <span>আয়াতে ব্যবহার</span>
+        </div>
+        <button type="button" class="btn-ayah-context-audio btn-ayah-header-audio" id="btn-play-ayah-context" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
+          <span class="icon">${Icons.speaker}</span>
+          <span>পূর্ণ আয়াত শুনুন</span>
+        </button>
       </div>
-      <div class="ayah-highlight-box">
+      <div class="ayah-highlight-box ayah-highlight-box-flush">
         <div class="ayah-highlight-ar">${highlightedArabic}</div>
         <div class="ayah-highlight-bn">${word.ayah_translation_bn || ''}</div>
       </div>
-      <button class="surah-practice-cta btn-ayah-context-audio" id="btn-play-ayah-context">
-        <span class="icon">${Icons.speaker}</span> পূর্ণ আয়াত শুনুন
-      </button>
     `;
 
     const activePill = ayahCard.querySelector('.active-word-pill');
@@ -2591,17 +2635,34 @@
             exactKeys.push(k);
           }
         }
+        if (!exactSeen.has(wordKey)) {
+          exactSeen.add(wordKey);
+          exactKeys.unshift(wordKey);
+        }
         resolvedExactOccurrences = Math.max(1, exactKeys.length);
 
         const excluded = new Set(exactSeen);
         excluded.add(wordKey);
+        const rootTotalSeen = new Set(word.root ? exactSeen : []);
         const rootDifferentSeen = new Set();
         const rootDifferentKeys = [];
         for (const k of rootKeysRaw || []) {
-          if (k && !excluded.has(k) && !rootDifferentSeen.has(k)) {
+          if (!k) continue;
+          if (word.root) rootTotalSeen.add(k);
+          if (!excluded.has(k) && !rootDifferentSeen.has(k)) {
             rootDifferentSeen.add(k);
             rootDifferentKeys.push(k);
           }
+        }
+
+        // Update the two top Hero Card counters
+        const heroExactValEl = heroCard.querySelector('#hero-exact-count-val');
+        if (heroExactValEl) {
+          heroExactValEl.textContent = `${toBnNumber(resolvedExactOccurrences)} বার`;
+        }
+        const heroRootValEl = heroCard.querySelector('#hero-root-count-val');
+        if (heroRootValEl) {
+          heroRootValEl.textContent = word.root ? `${toBnNumber(rootTotalSeen.size)}টি` : 'প্রযোজ্য নয়';
         }
 
         mountConcordanceTableSection({
@@ -2812,7 +2873,7 @@
           <div class="engine-icon-wrap engine-icon-4"><span class="icon">${Icons.warning}</span></div>
           <div class="engine-info">
             <h3>দুর্বল শব্দ</h3>
-            <p>কুইজে ভুল হওয়া শব্দগুলো বহুনির্বাচনী (MCQ) কুইজে ঝালিয়ে নিন।</p>
+            <p>কুইজ বা ফ্ল্যাশকার্ডে ভুল/কঠিন হওয়া শব্দগুলো বহুনির্বাচনী (MCQ) কুইজে ঝালিয়ে নিন।</p>
             <div class="engine-meta-line tabular-nums">${weakMeta}</div>
           </div>
         </button>
@@ -4075,7 +4136,7 @@
 
     const rawAyah = surahData.ayahs.find((a) => parseInt(a.ayah, 10) === targetState.ayah);
     const eligibleWords = AQR.getQuizEligibleWords(rawAyah);
-    const ayahWords = eligibleWords.map((w) => ({
+    const orderedAyahWords = eligibleWords.map((w) => ({
       ...w,
       surah: sNum,
       ayah: targetState.ayah,
@@ -4083,6 +4144,9 @@
       ayah_arabic: (rawAyah && rawAyah.arabic) || '',
       ayah_translation_bn: (rawAyah && rawAyah.translation_bn) || ''
     }));
+    const ayahWords = typeof AQR.shuffleQuizWords === 'function'
+      ? AQR.shuffleQuizWords(orderedAyahWords)
+      : orderedAyahWords;
 
     // Build rich distractor pool from the whole surah (plus Surah 1 fallback if short surah)
     const distractorPool = [];
@@ -4160,6 +4224,8 @@
     const safeEsc = (str) => String(str || '').replace(/[&<>"']/g, (ch) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[ch]));
+
+    state.historyVisibleLimit = 10;
 
     if (!user) {
       const activeTab = state.accountAuthTab || 'signin';
@@ -4508,20 +4574,15 @@
         </div>
       </div>
 
-      <!-- Reading & Listening History + Daily Study Time inside Account Dashboard -->
-      <div id="account-reading-history-mount"></div>
-
       <!-- Daily Streak Calendar inside Account Dashboard -->
       <div id="account-streak-calendar-mount"></div>
 
       <!-- 30-Day Progress Chart inside Account Dashboard -->
       <div id="account-progress-chart-mount"></div>
-    `;
 
-    const historyMount = container.querySelector('#account-reading-history-mount');
-    if (historyMount) {
-      renderReadingHistorySection(historyMount, { isSignedIn: true });
-    }
+      <!-- Reading & Listening History + Daily Study Time at the bottom of Account Dashboard -->
+      <div id="account-reading-history-mount"></div>
+    `;
 
     const streakMount = container.querySelector('#account-streak-calendar-mount');
     if (streakMount) {
@@ -4531,6 +4592,11 @@
     const chartMount = container.querySelector('#account-progress-chart-mount');
     if (chartMount && window.ProgressChart) {
       window.ProgressChart.render(chartMount);
+    }
+
+    const historyMount = container.querySelector('#account-reading-history-mount');
+    if (historyMount) {
+      renderReadingHistorySection(historyMount, { isSignedIn: true });
     }
 
     const syncBtn = container.querySelector('#account-sync-now-btn');
@@ -4625,8 +4691,19 @@
       ? 'আপনার একাউন্টে স্বয়ংক্রিয়ভাবে সংরক্ষিত ও সিঙ্ক হয়'
       : 'এই ডিভাইসে সংরক্ষিত · লগইন করলে একাউন্টে ব্যাকআপ থাকবে';
 
+    const visibleLimit = Math.max(10, Number(state.historyVisibleLimit) || 10);
+    const paginated = typeof window.ReadingHistory.paginateHistoryGroups === 'function'
+      ? window.ReadingHistory.paginateHistoryGroups(groups, visibleLimit)
+      : {
+          visibleGroups: groups,
+          totalItems: groups.reduce((acc, g) => acc + (g.items ? g.items.length : 0), 0),
+          shownItems: groups.reduce((acc, g) => acc + (g.items ? g.items.length : 0), 0),
+          remainingItems: 0,
+          hasMore: false
+        };
+
     let listHtml = '';
-    if (groups.length === 0) {
+    if (paginated.visibleGroups.length === 0) {
       const hasAnyHistory = entries.length > 0;
       listHtml = `
         <div class="rh-empty-state">
@@ -4639,7 +4716,7 @@
         </div>
       `;
     } else {
-      listHtml = groups.map((group) => {
+      listHtml = paginated.visibleGroups.map((group) => {
         const dayDurLabel = window.ReadingHistory.formatDurationBn(group.dayTotalSeconds);
         const rowsHtml = group.items.map((item) => {
           const meta = surahMap.get(Number(item.surah));
@@ -4688,6 +4765,17 @@
       }).join('');
     }
 
+    const loadMoreHtml = paginated.hasMore
+      ? `
+        <div class="rh-load-more-wrap">
+          <button type="button" class="rh-load-more-btn" id="rh-load-more-btn">
+            <span>আরও লোড করুন</span>
+            <span class="rh-load-more-count tabular-nums">(আরও ${toBnNumber(paginated.remainingItems)}টি বাকি)</span>
+          </button>
+        </div>
+      `
+      : '';
+
     mountEl.innerHTML = `
       <section class="rh-section-card" aria-label="পড়া ও শোনার হিস্ট্রি">
         <div class="rh-section-head">
@@ -4732,12 +4820,14 @@
         <div class="rh-groups-wrap">
           ${listHtml}
         </div>
+        ${loadMoreHtml}
       </section>
     `;
 
     mountEl.querySelectorAll('[data-rh-activity]').forEach((btn) => {
       btn.onclick = () => {
         state.historyActivityFilter = btn.dataset.rhActivity || 'all';
+        state.historyVisibleLimit = 10;
         renderReadingHistorySection(mountEl, opts);
       };
     });
@@ -4745,9 +4835,18 @@
     mountEl.querySelectorAll('[data-rh-range]').forEach((btn) => {
       btn.onclick = () => {
         state.historyRangeFilter = btn.dataset.rhRange || '30d';
+        state.historyVisibleLimit = 10;
         renderReadingHistorySection(mountEl, opts);
       };
     });
+
+    const loadMoreBtn = mountEl.querySelector('#rh-load-more-btn');
+    if (loadMoreBtn) {
+      loadMoreBtn.onclick = () => {
+        state.historyVisibleLimit = visibleLimit + 10;
+        renderReadingHistorySection(mountEl, opts);
+      };
+    }
 
     mountEl.querySelectorAll('.rh-surah-row').forEach((row) => {
       row.onclick = () => {
@@ -5352,12 +5451,17 @@
       } catch (e) {}
     }
 
-    // Build drillSet: preserve priority queue order for Smart Flashcards & Weak Words, sequential for ayah/custom, shuffled for surah MCQ
+    // Build drillSet: preserve priority queue order for Smart Flashcards & Weak Words,
+    // randomized order for ayah quizzes, and shuffled slice for general surah MCQ
     let drillSet;
     if (isGlobalFrequencyMode) {
       drillSet = words.slice(0, 10);
-    } else if (isFlashcardMode || isWeakMode || ayahNumber || Array.isArray(customDeckWords)) {
+    } else if (isFlashcardMode || isWeakMode || Array.isArray(customDeckWords)) {
       drillSet = words.slice();
+    } else if (ayahNumber) {
+      drillSet = (window.AyahQuizRoadmap && typeof window.AyahQuizRoadmap.shuffleQuizWords === 'function')
+        ? window.AyahQuizRoadmap.shuffleQuizWords(words)
+        : words.slice();
     } else {
       words.sort(() => Math.random() - 0.5);
       drillSet = words.slice(0, 10);
@@ -5481,36 +5585,25 @@
         <!-- 3D Flip-to-Reveal Card Container -->
         <div class="flashcard-3d-scene" id="flashcard-scene">
           <div class="flashcard-3d-card" id="flashcard-interactive-card" data-flipped="false">
-            <div class="flashcard-top-controls">
-              <div class="drill-audio-group">
-                <button type="button" class="drill-audio-btn" id="flash-word-audio-btn" aria-label="শব্দের উচ্চারণ শুনুন">
-                  <span class="icon">${Icons.volume2 || Icons.speaker}</span>
-                  <span>শব্দের অডিও</span>
-                </button>
-                <button type="button" class="drill-audio-btn ayah-audio" id="flash-ayah-audio-btn" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
-                  <span class="icon">${Icons.speaker}</span>
-                  <span>আয়াতের অডিও</span>
-                </button>
-              </div>
+            <div class="flashcard-top-controls flashcard-top-controls-clean">
               <div class="flashcard-meta-right tabular-nums">
                 <span>${tierLabel}</span>
                 <span aria-hidden="true">·</span>
-                <span>আয়াত ${toBnNumber(q.verse_key || `${sNum}:${aNum}`)}</span>
+                <span>সূরা ${toBnNumber(sNum)} · আয়াত ${toBnNumber(aNum)}</span>
               </div>
             </div>
 
-            <!-- FRONT FACE: Arabic Word & Context Prompt -->
+            <!-- FRONT FACE: Clean Arabic Word Only (No Ayah Text) -->
             <div class="flashcard-face-front" id="flashcard-front-content">
               <div class="flashcard-side-label">প্রশ্ন পৃষ্ঠা · আরবী শব্দ</div>
               <div class="flashcard-arabic-hero" dir="rtl">${q.arabic}</div>
-              ${q.ayah_arabic ? `<div class="drill-ayah-context" style="margin-top:12px">${q.ayah_arabic.replace(q.arabic, `<span class="drill-ayah-highlight">${q.arabic}</span>`)}</div>` : ''}
               <button type="button" class="flashcard-flip-cta-btn" id="btn-flip-to-reveal" aria-label="কার্ড ফ্লিপ করে অর্থ দেখুন">
                 <span class="icon">${Icons.repeat}</span>
                 <span>কার্ড ফ্লিপ করে অর্থ দেখুন</span>
               </button>
             </div>
 
-            <!-- BACK FACE: Revealed Bengali Meaning, Root & Ayah Translation -->
+            <!-- BACK FACE: Revealed Bengali Meaning & Root (No Ayah Text) -->
             <div class="flashcard-face-back" id="flashcard-back-content" style="display:none">
               <div class="flashcard-side-label revealed">উত্তর পৃষ্ঠা · বাংলা অর্থ ও বিশ্লেষণ</div>
               <div class="flashcard-arabic-sub" dir="rtl">${q.arabic}</div>
@@ -5519,8 +5612,6 @@
                 ${q.root ? `<span>মূল ধাতু: <strong>${q.root}</strong></span><span aria-hidden="true">·</span>` : ''}
                 <span>সূরা ${toBnNumber(sNum)} · আয়াত ${toBnNumber(aNum)}</span>
               </div>
-              ${q.ayah_arabic ? `<div class="drill-ayah-context" style="margin-top:12px">${q.ayah_arabic.replace(q.arabic, `<span class="drill-ayah-highlight">${q.arabic}</span>`)}</div>` : ''}
-              ${q.ayah_translation_bn ? `<div class="flashcard-ayah-bn-trans">${q.ayah_translation_bn}</div>` : ''}
               <div class="flashcard-back-actions">
                 <button type="button" class="flashcard-flip-back-btn" id="btn-flip-to-front" aria-label="প্রশ্ন পৃষ্ঠায় ফিরে যান">
                   <span class="icon">${Icons.repeat}</span>
@@ -5531,6 +5622,18 @@
                   <span>শব্দ বিশ্লেষণ</span>
                 </button>
               </div>
+            </div>
+
+            <!-- BOTTOM 100%-WIDTH AUDIO BAR (Thumb-Friendly Word & Ayah Audio) -->
+            <div class="flashcard-bottom-audio-bar" role="group" aria-label="অডিও উচ্চারণ ও তিলাওয়াত">
+              <button type="button" class="flashcard-audio-full-btn word-audio" id="flash-word-audio-btn" aria-label="শব্দের উচ্চারণ শুনুন">
+                <span class="icon" aria-hidden="true">${Icons.volume2 || Icons.speaker}</span>
+                <span>শব্দের অডিও</span>
+              </button>
+              <button type="button" class="flashcard-audio-full-btn ayah-audio" id="flash-ayah-audio-btn" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
+                <span class="icon" aria-hidden="true">${Icons.speaker}</span>
+                <span>আয়াতের অডিও</span>
+              </button>
             </div>
           </div>
         </div>
@@ -5546,7 +5649,7 @@
                 <span class="icon">${Icons.xCircle}</span>
                 <strong>ভুলে গেছি / কঠিন</strong>
               </span>
-              <span class="rate-btn-sub">আবার দ্রুত আসবে</span>
+              <span class="rate-btn-sub">দুর্বল শব্দে যুক্ত হবে</span>
             </button>
             <button type="button" class="flashcard-rate-btn rate-hard" id="btn-rate-medium" data-rate="medium" data-grade="3">
               <span class="rate-btn-top">
@@ -5650,7 +5753,7 @@
             missedFlashcards.push(q);
           }
 
-          // Source: 'flashcard' — updates 4-tier priority queue WITHOUT adding to Weak Words
+          // Source: 'flashcard' — Medium/Easy updates 4-tier rotation; Hard/Forgot demotes from Learned Words into Weak Words
           await QuranDB.recordSpacedRepetition(q.key, grade, q, { source: 'flashcard' });
           currentIndex++;
           renderQuestion();
@@ -5660,12 +5763,9 @@
       area.appendChild(wrapper);
     }
 
-    // MCQ Question Render
+    // MCQ Question Render (Ayah Word Quiz, Frequency MCQ & Weak Words MCQ)
     function renderMcqQuestion(area, q) {
       const card = document.createElement('div');
-      const ayahSnippet = q.ayah_arabic
-        ? `<div class="drill-ayah-context">${q.ayah_arabic.replace(q.arabic, `<span class="drill-ayah-highlight">${q.arabic}</span>`)}</div>`
-        : '';
 
       const sNum = q.surah || (q.verse_key ? parseInt(q.verse_key.split(':')[0], 10) : (q.key ? parseInt(q.key.split(':')[0], 10) : 1));
       const aNum = q.ayah || (q.verse_key ? parseInt(q.verse_key.split(':')[1], 10) : (q.key ? parseInt(q.key.split(':')[1], 10) : 1));
@@ -5674,25 +5774,28 @@
 
       card.innerHTML = `
         <div class="drill-word-card">
-          <div class="drill-card-topbar">
-            <div class="drill-audio-group">
-              <button class="drill-audio-btn" id="drill-mcq-word-audio" aria-label="শব্দের উচ্চারণ শুনুন" title="শব্দটির অডিও শুনুন">
-                <span class="icon">${Icons.volume2 || Icons.speaker}</span> <span>শব্দের অডিও</span>
-              </button>
-              <button class="drill-audio-btn ayah-audio" id="drill-mcq-ayah-audio" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন" title="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
-                <span class="icon">${Icons.speaker}</span> <span>আয়াতের অডিও</span>
-              </button>
+          ${q.verse_key ? `
+            <div class="drill-card-topbar drill-card-topbar-clean">
+              <span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>
             </div>
-            ${q.verse_key ? `<span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>` : ''}
-          </div>
+          ` : ''}
           <div class="drill-occurrence-bar" id="drill-mcq-occurrence-counter" aria-label="পূর্ণ কুরআনে শব্দের মোট সংখ্যা">
             <span class="drill-occurrence-label">পূর্ণ কুরআনে এসেছে:</span>
             <strong class="drill-occurrence-count tabular-nums">${toBnNumber(occurrenceCount)} বার</strong>
           </div>
           <div class="drill-arabic-word">${q.arabic}</div>
-          ${ayahSnippet}
           ${q.root ? `<div class="drill-word-root">মূল ধাতু: <strong>${q.root}</strong></div>` : ''}
           <div class="drill-question-prompt">নিচের কোনটি সঠিক বাংলা অর্থ?</div>
+          <div class="flashcard-bottom-audio-bar drill-bottom-audio-bar" role="group" aria-label="অডিও উচ্চারণ ও তিলাওয়াত">
+            <button type="button" class="flashcard-audio-full-btn word-audio" id="drill-mcq-word-audio" aria-label="শব্দের উচ্চারণ শুনুন" title="শব্দটির অডিও শুনুন">
+              <span class="icon" aria-hidden="true">${Icons.volume2 || Icons.speaker}</span>
+              <span>শব্দের অডিও</span>
+            </button>
+            <button type="button" class="flashcard-audio-full-btn ayah-audio" id="drill-mcq-ayah-audio" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন" title="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
+              <span class="icon" aria-hidden="true">${Icons.speaker}</span>
+              <span>আয়াতের অডিও</span>
+            </button>
+          </div>
         </div>
         <div class="options-grid" id="drill-options"></div>
       `;
@@ -6160,7 +6263,9 @@
             </div>
             <p class="mcq-summary-desc">
               ${isFlashcardMode
-                ? 'ভালো মনে থাকা শব্দগুলো তালিকার নিচে চলে গেছে এবং নতুন ও কঠিন শব্দগুলো পরবর্তী সেটে অগ্রাধিকার পাবে।'
+                ? (ratingCounts.hard > 0
+                    ? `ভালো মনে থাকা শব্দগুলো তালিকার নিচে চলে গেছে এবং কঠিন চিহ্নিত ${toBnNumber(ratingCounts.hard)}টি শব্দ শেখা শব্দ থেকে সরে দুর্বল শব্দ তালিকায় যুক্ত হয়েছে।`
+                    : 'ভালো মনে থাকা শব্দগুলো তালিকার নিচে চলে গেছে এবং বাকি নতুন শব্দগুলো পরবর্তী সেটে অগ্রাধিকার পাবে।')
                 : 'আলহামদুলিল্লাহ! আপনার অনুশীলনের অগ্রগতি সংরক্ষিত হয়েছে।'}
             </p>
             ${flashcardBreakdownHtml}
@@ -6542,6 +6647,258 @@
     });
 
     listEl.appendChild(tableWrap);
+  }
+
+  // ============================================================
+  // MOST FREQUENT WORDS VIEW (সর্বাধিক ব্যবহৃত শব্দ — অধ্যায় ১–৫)
+  // ============================================================
+
+  async function renderFrequentWordsView() {
+    const container = document.getElementById('frequent-words-container');
+    if (!container) return;
+    container.innerHTML = '<div class="loading-spinner" style="margin:40px auto"></div>';
+
+    const MFG = window.McqFrequencyGroups;
+    if (!MFG || typeof MFG.loadHierarchy !== 'function') {
+      container.innerHTML = `
+        <div class="card bookmarks-empty-card">
+          <h3 class="bookmarks-empty-title">শব্দ তালিকা লোড করা যায়নি</h3>
+          <p class="bookmarks-empty-desc">অনুগ্রহ করে পেজটি রিলোড করে আবার চেষ্টা করুন।</p>
+        </div>
+      `;
+      return;
+    }
+
+    let hierarchy;
+    try {
+      hierarchy = await MFG.loadHierarchy();
+    } catch (err) {
+      container.innerHTML = `
+        <div class="card bookmarks-empty-card">
+          <h3 class="bookmarks-empty-title">ডাটা লোডে সমস্যা হয়েছে</h3>
+          <p class="bookmarks-empty-desc">ইন্টারনেট বা অফলাইন ক্যাশ যাচাই করে আবার চেষ্টা করুন।</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Ensure surah metadata is available for Share Card surah names (e.g. "আল-ফাতিহা")
+    let surahsList = Array.isArray(window.SURAHS_META) && window.SURAHS_META.length > 0
+      ? window.SURAHS_META
+      : (Array.isArray(state.allSurahs) && state.allSurahs.length > 0 ? state.allSurahs : []);
+    if (surahsList.length === 0 && window.QuranDB && typeof QuranDB.getSurahsList === 'function') {
+      try {
+        surahsList = await QuranDB.getSurahsList();
+        if (Array.isArray(surahsList) && surahsList.length > 0) {
+          state.allSurahs = surahsList;
+        }
+      } catch (_e) {}
+    }
+    const surahNameMap = new Map();
+    for (const s of surahsList || []) {
+      const id = Number(s.surah || s.id || s.number);
+      if (id) {
+        surahNameMap.set(
+          id,
+          s.name_bn_script || s.name_bn || s.name_transliteration || toBnNumber(id)
+        );
+      }
+    }
+
+    const allWords = MFG.getCoreFrequentWords(hierarchy);
+    const summary = MFG.summarizeCoreFrequentWords(allWords, hierarchy);
+    const activeChapter = state.frequentChapterFilter || 'all';
+    const coverageBn = toBnNumber(summary.coveragePct);
+
+    const chapterTabsHtml = [
+      `<button type="button" class="frequent-filter-btn ${activeChapter === 'all' ? 'active' : ''}" data-chapter="all" role="tab" aria-selected="${activeChapter === 'all'}">সব (${formatBnInt(summary.totalWords)})</button>`,
+      ...summary.chapters.map((ch) => {
+        const isAct = activeChapter === ch.groupId;
+        return `<button type="button" class="frequent-filter-btn ${isAct ? 'active' : ''}" data-chapter="${ch.groupId}" role="tab" aria-selected="${isAct}">অধ্যায় ${toBnNumber(ch.order)} (${formatBnInt(ch.wordCount)})</button>`;
+      })
+    ].join('');
+
+    container.innerHTML = `
+      <div class="detail-card frequent-summary-strip">
+        <div class="learned-summary-info">
+          <div class="learned-summary-meta tabular-nums">
+            <span>মোট <strong>${formatBnInt(summary.totalWords)}টি</strong> শব্দ</span>
+            <span aria-hidden="true">·</span>
+            <span>কুরআনের <strong>${coverageBn}%</strong> অংশ</span>
+            <span aria-hidden="true">·</span>
+            <span>সর্বাধিক → কম ক্রমে</span>
+          </div>
+          <div class="learned-summary-title">সর্বাধিক ব্যবহৃত কুরআনী শব্দ (অধ্যায় ১–৫)</div>
+        </div>
+      </div>
+
+      <div class="learned-controls-bar">
+        <div class="learned-search-wrap">
+          <span class="learned-search-icon" aria-hidden="true">${Icons.search}</span>
+          <input
+            type="text"
+            class="learned-search-input"
+            id="frequent-search-input"
+            placeholder="আরবী শব্দ বা বাংলা অর্থ খুঁজুন…"
+            value="${String(state.frequentQuery || '').replace(/"/g, '&quot;')}"
+            autocomplete="off"
+            aria-label="সর্বাধিক ব্যবহৃত শব্দ খুঁজুন"
+          >
+        </div>
+        <div class="frequent-filter-tabs" role="tablist" aria-label="অধ্যায় অনুযায়ী ফিল্টার">
+          ${chapterTabsHtml}
+        </div>
+      </div>
+
+      <div id="frequent-table-mount"></div>
+    `;
+
+    const tableMount = container.querySelector('#frequent-table-mount');
+
+    function drawFrequentTable() {
+      if (!tableMount) return;
+      const filtered = MFG.filterCoreFrequentWords(
+        allWords,
+        state.frequentChapterFilter || 'all',
+        state.frequentQuery || ''
+      );
+
+      tableMount.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tableMount.innerHTML = `
+          <div class="card bookmarks-empty-card" style="padding:28px 18px">
+            <h3 class="bookmarks-empty-title" style="font-size:0.98rem">কোনো শব্দ পাওয়া যায়নি</h3>
+            <p class="bookmarks-empty-desc">অন্য অধ্যায় বা সার্চ শব্দ দিয়ে চেষ্টা করুন।</p>
+          </div>
+        `;
+        return;
+      }
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'bookmarks-table-wrap frequent-table-wrap';
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'frequent-list-header';
+      headerRow.innerHTML = `
+        <span class="freq-hdr-ar">আরবী শব্দ</span>
+        <span class="freq-hdr-bn">অর্থ</span>
+        <span class="freq-hdr-count">ব্যবহার</span>
+        <span class="freq-hdr-share">শেয়ার</span>
+      `;
+      tableWrap.appendChild(headerRow);
+
+      const visibleSlice = filtered.slice(0, state.frequentVisibleLimit || 60);
+
+      visibleSlice.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'card frequent-row-card';
+        row.dataset.wordId = item.key;
+        row.dataset.occurrenceCount = String(item.occurrenceCount);
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+
+        const surahNameBn = surahNameMap.get(item.surah) || `সূরা ${toBnNumber(item.surah)}`;
+
+        row.innerHTML = `
+          <div class="frequent-col-ar">
+            <div class="frequent-word-ar" dir="rtl" title="ট্যাপ করুন বিস্তারিত দেখতে, চেপে ধরে রাখুন শুনতে">${item.arabic}</div>
+            <div class="frequent-rank-meta tabular-nums">#${toBnNumber(item.rank)}</div>
+          </div>
+          <div class="frequent-col-bn">
+            <div class="frequent-meaning-text">${item.meaning_bn || '—'}</div>
+          </div>
+          <div class="frequent-col-count tabular-nums">
+            <span class="frequent-count-num">${formatBnInt(item.occurrenceCount)}</span>
+            <span class="frequent-count-unit">বার</span>
+          </div>
+          <div class="frequent-col-share">
+            <button type="button" class="topbar-btn btn-freq-share" aria-label="${item.arabic} শেয়ার করুন" title="শব্দ কার্ড শেয়ার করুন">
+              <span class="icon">${Icons.share}</span>
+            </button>
+          </div>
+        `;
+
+        const arEl = row.querySelector('.frequent-word-ar');
+        if (arEl) {
+          attachWordTokenHoldAndClick(arEl, item.key, () => {
+            navigateTo('word', { wordId: item.key });
+          });
+        }
+
+        const shareBtn = row.querySelector('.btn-freq-share');
+        if (shareBtn) {
+          shareBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.WordShareCard && typeof window.WordShareCard.open === 'function') {
+              window.WordShareCard.open({
+                wordKey: item.key,
+                arabic: item.arabic,
+                surah: item.surah,
+                ayah: item.ayah,
+                position: item.position,
+                surahNameBn,
+                occurrences: item.occurrenceCount
+              });
+            }
+          };
+        }
+
+        row.onclick = (e) => {
+          if (e.target.closest('button') || e.target.closest('.frequent-word-ar')) return;
+          navigateTo('word', { wordId: item.key });
+        };
+
+        row.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            navigateTo('word', { wordId: item.key });
+          }
+        };
+
+        tableWrap.appendChild(row);
+      });
+
+      if (filtered.length > visibleSlice.length) {
+        const remaining = filtered.length - visibleSlice.length;
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.type = 'button';
+        loadMoreBtn.className = 'mcq-horizon-toggle-btn';
+        loadMoreBtn.id = 'btn-frequent-load-more';
+        loadMoreBtn.innerHTML = `<span>আরও দেখুন (+${formatBnInt(remaining)}টি শব্দ)</span><span class="icon" aria-hidden="true">${Icons.chevronDown}</span>`;
+        loadMoreBtn.onclick = () => {
+          state.frequentVisibleLimit = (state.frequentVisibleLimit || 60) + 60;
+          drawFrequentTable();
+        };
+        tableWrap.appendChild(loadMoreBtn);
+      }
+
+      tableMount.appendChild(tableWrap);
+    }
+
+    const searchInput = container.querySelector('#frequent-search-input');
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        state.frequentQuery = e.target.value || '';
+        state.frequentVisibleLimit = 60;
+        drawFrequentTable();
+      };
+    }
+
+    container.querySelectorAll('.frequent-filter-btn').forEach((btn) => {
+      btn.onclick = () => {
+        state.frequentChapterFilter = btn.dataset.chapter || 'all';
+        state.frequentVisibleLimit = 60;
+        container.querySelectorAll('.frequent-filter-btn').forEach((b) => {
+          const isAct = b === btn;
+          b.classList.toggle('active', isAct);
+          b.setAttribute('aria-selected', isAct ? 'true' : 'false');
+        });
+        drawFrequentTable();
+      };
+    });
+
+    drawFrequentTable();
   }
 
   // ============================================================

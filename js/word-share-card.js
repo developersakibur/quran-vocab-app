@@ -197,21 +197,37 @@
     return toBnDigits(formatted);
   }
 
+  function normalizeBengaliUnicode(input) {
+    const raw = String(input == null ? '' : input);
+    if (!raw) return '';
+    const nfc = typeof raw.normalize === 'function' ? raw.normalize('NFC') : raw;
+    return nfc
+      .replace(/\u09A1\u09BC/g, '\u09DC')
+      .replace(/\u09A2\u09BC/g, '\u09DD')
+      .replace(/\u09AF\u09BC/g, '\u09DF')
+      .replace(/\u09C7\u09BE/g, '\u09CB')
+      .replace(/\u09C7\u09D7/g, '\u09CC')
+      .replace(/[\u200B\u200E\u200F\uFEFF]/g, '')
+      .replace(/\r\n?/g, '\n');
+  }
+
   function buildWordShareCaption(payload, baseUrl) {
     const countBn = formatCountBn(payload.occurrences);
     const pct = computeWordCoveragePercent(payload.occurrences, payload.totalQuranWords);
     const pctBn = formatCoveragePercentBn(pct);
     const shareUrl = buildWordShareUrl(payload.wordKey, baseUrl);
 
-    return [
-      'আপনি কি এই শব্দের অর্থ জানেন?',
-      '',
-      'পবিত্র কুরআনে এই শব্দটি ' + countBn + ' বার এসেছে।',
-      'এই শব্দটির অর্থ জানলে কুরআনের ' + pctBn + '% বাংলা অর্থ আপনি জানবেন।',
-      '',
-      'অর্থ জানতে লিংকে ক্লিক করুন:',
-      shareUrl,
-    ].join('\n');
+    return normalizeBengaliUnicode(
+      [
+        'আপনি কি এই শব্দের অর্থ জানেন?',
+        '',
+        'পবিত্র কুরআনে এই শব্দটি ' + countBn + ' বার এসেছে।',
+        'এই শব্দটির অর্থ জানলে কুরআনের ' + pctBn + '% বাংলা অর্থ আপনি জানবেন।',
+        '',
+        'অর্থ জানতে লিংকে ক্লিক করুন:',
+        shareUrl,
+      ].join('\n')
+    );
   }
 
   function buildWordShareFilename(wordKey) {
@@ -338,14 +354,16 @@
 
   async function ensureCanvasFontsReady() {
     if (!document.fonts) return;
+    const bnSample = 'আপনি কি এই শব্দের অর্থ জানেন? কুরআন সূরা আয়াত ০১২৩৪৫৬৭৮৯';
+    const arSample = 'بِسْمِ اللَّهِ';
     try {
       await Promise.allSettled([
         document.fonts.ready,
-        document.fonts.load('400 120px "IndoPak"'),
-        document.fonts.load('400 120px "Amiri"'),
-        document.fonts.load('700 40px "Noto Sans Bengali"'),
-        document.fonts.load('600 32px "Noto Sans Bengali"'),
-        document.fonts.load('400 28px "Noto Sans Bengali"'),
+        document.fonts.load('400 120px "IndoPak"', arSample),
+        document.fonts.load('400 120px "Amiri"', arSample),
+        document.fonts.load('700 40px "Noto Sans Bengali"', bnSample),
+        document.fonts.load('600 32px "Noto Sans Bengali"', bnSample),
+        document.fonts.load('400 28px "Noto Sans Bengali"', bnSample),
       ]);
     } catch (_err) {
       // Proceed cleanly with available fonts
@@ -446,7 +464,7 @@
     ctx.restore();
 
     // 5. Surah & Ayah Reference Line (Subtle Metadata)
-    const surahName = payload.surahNameBn || ('সূরা ' + toBnDigits(payload.surah || 1));
+    const surahName = normalizeBengaliUnicode(payload.surahNameBn || ('সূরা ' + toBnDigits(payload.surah || 1)));
     const ayahBn = toBnDigits(payload.ayah || 1);
     ctx.save();
     ctx.direction = 'ltr';
@@ -454,7 +472,7 @@
     ctx.textBaseline = 'middle';
     ctx.font = '600 28px ' + bnFont;
     ctx.fillStyle = p.refColor;
-    ctx.fillText('সূরা ' + surahName + '  ·  আয়াত ' + ayahBn, cx, 508);
+    ctx.fillText(normalizeBengaliUnicode('সূরা ' + surahName + '  ·  আয়াত ' + ayahBn), cx, 508);
     ctx.restore();
 
     // 6. Curiosity Stat Panel (Frequency + Quran Coverage %)
@@ -576,9 +594,10 @@
      ------------------------------------------------------------ */
 
   async function copyTextToClipboard(text) {
+    const cleanText = normalizeBengaliUnicode(text);
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(cleanText);
         return true;
       } catch (_err) {
         // Fall through to execCommand fallback
@@ -586,7 +605,7 @@
     }
     try {
       const ta = document.createElement('textarea');
-      ta.value = text;
+      ta.value = cleanText;
       ta.setAttribute('readonly', '');
       ta.style.position = 'fixed';
       ta.style.top = '-9999px';
@@ -866,7 +885,9 @@
       const blob = sheetState.currentBlob || await renderCardBlob(payload, sheetState.templateId);
       sheetState.currentBlob = blob;
 
-      // 1. Mobile Native Share with Image File + Caption
+      const shareTitle = normalizeBengaliUnicode('আপনি কি এই শব্দের অর্থ জানেন?');
+
+      // 1. Mobile Native Share with Image File + Clean Precomposed Bengali Unicode Caption
       if (typeof navigator !== 'undefined' && typeof navigator.share === 'function' && typeof File === 'function') {
         const pngFile = new File([blob], filename, { type: 'image/png' });
         const canShareFiles = typeof navigator.canShare === 'function'
@@ -876,7 +897,7 @@
           try {
             await navigator.share({
               files: [pngFile],
-              title: 'আপনি কি এই শব্দের অর্থ জানেন?',
+              title: shareTitle,
               text: caption,
             });
             return;
@@ -886,10 +907,9 @@
           }
         } else {
           // Device supports navigator.share(text/url) without files:
-          // save the image AND open share sheet or fallback cleanly
           try {
             await navigator.share({
-              title: 'আপনি কি এই শব্দের অর্থ জানেন?',
+              title: shareTitle,
               text: caption,
               url: shareUrl,
             });
@@ -945,7 +965,7 @@
       surah: Number(payload.surah) || 1,
       ayah: Number(payload.ayah) || 1,
       position: Number(payload.position) || 1,
-      surahNameBn: payload.surahNameBn || ('সূরা ' + toBnDigits(payload.surah || 1)),
+      surahNameBn: normalizeBengaliUnicode(payload.surahNameBn || ('সূরা ' + toBnDigits(payload.surah || 1))),
       occurrences: Math.max(1, Number(payload.occurrences) || 1),
       totalQuranWords: payload.totalQuranWords || getTotalQuranWords(),
     };
@@ -954,7 +974,7 @@
     sheetState.isOpen = true;
     sheetState.templateId = loadSavedTemplateId();
 
-    els.subtitle.textContent = 'সূরা ' + normalized.surahNameBn + ' · আয়াত ' + toBnDigits(normalized.ayah);
+    els.subtitle.textContent = normalizeBengaliUnicode('সূরা ' + normalized.surahNameBn + ' · আয়াত ' + toBnDigits(normalized.ayah));
     els.captionText.textContent = buildWordShareCaption(normalized);
     els.previewImg.classList.remove('is-ready');
     syncTemplateButtons();
@@ -982,6 +1002,7 @@
     getTotalQuranWords,
     computeWordCoveragePercent,
     formatCoveragePercentBn,
+    normalizeBengaliUnicode,
     buildWordShareCaption,
     buildWordShareFilename,
     resolveShareTemplateId,
