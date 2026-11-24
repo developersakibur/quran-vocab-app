@@ -12,10 +12,12 @@
   function getAuthRedirectUrl() {
     try {
       if (!global.location || !global.location.origin) return undefined;
-      if (global.location.origin === 'null' || global.location.origin.startsWith('file:')) {
+      const cleanOrigin = String(global.location.origin || '').trim();
+      if (!/^https?:\/\/[^/\s]+$/i.test(cleanOrigin)) {
         return undefined;
       }
-      return `${global.location.origin}${global.location.pathname || '/'}`;
+      const cleanPath = String(global.location.pathname || '/').trim() || '/';
+      return `${cleanOrigin}${cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath}`;
     } catch (e) {
       return undefined;
     }
@@ -25,31 +27,82 @@
     try {
       const hash = (global.location && global.location.hash) || '';
       const search = (global.location && global.location.search) || '';
-      const combined = `${search}&${hash}`;
-      const isAuthCallback =
-        combined.includes('access_token=') ||
-        combined.includes('refresh_token=') ||
-        combined.includes('type=signup') ||
-        combined.includes('type=email') ||
-        combined.includes('type=recovery') ||
-        combined.includes('code=');
-      const hasError = combined.includes('error=') || combined.includes('error_description=');
-      if (!isAuthCallback && !hasError) return null;
+      const searchParams = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+      const hashRaw = hash.startsWith('#') ? hash.slice(1) : hash;
+      const hashParams = new URLSearchParams(hashRaw.includes('=') ? hashRaw : '');
+      const getParam = (key) => (hashParams.get(key) || searchParams.get(key) || '').trim();
 
-      let errorDescription = '';
-      if (hasError) {
-        const params = new URLSearchParams(
-          hash.startsWith('#') ? hash.slice(1) : (search.startsWith('?') ? search.slice(1) : '')
-        );
-        errorDescription = params.get('error_description') || params.get('error') || 'Verification link invalid or expired';
+      const error = getParam('error');
+      const errorCode = getParam('error_code');
+      const errorDescription = getParam('error_description');
+      const type = getParam('type').toLowerCase();
+      const hasTokenOrCode = Boolean(
+        getParam('access_token') ||
+        getParam('refresh_token') ||
+        getParam('code') ||
+        getParam('token_hash')
+      );
+
+      if (error || errorCode || errorDescription) {
+        return {
+          kind: 'error',
+          isAuthCallback: false,
+          hasError: true,
+          errorCode: errorCode || error,
+          errorDescription: errorDescription || error || 'Verification link invalid or expired'
+        };
       }
-      return { isAuthCallback, hasError, errorDescription };
+
+      if (type === 'recovery') {
+        return {
+          kind: 'recovery',
+          isAuthCallback: true,
+          hasError: false,
+          errorCode: '',
+          errorDescription: ''
+        };
+      }
+
+      if (type === 'signup' || type === 'email' || type === 'magiclink' || hasTokenOrCode) {
+        return {
+          kind: 'signup',
+          isAuthCallback: true,
+          hasError: false,
+          errorCode: '',
+          errorDescription: ''
+        };
+      }
+
+      return null;
     } catch (e) {
       return null;
     }
   }
 
   let pendingAuthCallback = null;
+  let passwordRecoveryMode = false;
+  let bufferedAuthRedirectDetail = null;
+
+  function emitAuthRedirect(detail) {
+    bufferedAuthRedirectDetail = detail;
+    if (typeof global.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      global.dispatchEvent(new CustomEvent('quran-auth-redirect', { detail }));
+    }
+  }
+
+  function consumePendingAuthRedirect() {
+    const detail = bufferedAuthRedirectDetail;
+    bufferedAuthRedirectDetail = null;
+    return detail;
+  }
+
+  function isPasswordRecoveryMode() {
+    return passwordRecoveryMode;
+  }
+
+  function clearPasswordRecoveryMode() {
+    passwordRecoveryMode = false;
+  }
 
   function init() {
     if (client) return client;
@@ -64,6 +117,9 @@
     }
 
     pendingAuthCallback = detectAuthRedirectIntent();
+    if (pendingAuthCallback && pendingAuthCallback.kind === 'recovery') {
+      passwordRecoveryMode = true;
+    }
 
     try {
       client = global.supabase.createClient(config.url, config.anonKey, {
@@ -75,30 +131,58 @@
       });
 
       if (pendingAuthCallback && pendingAuthCallback.hasError) {
-        setTimeout(() => {
-          if (typeof global.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
-            global.dispatchEvent(new CustomEvent('quran-auth-redirect', {
-              detail: { status: 'error', message: pendingAuthCallback.errorDescription }
-            }));
-          }
-        }, 150);
+        const errDetail = {
+          status: 'error',
+          errorCode: pendingAuthCallback.errorCode,
+          message: pendingAuthCallback.errorDescription
+        };
+        pendingAuthCallback = null;
+        emitAuthRedirect(errDetail);
       }
 
       // Listen for auth state changes
       client.auth.onAuthStateChange(async (event, session) => {
         currentUser = session ? session.user : null;
         console.log('[Supabase Auth]', event, currentUser ? currentUser.email : 'Signed Out');
+
+        if (event === 'PASSWORD_RECOVERY') {
+          passwordRecoveryMode = true;
+          pendingAuthCallback = null;
+          notifyAuthListeners(event, currentUser);
+          emitAuthRedirect({
+            status: 'recovery',
+            user: currentUser,
+            email: currentUser ? currentUser.email : ''
+          });
+          return;
+        }
+
+        if (event === 'SIGNED_OUT') {
+          passwordRecoveryMode = false;
+        }
+
         notifyAuthListeners(event, currentUser);
+
         if (currentUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          if (pendingAuthCallback && pendingAuthCallback.kind === 'recovery') {
+            passwordRecoveryMode = true;
+            pendingAuthCallback = null;
+            emitAuthRedirect({
+              status: 'recovery',
+              user: currentUser,
+              email: currentUser.email || ''
+            });
+            return;
+          }
+
           if (pendingAuthCallback && pendingAuthCallback.isAuthCallback && !pendingAuthCallback.hasError) {
             pendingAuthCallback = null;
-            if (typeof global.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
-              global.dispatchEvent(new CustomEvent('quran-auth-redirect', {
-                detail: { status: 'verified', user: currentUser }
-              }));
-            }
+            emitAuthRedirect({ status: 'verified', user: currentUser });
           }
-          await syncFromCloud();
+
+          if (!passwordRecoveryMode) {
+            await syncFromCloud();
+          }
         }
       });
 
@@ -199,11 +283,40 @@
     return data;
   }
 
+  async function resetPassword(email) {
+    const sb = getClient();
+    if (!sb) throw new Error('Supabase client unavailable');
+    const cleanEmail = String(email || '').trim();
+    const redirectTo = getAuthRedirectUrl();
+    const { data, error } = await sb.auth.resetPasswordForEmail(
+      cleanEmail,
+      redirectTo ? { redirectTo } : undefined
+    );
+    if (error) throw error;
+    return data;
+  }
+
+  async function updatePassword(newPassword) {
+    const sb = getClient();
+    if (!sb) throw new Error('Supabase client unavailable');
+    const { data, error } = await sb.auth.updateUser({
+      password: String(newPassword || '')
+    });
+    if (error) throw error;
+    passwordRecoveryMode = false;
+    if (data && data.user) {
+      currentUser = data.user;
+    }
+    notifyAuthListeners('USER_UPDATED', currentUser);
+    return data;
+  }
+
   async function signOut() {
     const sb = getClient();
     if (!sb) return;
     const { error } = await sb.auth.signOut();
     if (error) throw error;
+    passwordRecoveryMode = false;
     currentUser = null;
     notifyAuthListeners('SIGNED_OUT', null);
   }
@@ -481,6 +594,11 @@
     signIn,
     signOut,
     resendVerification,
+    resetPassword,
+    updatePassword,
+    isPasswordRecoveryMode,
+    clearPasswordRecoveryMode,
+    consumePendingAuthRedirect,
     syncToCloud,
     syncFromCloud,
     syncReadingHistoryToCloud,

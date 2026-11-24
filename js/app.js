@@ -1251,8 +1251,11 @@
     ayahQuizFilter: 'all', // 'all' | 'in-progress' | 'completed'
     ayahQuizStepMap: {},
     stats: null,
-    accountAuthTab: 'signin', // 'signin' | 'signup' | 'verify'
+    accountAuthTab: 'signin', // 'signin' | 'signup' | 'verify' | 'forgot' | 'forgot-sent'
     lastRegisteredEmail: '',
+    lastResetEmail: '',
+    passwordRecoveryMode: false,
+    passwordRecoveryEmail: '',
     accountAuthNotice: '',
     historyActivityFilter: 'all', // 'all' | 'read' | 'listen'
     historyRangeFilter: '30d', // '7d' | '30d' | 'all'
@@ -1346,9 +1349,30 @@
       hash.includes('access_token=') ||
       hash.includes('refresh_token=') ||
       hash.includes('error_description=') ||
+      hash.includes('error_code=') ||
       hash.includes('type=signup') ||
-      search.includes('code=')
+      hash.includes('type=email') ||
+      hash.includes('type=recovery') ||
+      search.includes('code=') ||
+      search.includes('type=recovery') ||
+      search.includes('error_description=')
     ) {
+      if (hash.includes('error_description=') || hash.includes('error_code=') || search.includes('error_description=')) {
+        try {
+          const hashRaw = hash.startsWith('#') ? hash.slice(1) : hash;
+          const hParams = new URLSearchParams(hashRaw.includes('=') ? hashRaw : '');
+          const sParams = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+          const errText = hParams.get('error_description') || hParams.get('error_code') || sParams.get('error_description') || 'expired';
+          state.passwordRecoveryMode = false;
+          state.accountAuthTab = 'signin';
+          state.accountAuthNotice = translateAccountAuthErrorBn(errText);
+          if (window.history && typeof window.history.replaceState === 'function') {
+            window.history.replaceState({ view: 'account' }, '', window.location.pathname + '#account');
+          }
+        } catch (_err) {
+          // Ignore malformed hash params
+        }
+      }
       navigateTo('account', {}, false);
       return;
     }
@@ -4194,9 +4218,12 @@
   // ============================================================
 
   function translateAccountAuthErrorBn(err) {
-    const msg = String((err && err.message) || '').toLowerCase();
+    const msg = String((err && err.message) || err || '').toLowerCase();
     if (msg.includes('invalid login credentials')) {
       return 'ভুল ইমেইল বা পাসওয়ার্ড। অনুগ্রহ করে সঠিক তথ্য দিয়ে পুনরায় চেষ্টা করুন।';
+    }
+    if (msg.includes('email not confirmed')) {
+      return 'আপনার ইমেইল এখনও যাচাই করা হয়নি। ইনবক্সের লিংকে ক্লিক করে ইমেইল নিশ্চিত করুন।';
     }
     if (msg.includes('already registered') || msg.includes('already been registered')) {
       return 'এই ইমেইল দিয়ে ইতিপূর্বেই একাউন্ট খোলা হয়েছে। অনুগ্রহ করে লগইন করুন।';
@@ -4204,8 +4231,17 @@
     if (msg.includes('password should be at least')) {
       return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।';
     }
-    if (msg.includes('rate limit') || msg.includes('too many requests')) {
-      return 'অতিরিক্ত চেষ্টার কারণে সাময়িকভাবে বিরতি দেওয়া হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
+    if (msg.includes('same_password') || msg.includes('different from the old password')) {
+      return 'নতুন পাসওয়ার্ডটি আগের পাসওয়ার্ডের থেকে ভিন্ন হতে হবে।';
+    }
+    if (msg.includes('otp_expired') || msg.includes('expired') || msg.includes('invalid flow state')) {
+      return 'লিংকটির মেয়াদ শেষ হয়ে গেছে বা ইতিমধ্যে ব্যবহৃত হয়েছে। অনুগ্রহ করে নতুন লিংক পাঠান।';
+    }
+    if (msg.includes('auth session missing') || msg.includes('session_not_found')) {
+      return 'রিসেট সেশনটি আর সক্রিয় নেই। অনুগ্রহ করে আবার পাসওয়ার্ড রিসেট লিংক পাঠান।';
+    }
+    if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('security purposes')) {
+      return 'অতিরিক্ত চেষ্টার কারণে সাময়িকভাবে বিরতি দেওয়া হয়েছে। এক মিনিট পর আবার চেষ্টা করুন।';
     }
     if (msg.includes('network') || msg.includes('fetch')) {
       return 'ইন্টারনেট সংযোগে সমস্যা হচ্ছে। আপনার নেটওয়ার্ক যাচাই করুন।';
@@ -4227,11 +4263,131 @@
 
     state.historyVisibleLimit = 10;
 
-    if (!user) {
-      const activeTab = state.accountAuthTab || 'signin';
+    const isRecoveryActive = Boolean(
+      state.passwordRecoveryMode ||
+      (window.SupabaseSync && typeof window.SupabaseSync.isPasswordRecoveryMode === 'function' && window.SupabaseSync.isPasswordRecoveryMode())
+    );
+
+    if (isRecoveryActive) {
+      const recoveryEmail = state.passwordRecoveryEmail || (user && user.email) || '';
       const noticeHtml = state.accountAuthNotice
         ? `<div class="account-auth-notice">${safeEsc(state.accountAuthNotice)}</div>`
         : '';
+
+      container.innerHTML = `
+        <div class="account-auth-page">
+          <div class="account-auth-hero">
+            <div class="account-auth-hero-icon" aria-hidden="true">
+              <span class="icon">${Icons.shieldCheck}</span>
+            </div>
+            <div class="account-auth-hero-text">
+              <h2>নতুন পাসওয়ার্ড সেট করুন</h2>
+              <p>আপনার একাউন্টের নিরাপত্তার জন্য কমপক্ষে ৬ অক্ষরের একটি নতুন পাসওয়ার্ড দিন।</p>
+            </div>
+          </div>
+
+          <div class="account-auth-card">
+            ${noticeHtml}
+            <div id="page-auth-recovery">
+              ${recoveryEmail ? `<div class="account-recovery-email-row"><span class="auth-verify-email-badge">${safeEsc(recoveryEmail)}</span></div>` : ''}
+              <form id="page-recovery-form" method="post" action="#" autocomplete="on" onsubmit="return false;">
+                <div class="auth-input-group">
+                  <label for="page-recovery-password">নতুন পাসওয়ার্ড</label>
+                  <input type="password" id="page-recovery-password" name="new-password" placeholder="কমপক্ষে ৬ অক্ষর" minlength="6" required autocomplete="new-password">
+                </div>
+                <div class="auth-input-group">
+                  <label for="page-recovery-confirm-password">নতুন পাসওয়ার্ড নিশ্চিত করুন</label>
+                  <input type="password" id="page-recovery-confirm-password" name="confirm-password" placeholder="নতুন পাসওয়ার্ডটি পুনরায় লিখুন" minlength="6" required autocomplete="new-password">
+                </div>
+                <div class="auth-error-msg" id="page-recovery-error" style="display:none"></div>
+                <div class="auth-submit-buttons">
+                  <button type="submit" class="btn-primary" id="page-btn-update-password">পাসওয়ার্ড আপডেট করুন</button>
+                  <button type="button" class="btn-secondary" id="page-btn-cancel-recovery">বাতিল করুন</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const recoveryForm = container.querySelector('#page-recovery-form');
+      const recPass = container.querySelector('#page-recovery-password');
+      const recConfirm = container.querySelector('#page-recovery-confirm-password');
+      const recErr = container.querySelector('#page-recovery-error');
+      const btnUpdate = container.querySelector('#page-btn-update-password');
+      const btnCancel = container.querySelector('#page-btn-cancel-recovery');
+
+      if (recoveryForm) {
+        recoveryForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const newPass = recPass ? recPass.value : '';
+          const confirmPass = recConfirm ? recConfirm.value : '';
+
+          if (!newPass) {
+            recErr.textContent = 'নতুন পাসওয়ার্ড লিখুন।';
+            recErr.style.display = 'block';
+            if (recPass) recPass.focus();
+            return;
+          }
+          if (newPass.length < 6) {
+            recErr.textContent = 'নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।';
+            recErr.style.display = 'block';
+            if (recPass) recPass.focus();
+            return;
+          }
+          if (newPass !== confirmPass) {
+            recErr.textContent = 'নতুন পাসওয়ার্ড ও নিশ্চিত পাসওয়ার্ড হুবহু মিলতে হবে।';
+            recErr.style.display = 'block';
+            if (recConfirm) recConfirm.focus();
+            return;
+          }
+          if (!window.SupabaseSync || typeof window.SupabaseSync.updatePassword !== 'function') return;
+
+          btnUpdate.disabled = true;
+          btnUpdate.textContent = 'আপডেট হচ্ছে…';
+          recErr.style.display = 'none';
+
+          try {
+            await window.SupabaseSync.updatePassword(newPass);
+            state.passwordRecoveryMode = false;
+            state.passwordRecoveryEmail = '';
+            state.accountAuthNotice = '';
+            state.accountAuthTab = 'signin';
+            if (window.SupabaseSync && typeof window.SupabaseSync.syncFromCloud === 'function') {
+              window.SupabaseSync.syncFromCloud();
+            }
+            showToast('আলহামদুলিল্লাহ! আপনার পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে।', 3200, 'success');
+            renderAccountDashboardView();
+          } catch (err) {
+            btnUpdate.disabled = false;
+            btnUpdate.textContent = 'পাসওয়ার্ড আপডেট করুন';
+            recErr.textContent = translateAccountAuthErrorBn(err);
+            recErr.style.display = 'block';
+          }
+        };
+      }
+
+      if (btnCancel) {
+        btnCancel.onclick = () => {
+          state.passwordRecoveryMode = false;
+          state.passwordRecoveryEmail = '';
+          state.accountAuthNotice = '';
+          if (window.SupabaseSync && typeof window.SupabaseSync.clearPasswordRecoveryMode === 'function') {
+            window.SupabaseSync.clearPasswordRecoveryMode();
+          }
+          renderAccountDashboardView();
+        };
+      }
+      return;
+    }
+
+    if (!user) {
+      const activeTab = state.accountAuthTab || 'signin';
+      const showSegmented = activeTab === 'signin' || activeTab === 'signup';
+      const noticeHtml = state.accountAuthNotice
+        ? `<div class="account-auth-notice">${safeEsc(state.accountAuthNotice)}</div>`
+        : '';
+      const prefillEmail = state.lastResetEmail || state.lastRegisteredEmail || '';
 
       container.innerHTML = `
         <div class="account-auth-page">
@@ -4247,7 +4403,7 @@
 
           <div class="account-auth-card">
             ${noticeHtml}
-            ${activeTab !== 'verify' ? `
+            ${showSegmented ? `
               <div class="account-auth-segmented" role="tablist" aria-label="লগইন বা নতুন একাউন্ট">
                 <button type="button" class="account-auth-seg-btn ${activeTab === 'signin' ? 'active' : ''}" id="page-tab-signin" role="tab" aria-selected="${activeTab === 'signin'}">লগইন</button>
                 <button type="button" class="account-auth-seg-btn ${activeTab === 'signup' ? 'active' : ''}" id="page-tab-signup" role="tab" aria-selected="${activeTab === 'signup'}">নতুন একাউন্ট</button>
@@ -4258,10 +4414,13 @@
               <form id="page-signin-form" method="post" action="#" autocomplete="on" onsubmit="return false;">
                 <div class="auth-input-group">
                   <label for="page-signin-email">ইমেইল ঠিকানা</label>
-                  <input type="email" id="page-signin-email" name="email" value="${safeEsc(state.lastRegisteredEmail)}" placeholder="আপনার ইমেইল লিখুন" required autocomplete="username email">
+                  <input type="email" id="page-signin-email" name="email" value="${safeEsc(prefillEmail)}" placeholder="আপনার ইমেইল লিখুন" required autocomplete="username email">
                 </div>
                 <div class="auth-input-group">
-                  <label for="page-signin-password">পাসওয়ার্ড</label>
+                  <div class="auth-label-row">
+                    <label for="page-signin-password">পাসওয়ার্ড</label>
+                    <button type="button" class="auth-forgot-link" id="page-link-forgot-password">পাসওয়ার্ড ভুলে গেছেন?</button>
+                  </div>
                   <input type="password" id="page-signin-password" name="password" placeholder="আপনার পাসওয়ার্ড" required autocomplete="current-password">
                 </div>
                 <div class="auth-error-msg" id="page-signin-error" style="display:none"></div>
@@ -4302,6 +4461,47 @@
               </form>
             </div>
 
+            <div id="page-auth-forgot" style="display:${activeTab === 'forgot' ? 'block' : 'none'}">
+              <div class="account-auth-subhead">
+                <div class="account-verify-icon-wrap" aria-hidden="true">
+                  <span class="icon">${Icons.lock}</span>
+                </div>
+                <h3>পাসওয়ার্ড রিসেট করুন</h3>
+                <p>আপনার নিবন্ধিত ইমেইল ঠিকানা লিখুন। আমরা পাসওয়ার্ড পরিবর্তনের একটি নিরাপদ লিংক পাঠিয়ে দেব।</p>
+              </div>
+              <form id="page-forgot-form" method="post" action="#" autocomplete="on" onsubmit="return false;">
+                <div class="auth-input-group">
+                  <label for="page-forgot-email">ইমেইল ঠিকানা</label>
+                  <input type="email" id="page-forgot-email" name="email" value="${safeEsc(prefillEmail)}" placeholder="আপনার নিবন্ধিত ইমেইল লিখুন" required autocomplete="username email">
+                </div>
+                <div class="auth-error-msg" id="page-forgot-error" style="display:none"></div>
+                <div class="auth-submit-buttons">
+                  <button type="submit" class="btn-primary" id="page-btn-send-reset">রিসেট লিংক পাঠান</button>
+                  <button type="button" class="btn-secondary" id="page-btn-forgot-back-signin">লগইনে ফিরে যান</button>
+                </div>
+              </form>
+            </div>
+
+            <div id="page-auth-forgot-sent" style="display:${activeTab === 'forgot-sent' ? 'block' : 'none'}">
+              <div class="account-verify-card">
+                <div class="account-verify-icon-wrap" aria-hidden="true">
+                  <span class="icon">${Icons.mail}</span>
+                </div>
+                <h3 style="margin:0 0 8px;font-size:1.1rem">রিসেট লিংক পাঠানো হয়েছে</h3>
+                <p style="font-size:0.86rem;color:var(--text-secondary);line-height:1.58;margin:0 0 14px">
+                  এই ইমেইলে একাউন্ট থাকলে পাসওয়ার্ড রিসেট লিংক পাঠানো হয়েছে:
+                  <br>
+                  <span class="auth-verify-email-badge">${safeEsc(state.lastResetEmail)}</span>
+                  <br><br>
+                  <strong>ইনবক্স (বা স্প্যাম ফোল্ডার) থেকে লিংকটিতে ক্লিক করে নতুন পাসওয়ার্ড সেট করুন।</strong>
+                </p>
+                <div class="auth-submit-buttons">
+                  <button type="button" class="btn-primary" id="page-btn-reset-back-login">লগইনে ফিরে যান</button>
+                  <button type="button" class="btn-secondary" id="page-btn-resend-reset">পুনরায় রিসেট লিংক পাঠান</button>
+                </div>
+              </div>
+            </div>
+
             <div id="page-auth-verify" style="display:${activeTab === 'verify' ? 'block' : 'none'}">
               <div class="account-verify-card">
                 <div class="account-verify-icon-wrap" aria-hidden="true">
@@ -4336,6 +4536,7 @@
       const tabSignUp = container.querySelector('#page-tab-signup');
       const linkGotoSignUp = container.querySelector('#page-link-goto-signup');
       const linkGotoSignIn = container.querySelector('#page-link-goto-signin');
+      const linkForgotPass = container.querySelector('#page-link-forgot-password');
 
       if (tabSignIn) tabSignIn.onclick = () => { state.accountAuthTab = 'signin'; state.accountAuthNotice = ''; renderAccountDashboardView(); };
       if (tabSignUp) tabSignUp.onclick = () => { state.accountAuthTab = 'signup'; state.accountAuthNotice = ''; renderAccountDashboardView(); };
@@ -4347,6 +4548,16 @@
       const signinPass = container.querySelector('#page-signin-password');
       const signinErr = container.querySelector('#page-signin-error');
       const btnSignIn = container.querySelector('#page-btn-signin');
+
+      if (linkForgotPass) {
+        linkForgotPass.onclick = () => {
+          const typedEmail = signinEmail ? signinEmail.value.trim() : '';
+          if (typedEmail) state.lastResetEmail = typedEmail;
+          state.accountAuthTab = 'forgot';
+          state.accountAuthNotice = '';
+          renderAccountDashboardView();
+        };
+      }
 
       if (signinForm) {
         signinForm.onsubmit = async (e) => {
@@ -4415,6 +4626,82 @@
               }
               signinErr.style.display = 'block';
             }
+          }
+        };
+      }
+
+      const forgotForm = container.querySelector('#page-forgot-form');
+      const forgotEmail = container.querySelector('#page-forgot-email');
+      const forgotErr = container.querySelector('#page-forgot-error');
+      const btnSendReset = container.querySelector('#page-btn-send-reset');
+      const btnForgotBack = container.querySelector('#page-btn-forgot-back-signin');
+
+      if (btnForgotBack) {
+        btnForgotBack.onclick = () => {
+          state.accountAuthTab = 'signin';
+          state.accountAuthNotice = '';
+          renderAccountDashboardView();
+        };
+      }
+
+      if (forgotForm) {
+        forgotForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const email = forgotEmail ? forgotEmail.value.trim() : '';
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            if (forgotErr) {
+              forgotErr.textContent = 'সঠিক ইমেইল ঠিকানা লিখুন।';
+              forgotErr.style.display = 'block';
+            }
+            if (forgotEmail) forgotEmail.focus();
+            return;
+          }
+          if (!window.SupabaseSync || typeof window.SupabaseSync.resetPassword !== 'function') return;
+
+          btnSendReset.disabled = true;
+          btnSendReset.textContent = 'লিংক পাঠানো হচ্ছে…';
+          if (forgotErr) forgotErr.style.display = 'none';
+
+          try {
+            await window.SupabaseSync.resetPassword(email);
+            state.lastResetEmail = email;
+            state.accountAuthTab = 'forgot-sent';
+            state.accountAuthNotice = '';
+            renderAccountDashboardView();
+          } catch (err) {
+            btnSendReset.disabled = false;
+            btnSendReset.textContent = 'রিসেট লিংক পাঠান';
+            if (forgotErr) {
+              forgotErr.textContent = translateAccountAuthErrorBn(err);
+              forgotErr.style.display = 'block';
+            }
+          }
+        };
+      }
+
+      const btnResetBackLogin = container.querySelector('#page-btn-reset-back-login');
+      const btnResendReset = container.querySelector('#page-btn-resend-reset');
+      if (btnResetBackLogin) {
+        btnResetBackLogin.onclick = () => {
+          state.accountAuthTab = 'signin';
+          state.accountAuthNotice = '';
+          renderAccountDashboardView();
+        };
+      }
+      if (btnResendReset) {
+        btnResendReset.onclick = async () => {
+          const email = state.lastResetEmail;
+          if (!email || !window.SupabaseSync || typeof window.SupabaseSync.resetPassword !== 'function') return;
+          btnResendReset.disabled = true;
+          btnResendReset.textContent = 'পাঠানো হচ্ছে…';
+          try {
+            await window.SupabaseSync.resetPassword(email);
+            showToast('পাসওয়ার্ড রিসেট লিংক পুনরায় পাঠানো হয়েছে', 2600, 'success');
+          } catch (err) {
+            showToast(translateAccountAuthErrorBn(err), 3000, 'error');
+          } finally {
+            btnResendReset.disabled = false;
+            btnResendReset.textContent = 'পুনরায় রিসেট লিংক পাঠান';
           }
         };
       }
@@ -7031,19 +7318,52 @@
       }
     });
 
-    // Handle Supabase email confirmation redirect callback
-    window.addEventListener('quran-auth-redirect', (evt) => {
-      const detail = (evt && evt.detail) || {};
-      if (detail.status === 'verified') {
-        state.accountAuthNotice = '';
-        showToast('আলহামদুলিল্লাহ! আপনার ইমেইল সফলভাবে ভেরিফাই হয়েছে।', 3200, 'success');
-        navigateTo('account');
-      } else if (detail.status === 'error') {
-        state.accountAuthTab = 'signin';
-        state.accountAuthNotice = 'ইমেইল ভেরিফিকেশন লিঙ্কটির মেয়াদ শেষ হয়েছে বা অকার্যকর। পুনরায় চেষ্টা করুন।';
-        navigateTo('account');
+    // Clean sensitive Supabase callback tokens/codes from URL once consumed
+    function cleanAuthCallbackUrl() {
+      if (window.history && typeof window.history.replaceState === 'function') {
+        try {
+          window.history.replaceState({ view: 'account' }, '', window.location.pathname + '#account');
+        } catch (_err) {
+          // Ignore restricted history environments
+        }
       }
+    }
+
+    function handleAuthRedirectDetail(detail) {
+      if (!detail || !detail.status) return;
+      if (detail.status === 'recovery') {
+        state.passwordRecoveryMode = true;
+        state.passwordRecoveryEmail = detail.email || (detail.user && detail.user.email) || '';
+        state.accountAuthNotice = '';
+        cleanAuthCallbackUrl();
+        navigateTo('account', {}, false);
+      } else if (detail.status === 'verified') {
+        state.passwordRecoveryMode = false;
+        state.accountAuthNotice = '';
+        cleanAuthCallbackUrl();
+        showToast('আলহামদুলিল্লাহ! আপনার ইমেইল সফলভাবে ভেরিফাই হয়েছে।', 3200, 'success');
+        navigateTo('account', {}, false);
+      } else if (detail.status === 'error') {
+        state.passwordRecoveryMode = false;
+        state.accountAuthTab = 'signin';
+        state.accountAuthNotice = translateAccountAuthErrorBn(detail.message || detail.errorCode || 'expired');
+        cleanAuthCallbackUrl();
+        navigateTo('account', {}, false);
+      }
+    }
+
+    // Handle Supabase email confirmation & password recovery redirect callbacks
+    window.addEventListener('quran-auth-redirect', (evt) => {
+      handleAuthRedirectDetail((evt && evt.detail) || {});
     });
+
+    // Replay any auth redirect event emitted before DOMContentLoaded finished
+    if (window.SupabaseSync && typeof window.SupabaseSync.consumePendingAuthRedirect === 'function') {
+      const earlyRedirect = window.SupabaseSync.consumePendingAuthRedirect();
+      if (earlyRedirect) {
+        handleAuthRedirectDetail(earlyRedirect);
+      }
+    }
 
     // Backwards-compatible shim: navigate to Account page instead of opening a modal
     global.openAuthModal = (defaultTab = 'signin') => {

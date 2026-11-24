@@ -6902,14 +6902,85 @@ body.overlay-open {
   justify-content: center;
 }
 
+.account-verify-icon-wrap .icon,
+.account-auth-hero-icon .icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .account-verify-icon-wrap svg {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 
 [data-theme='dark'] .account-verify-icon-wrap {
   background: hsl(var(--color-primary-h) 38% 18%);
   color: #6ee7b7;
+}
+
+.auth-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.auth-label-row label {
+  margin-bottom: 0;
+}
+
+.auth-forgot-link {
+  background: none;
+  border: none;
+  padding: 6px 2px;
+  min-height: 36px;
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.auth-forgot-link:hover,
+.auth-forgot-link:focus-visible {
+  text-decoration: underline;
+  opacity: 0.88;
+}
+
+[data-theme='dark'] .auth-forgot-link {
+  color: #6ee7b7;
+}
+
+.account-auth-subhead {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.account-auth-subhead h3 {
+  margin: 0 0 6px;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.account-auth-subhead p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.account-recovery-email-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
 }
 
 /* ---------- Sidebar Font Size Settings Panel ---------- */
@@ -9108,15 +9179,16 @@ body.share-modal-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 8px 8px;
   border-radius: 12px;
   border: 1.5px solid var(--border-subtle);
   background: var(--bg-surface-raised);
   color: var(--text-primary);
   font-family: var(--font-bangla);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }

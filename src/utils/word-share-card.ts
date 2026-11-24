@@ -9,7 +9,7 @@ export const PRODUCTION_APP_BASE_URL = 'https://developersakibur.github.io/quran
 export const TOTAL_QURAN_WORDS = 77429;
 export const SHARE_TEMPLATE_STORAGE_KEY = 'quran-word-share-template-v1';
 
-export type ShareTemplateId = 'emerald' | 'cream' | 'midnight';
+export type ShareTemplateId = 'emerald' | 'cream' | 'midnight' | 'burgundy' | 'teal' | 'sand';
 
 export interface ShareCardTemplateMeta {
   id: ShareTemplateId;
@@ -44,6 +44,30 @@ export const SHARE_CARD_TEMPLATES: readonly ShareCardTemplateMeta[] = [
     swatchBg: 'linear-gradient(135deg, #172531 0%, #0A1117 100%)',
     swatchBorder: '#E2C174',
     swatchAccent: '#F2CF78',
+  },
+  {
+    id: 'burgundy',
+    labelBn: 'রয়েল মেরুন ও গোল্ড',
+    shortLabelBn: 'মেরুন',
+    swatchBg: 'linear-gradient(135deg, #561728 0%, #240810 100%)',
+    swatchBorder: '#E6C275',
+    swatchAccent: '#F3D283',
+  },
+  {
+    id: 'teal',
+    labelBn: 'ময়ূরনীল ও গোল্ড',
+    shortLabelBn: 'ময়ূরনীল',
+    swatchBg: 'linear-gradient(135deg, #0F5566 0%, #052029 100%)',
+    swatchBorder: '#E6C067',
+    swatchAccent: '#F4CE74',
+  },
+  {
+    id: 'sand',
+    labelBn: 'সোনালি বালি ও ব্রোঞ্জ',
+    shortLabelBn: 'স্যান্ড',
+    swatchBg: 'linear-gradient(135deg, #FCF6E9 0%, #E5D0AA 100%)',
+    swatchBorder: '#7D4718',
+    swatchAccent: '#4B2B14',
   },
 ] as const;
 
@@ -203,9 +227,9 @@ export function buildWordShareCaption(
       'আপনি কি এই শব্দের অর্থ জানেন?',
       '',
       `পবিত্র কুরআনে এই শব্দটি ${countBn} বার এসেছে।`,
-      `এই শব্দটির অর্থ জানলে কুরআনের ${pctBn}% বাংলা অর্থ আপনি জানবেন।`,
+      `এই একটি শব্দ শিখলেই কুরআনের ${pctBn}% অংশ বুঝতে পারবেন।`,
       '',
-      'অর্থ জানতে লিংকে ক্লিক করুন:',
+      'জানা থাকলে কমেন্টে লিখুন, আর সঠিক অর্থ ও উচ্চারণ মিলিয়ে নিতে নিচের লিংকে ট্যাপ করুন:',
       shareUrl,
     ].join('\n')
   );
@@ -223,7 +247,14 @@ export function buildWordShareFilename(wordKey: string): string {
  * Resolve and validate a template ID, falling back to 'emerald'.
  */
 export function resolveShareTemplateId(raw: unknown): ShareTemplateId {
-  if (raw === 'emerald' || raw === 'cream' || raw === 'midnight') {
+  if (
+    raw === 'emerald'
+    || raw === 'cream'
+    || raw === 'midnight'
+    || raw === 'burgundy'
+    || raw === 'teal'
+    || raw === 'sand'
+  ) {
     return raw;
   }
   return 'emerald';

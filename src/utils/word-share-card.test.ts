@@ -109,19 +109,23 @@ describe('word-share-card pure utilities', () => {
 
     assert.ok(caption.includes('আপনি কি এই শব্দের অর্থ জানেন?'));
     assert.ok(caption.includes('পবিত্র কুরআনে এই শব্দটি ২,৬৯৯ বার এসেছে।'));
-    assert.ok(caption.includes('এই শব্দটির অর্থ জানলে কুরআনের ৩.৪৯% বাংলা অর্থ আপনি জানবেন।'));
+    assert.ok(caption.includes('এই একটি শব্দ শিখলেই কুরআনের ৩.৪৯% অংশ বুঝতে পারবেন।'));
+    assert.ok(caption.includes('জানা থাকলে কমেন্টে লিখুন, আর সঠিক অর্থ ও উচ্চারণ মিলিয়ে নিতে নিচের লিংকে ট্যাপ করুন:'));
     assert.ok(caption.includes('https://developersakibur.github.io/quran-vocab-app/?word=1:1:2'));
     assert.equal(caption.includes('আল্লাহর'), false);
   });
 
-  it('provides 3 distinct templates and resolves unknown template IDs safely', () => {
-    assert.equal(SHARE_CARD_TEMPLATES.length, 3);
+  it('provides 6 distinct templates and resolves unknown template IDs safely', () => {
+    assert.equal(SHARE_CARD_TEMPLATES.length, 6);
     assert.deepEqual(
       SHARE_CARD_TEMPLATES.map((t) => t.id),
-      ['emerald', 'cream', 'midnight']
+      ['emerald', 'cream', 'midnight', 'burgundy', 'teal', 'sand']
     );
     assert.equal(resolveShareTemplateId('cream'), 'cream');
     assert.equal(resolveShareTemplateId('midnight'), 'midnight');
+    assert.equal(resolveShareTemplateId('burgundy'), 'burgundy');
+    assert.equal(resolveShareTemplateId('teal'), 'teal');
+    assert.equal(resolveShareTemplateId('sand'), 'sand');
     assert.equal(resolveShareTemplateId('unknown'), 'emerald');
     assert.equal(resolveShareTemplateId(null), 'emerald');
   });

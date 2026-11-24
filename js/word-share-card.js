@@ -1,7 +1,7 @@
 /* ============================================================
    WORD SOCIAL SHARE CARD GENERATOR & PREVIEW SHEET
    - High-DPI 1080x1080 (1:1) HTML5 Canvas 2D renderer
-   - 3 selectable Islamic manuscript templates (Emerald, Cream, Midnight)
+   - 6 selectable Islamic manuscript templates (Emerald, Cream, Midnight, Burgundy, Teal, Sand)
    - Curiosity-hook layout (Bengali meaning intentionally omitted)
    - Native mobile Web Share API (files + caption) with desktop fallback
    ============================================================ */
@@ -110,6 +110,102 @@
         ctaBg: '#E2C174',
         ctaText: '#0B131A',
         brandColor: 'rgba(191, 208, 222, 0.72)',
+      },
+    },
+    {
+      id: 'burgundy',
+      labelBn: 'রয়েল মেরুন ও গোল্ড',
+      shortLabelBn: 'মেরুন',
+      swatchBg: 'linear-gradient(135deg, #561728 0%, #240810 100%)',
+      swatchBorder: '#E6C275',
+      swatchAccent: '#F3D283',
+      palette: {
+        bgStops: [
+          [0, '#561728'],
+          [0.54, '#330C17'],
+          [1, '#1A050B'],
+        ],
+        glowColor: 'rgba(230, 194, 117, 0.14)',
+        outerBorder: 'rgba(230, 194, 117, 0.72)',
+        innerBorder: 'rgba(230, 194, 117, 0.32)',
+        ornament: '#E6C275',
+        promptColor: '#F3D792',
+        dividerColor: 'rgba(230, 194, 117, 0.46)',
+        arabicColor: '#FFF9EE',
+        arabicShadow: 'rgba(16, 2, 6, 0.50)',
+        refColor: '#EBCBD3',
+        panelBg: 'rgba(255, 255, 255, 0.068)',
+        panelBorder: 'rgba(230, 194, 117, 0.34)',
+        panelDivider: 'rgba(230, 194, 117, 0.22)',
+        statText: '#FBF2F4',
+        statHighlight: '#F5D37E',
+        ctaBg: '#E6C275',
+        ctaText: '#1E060D',
+        brandColor: 'rgba(240, 211, 218, 0.76)',
+      },
+    },
+    {
+      id: 'teal',
+      labelBn: 'ময়ূরনীল ও গোল্ড',
+      shortLabelBn: 'ময়ূরনীল',
+      swatchBg: 'linear-gradient(135deg, #0F5566 0%, #052029 100%)',
+      swatchBorder: '#E6C067',
+      swatchAccent: '#F4CE74',
+      palette: {
+        bgStops: [
+          [0, '#0F5566'],
+          [0.54, '#083440'],
+          [1, '#041B23'],
+        ],
+        glowColor: 'rgba(242, 202, 110, 0.14)',
+        outerBorder: 'rgba(230, 192, 103, 0.72)',
+        innerBorder: 'rgba(230, 192, 103, 0.32)',
+        ornament: '#E6C067',
+        promptColor: '#F4D588',
+        dividerColor: 'rgba(230, 192, 103, 0.45)',
+        arabicColor: '#F8FDFF',
+        arabicShadow: 'rgba(2, 16, 22, 0.48)',
+        refColor: '#B9E1EA',
+        panelBg: 'rgba(255, 255, 255, 0.068)',
+        panelBorder: 'rgba(230, 192, 103, 0.34)',
+        panelDivider: 'rgba(230, 192, 103, 0.22)',
+        statText: '#EEF8FA',
+        statHighlight: '#F5D074',
+        ctaBg: '#E6C067',
+        ctaText: '#041B23',
+        brandColor: 'rgba(195, 230, 238, 0.75)',
+      },
+    },
+    {
+      id: 'sand',
+      labelBn: 'সোনালি বালি ও ব্রোঞ্জ',
+      shortLabelBn: 'স্যান্ড',
+      swatchBg: 'linear-gradient(135deg, #FCF6E9 0%, #E5D0AA 100%)',
+      swatchBorder: '#7D4718',
+      swatchAccent: '#4B2B14',
+      palette: {
+        bgStops: [
+          [0, '#FCF6E9'],
+          [0.58, '#F2E4C9'],
+          [1, '#E5D0AA'],
+        ],
+        glowColor: 'rgba(156, 90, 27, 0.08)',
+        outerBorder: 'rgba(125, 71, 24, 0.70)',
+        innerBorder: 'rgba(156, 90, 27, 0.42)',
+        ornament: '#8A4E1A',
+        promptColor: '#7A4213',
+        dividerColor: 'rgba(156, 90, 27, 0.50)',
+        arabicColor: '#3D2412',
+        arabicShadow: 'rgba(61, 36, 18, 0.10)',
+        refColor: '#6E4E34',
+        panelBg: 'rgba(255, 252, 245, 0.86)',
+        panelBorder: 'rgba(125, 71, 24, 0.24)',
+        panelDivider: 'rgba(125, 71, 24, 0.16)',
+        statText: '#3A2618',
+        statHighlight: '#8D4B12',
+        ctaBg: '#4B2B14',
+        ctaText: '#FFFBF2',
+        brandColor: '#6D523B',
       },
     },
   ];
@@ -222,9 +318,9 @@
         'আপনি কি এই শব্দের অর্থ জানেন?',
         '',
         'পবিত্র কুরআনে এই শব্দটি ' + countBn + ' বার এসেছে।',
-        'এই শব্দটির অর্থ জানলে কুরআনের ' + pctBn + '% বাংলা অর্থ আপনি জানবেন।',
+        'এই একটি শব্দ শিখলেই কুরআনের ' + pctBn + '% অংশ বুঝতে পারবেন।',
         '',
-        'অর্থ জানতে লিংকে ক্লিক করুন:',
+        'জানা থাকলে কমেন্টে লিখুন, আর সঠিক অর্থ ও উচ্চারণ মিলিয়ে নিতে নিচের লিংকে ট্যাপ করুন:',
         shareUrl,
       ].join('\n')
     );
@@ -236,7 +332,16 @@
   }
 
   function resolveShareTemplateId(raw) {
-    if (raw === 'emerald' || raw === 'cream' || raw === 'midnight') return raw;
+    if (
+      raw === 'emerald'
+      || raw === 'cream'
+      || raw === 'midnight'
+      || raw === 'burgundy'
+      || raw === 'teal'
+      || raw === 'sand'
+    ) {
+      return raw;
+    }
     return 'emerald';
   }
 
@@ -465,6 +570,7 @@
 
     // 5. Surah & Ayah Reference Line (Subtle Metadata)
     const surahName = normalizeBengaliUnicode(payload.surahNameBn || ('সূরা ' + toBnDigits(payload.surah || 1)));
+    const surahLabel = surahName.startsWith('সূরা ') ? surahName : ('সূরা ' + surahName);
     const ayahBn = toBnDigits(payload.ayah || 1);
     ctx.save();
     ctx.direction = 'ltr';
@@ -472,7 +578,7 @@
     ctx.textBaseline = 'middle';
     ctx.font = '600 28px ' + bnFont;
     ctx.fillStyle = p.refColor;
-    ctx.fillText(normalizeBengaliUnicode('সূরা ' + surahName + '  ·  আয়াত ' + ayahBn), cx, 508);
+    ctx.fillText(normalizeBengaliUnicode(surahLabel + '  ·  আয়াত ' + ayahBn), cx, 508);
     ctx.restore();
 
     // 6. Curiosity Stat Panel (Frequency + Quran Coverage %)
@@ -523,7 +629,7 @@
     drawCenteredSegments(
       ctx,
       [
-        { text: 'এই শব্দটির অর্থ জানলে কুরআনের ', font: statBodyFont, color: p.statText },
+        { text: 'এই একটি শব্দ শিখলেই কুরআনের ', font: statBodyFont, color: p.statText },
         { text: pctBn + '%', font: statHighlightFont, color: p.statHighlight },
       ],
       cx,
@@ -535,11 +641,11 @@
     ctx.textBaseline = 'middle';
     ctx.font = statBodyFont;
     ctx.fillStyle = p.statText;
-    ctx.fillText('বাংলা অর্থ আপনি জানবেন', cx, panelY + 226);
+    ctx.fillText('অংশ বুঝতে পারবেন', cx, panelY + 226);
     ctx.restore();
 
     // 7. Footer CTA Badge + Brand Signature
-    const ctaText = 'অর্থ জানতে লিংকে ক্লিক করুন';
+    const ctaText = 'সঠিক অর্থ ও উচ্চারণ দেখতে লিংকে যান';
     ctx.save();
     ctx.font = '700 28px ' + bnFont;
     const ctaTextW = ctx.measureText(ctaText).width;
@@ -565,7 +671,7 @@
     ctx.textBaseline = 'middle';
     ctx.font = '600 23px ' + bnFont;
     ctx.fillStyle = p.brandColor;
-    ctx.fillText('কুরআন ভোকাবুলারি  •  developersakibur.github.io', cx, 984);
+    ctx.fillText('কুরআন ভোকাবুলারি  •  শব্দে শব্দে কুরআন শিখুন', cx, 984);
     ctx.restore();
 
     return canvas;
@@ -974,7 +1080,10 @@
     sheetState.isOpen = true;
     sheetState.templateId = loadSavedTemplateId();
 
-    els.subtitle.textContent = normalizeBengaliUnicode('সূরা ' + normalized.surahNameBn + ' · আয়াত ' + toBnDigits(normalized.ayah));
+    const subtitleSurah = normalized.surahNameBn.startsWith('সূরা ')
+      ? normalized.surahNameBn
+      : ('সূরা ' + normalized.surahNameBn);
+    els.subtitle.textContent = normalizeBengaliUnicode(subtitleSurah + ' · আয়াত ' + toBnDigits(normalized.ayah));
     els.captionText.textContent = buildWordShareCaption(normalized);
     els.previewImg.classList.remove('is-ready');
     syncTemplateButtons();
