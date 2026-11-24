@@ -8,7 +8,7 @@
    - Bypasses non-GET and cross-origin APIs (e.g., Supabase sync).
    ============================================================ */
 
-const APP_SHELL_CACHE = 'quran-app-shell-v50';
+const APP_SHELL_CACHE = 'quran-app-shell-v51';
 const AUDIO_CACHE = 'quran-audio-v1';
 const SOUND_CACHE = 'quran-sound-effects-v1';
 

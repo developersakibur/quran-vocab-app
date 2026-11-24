@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   MAX_PARALLEL_SURAH_DOWNLOADS,
+  MAX_PARALLEL_WORD_SURAH_TASKS,
   WORD_AUDIO_CONCURRENCY,
   canStartTaskType,
   clearDownloadQueueForType,
@@ -10,6 +11,8 @@ import {
   computeAudioOverviewStats,
   computeSurahRowDownloadState,
   createEmptyAudioManifest,
+  createSharedWordDownloadPool,
+  dedupeWordUrls,
   dequeueDownloadTask,
   doesCacheUrlMatchSurahRecitation,
   doesCacheUrlMatchSurahWord,
@@ -243,18 +246,19 @@ describe('audio-download-manager cache reconciliation & URL matching', () => {
   });
 });
 
-describe('audio-download-manager parallel concurrency (3 surahs, 10 words)', () => {
-  it('enforces 3 parallel surah slots and 10 concurrent word workers', () => {
+describe('audio-download-manager parallel concurrency (3 surahs + 3 word surahs sharing global pool of 12)', () => {
+  it('enforces 3 parallel surah slots, 3 parallel word-surah slots, and global pool limit of 12', () => {
     assert.equal(MAX_PARALLEL_SURAH_DOWNLOADS, 3);
-    assert.equal(WORD_AUDIO_CONCURRENCY, 10);
+    assert.equal(MAX_PARALLEL_WORD_SURAH_TASKS, 3);
+    assert.equal(WORD_AUDIO_CONCURRENCY, 12);
 
-    const makeActive = (surah: number, bytes: number): ActiveDownloadState => ({
-      task: { id: makeTaskId('ayah', surah), type: 'ayah', surah, mode: 'single' },
+    const makeActive = (type: 'ayah' | 'word', surah: number, bytes: number): ActiveDownloadState => ({
+      task: { id: makeTaskId(type, surah), type, surah, mode: 'single' },
       percent: 50,
       receivedBytes: bytes,
       totalBytes: bytes * 2,
       completedUnits: 0,
-      totalUnits: 1
+      totalUnits: type === 'ayah' ? 1 : 20
     });
 
     let queue: DownloadTask[] = [
@@ -262,47 +266,137 @@ describe('audio-download-manager parallel concurrency (3 surahs, 10 words)', () 
       { id: 'ayah:2', type: 'ayah', surah: 2, mode: 'single' },
       { id: 'ayah:112', type: 'ayah', surah: 112, mode: 'single' },
       { id: 'ayah:114', type: 'ayah', surah: 114, mode: 'single' },
-      { id: 'word:1', type: 'word', surah: 1, mode: 'single' }
+      { id: 'word:1', type: 'word', surah: 1, mode: 'single' },
+      { id: 'word:2', type: 'word', surah: 2, mode: 'single' },
+      { id: 'word:112', type: 'word', surah: 112, mode: 'single' },
+      { id: 'word:114', type: 'word', surah: 114, mode: 'single' }
     ];
 
     const active: ActiveDownloadState[] = [];
 
-    // Pick 3 parallel Surahs
+    // Pick 3 parallel Surahs (ayah recitation)
     for (let i = 0; i < 3; i++) {
       const picked = pickNextRunnableTask(queue, active);
       assert.ok(picked.task);
       assert.equal(picked.task.type, 'ayah');
       queue = picked.queue;
-      active.push(makeActive(picked.task.surah, (i + 1) * 100_000));
+      active.push(makeActive('ayah', picked.task.surah, (i + 1) * 100_000));
     }
 
     // 4th Surah cannot start yet because 3 Surah slots are full
     assert.equal(canStartTaskType(active, 'ayah'), false);
 
-    // Word task CAN start on its own origin slot while 3 Surahs are running
-    assert.equal(canStartTaskType(active, 'word'), true);
-    const wordPick = pickNextRunnableTask(queue, active);
-    assert.equal(wordPick.task?.id, 'word:1');
-    queue = wordPick.queue;
+    // 3 Word Surah tasks CAN start concurrently on the word origin
+    for (let i = 0; i < 3; i++) {
+      assert.equal(canStartTaskType(active, 'word'), true);
+      const wordPick = pickNextRunnableTask(queue, active);
+      assert.ok(wordPick.task);
+      assert.equal(wordPick.task.type, 'word');
+      queue = wordPick.queue;
+      active.push(makeActive('word', wordPick.task.surah, 0));
+    }
 
-    // 4th Surah stays queued until one of the 3 Surah slots finishes
-    assert.deepEqual(queue.map((t) => t.id), ['ayah:114']);
+    // 4th Word Surah stays queued until one of the 3 Word Surah slots finishes
+    assert.equal(canStartTaskType(active, 'word'), false);
+    assert.deepEqual(queue.map((t) => t.id), ['ayah:114', 'word:114']);
     assert.equal(sumInFlightBytes(active), 600_000);
 
-    // Row states show all 3 as downloading and 4th as queued #1
+    // Row states show 3 ayah + 3 word as downloading and both 4ths as queued
     const manifest = createEmptyAudioManifest();
-    assert.equal(computeSurahRowDownloadState(SAMPLE_META[0], 'ayah', manifest, active, queue).status, 'downloading');
-    assert.equal(computeSurahRowDownloadState(SAMPLE_META[1], 'ayah', manifest, active, queue).status, 'downloading');
-    assert.equal(computeSurahRowDownloadState(SAMPLE_META[2], 'ayah', manifest, active, queue).status, 'downloading');
-    const row4 = computeSurahRowDownloadState(SAMPLE_META[3], 'ayah', manifest, active, queue);
-    assert.equal(row4.status, 'queued');
-    assert.equal(row4.queuePosition, 1);
+    assert.equal(computeSurahRowDownloadState(SAMPLE_META[0], 'word', manifest, active, queue).status, 'downloading');
+    assert.equal(computeSurahRowDownloadState(SAMPLE_META[1], 'word', manifest, active, queue).status, 'downloading');
+    assert.equal(computeSurahRowDownloadState(SAMPLE_META[2], 'word', manifest, active, queue).status, 'downloading');
+    const wordRow4 = computeSurahRowDownloadState(SAMPLE_META[3], 'word', manifest, active, queue);
+    assert.equal(wordRow4.status, 'queued');
+    assert.equal(wordRow4.queuePosition, 2);
 
-    // Free slot 2 -> 4th Surah immediately becomes runnable
-    const remainingActive = active.filter((a) => a.task.surah !== 2);
+    // Free word slot 2 -> 4th Word Surah immediately becomes runnable
+    const remainingActive = active.filter((a) => a.task.id !== 'word:2');
     const nextPick = pickNextRunnableTask(queue, remainingActive);
-    assert.equal(nextPick.task?.id, 'ayah:114');
-    assert.equal(nextPick.queue.length, 0);
+    assert.equal(nextPick.task?.id, 'word:114');
+    assert.deepEqual(nextPick.queue.map((t) => t.id), ['ayah:114']);
+  });
+
+  it('deduplicates word URLs while preserving order and omitting unavailable URLs', () => {
+    const raw = [
+      'https://audio.qurancdn.com/wbw/001_001_001.mp3',
+      'https://audio.qurancdn.com/wbw/001_001_002.mp3',
+      'https://audio.qurancdn.com/wbw/001_001_001.mp3',
+      'https://audio.qurancdn.com/wbw/001_001_003.mp3'
+    ];
+    const unavail = new Set(['https://audio.qurancdn.com/wbw/001_001_002.mp3']);
+    assert.deepEqual(dedupeWordUrls(raw, unavail), [
+      'https://audio.qurancdn.com/wbw/001_001_001.mp3',
+      'https://audio.qurancdn.com/wbw/001_001_003.mp3'
+    ]);
+  });
+
+  it('shares a strict global cap of 12 workers fairly across 3 simultaneous word surahs and isolates cancellation', async () => {
+    const pool = createSharedWordDownloadPool(12);
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const startedOrder: string[] = [];
+
+    const makeUrls = (prefix: string, count: number) =>
+      Array.from({ length: count }, (_, i) => `${prefix}:${i + 1}`);
+
+    const processUrl = async (url: string) => {
+      inFlight++;
+      if (inFlight > peakInFlight) peakInFlight = inFlight;
+      startedOrder.push(url);
+      await new Promise((r) => setTimeout(r, 12));
+      inFlight--;
+      return { ok: true };
+    };
+
+    const [r1, r2, r3] = await Promise.all([
+      pool.runJob({ id: 'word:1', urls: makeUrls('s1', 16), processUrl }),
+      pool.runJob({ id: 'word:2', urls: makeUrls('s2', 16), processUrl }),
+      pool.runJob({ id: 'word:3', urls: makeUrls('s3', 16), processUrl })
+    ]);
+
+    assert.equal(r1.processed, 16);
+    assert.equal(r2.processed, 16);
+    assert.equal(r3.processed, 16);
+    // Strict global cap: NEVER exceeds 12 even with 3 surahs running simultaneously!
+    assert.equal(peakInFlight, 12);
+
+    // First 12 dispatches must be fairly balanced 4 / 4 / 4 across the 3 surahs
+    const firstBatch = startedOrder.slice(0, 12);
+    assert.equal(firstBatch.filter((u) => u.startsWith('s1:')).length, 4);
+    assert.equal(firstBatch.filter((u) => u.startsWith('s2:')).length, 4);
+    assert.equal(firstBatch.filter((u) => u.startsWith('s3:')).length, 4);
+
+    // Cancelling one surah stops only that surah while the remaining surah completes cleanly
+    let cancelS2 = false;
+    const pA = pool.runJob({
+      id: 'word:10',
+      urls: makeUrls('a', 15),
+      processUrl: async () => {
+        await new Promise((r) => setTimeout(r, 8));
+        return { ok: true };
+      }
+    });
+    const pB = pool.runJob({
+      id: 'word:11',
+      urls: makeUrls('b', 30),
+      isStopped: () => cancelS2,
+      processUrl: async (u) => {
+        await new Promise((r) => setTimeout(r, 8));
+        if (u === 'b:3') {
+          cancelS2 = true;
+          pool.cancelJob('word:11');
+        }
+        return { ok: true };
+      }
+    });
+    const [resA, resB] = await Promise.all([pA, pB]);
+    assert.equal(resA.processed, 15);
+    assert.equal(resA.stopped, false);
+    assert.equal(resB.stopped, true);
+    assert.ok(resB.processed < 30);
+    assert.equal(pool.getActiveWorkerCount(), 0);
+    assert.equal(pool.getActiveJobCount(), 0);
   });
 
   it('completes Surah Al-Baqarah at 6116/6116 and also handles generic runtime 404 unavailableUrls cleanly', () => {

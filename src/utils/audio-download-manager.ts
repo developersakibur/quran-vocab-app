@@ -95,8 +95,8 @@ export const AUDIO_MANIFEST_VERSION = 1;
 export const DEFAULT_WORD_AUDIO_BYTES = 16 * 1024;
 export const DEFAULT_SURAH_AUDIO_FALLBACK_BYTES = 2_400_000;
 export const MAX_PARALLEL_SURAH_DOWNLOADS = 3;
-export const MAX_PARALLEL_WORD_SURAH_TASKS = 1;
-export const WORD_AUDIO_CONCURRENCY = 10;
+export const MAX_PARALLEL_WORD_SURAH_TASKS = 3;
+export const WORD_AUDIO_CONCURRENCY = 12;
 
 // Optional registry of permanently missing (HTTP 404/410) CDN files if any arise in the future.
 // Runtime 404/410 responses are also automatically recorded in each Surah's `unavailableUrls`.
@@ -715,3 +715,195 @@ export function doesCacheUrlMatchSurahRecitation(url: string, surah: number): bo
   const parsed = parseCacheAudioUrl(url);
   return Boolean(parsed && parsed.type === 'ayah' && parsed.surah === Math.floor(surah));
 }
+
+/**
+ * Deduplicate word URLs while preserving natural verse order and omitting known unavailable URLs.
+ */
+export function dedupeWordUrls(urls: readonly string[], unavailable?: ReadonlySet<string>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    if (typeof raw !== 'string' || !raw) continue;
+    if (unavailable && unavailable.has(raw)) continue;
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    out.push(raw);
+  }
+  return out;
+}
+
+export interface SharedWordPoolJob<TResult> {
+  id: string;
+  urls: readonly string[];
+  isStopped?: () => boolean;
+  processUrl: (url: string) => Promise<TResult>;
+  onResult?: (url: string, result: TResult) => void;
+}
+
+export interface SharedWordDownloadPool {
+  runJob<TResult>(job: SharedWordPoolJob<TResult>): Promise<{ processed: number; stopped: boolean }>;
+  cancelJob(id: string): void;
+  getActiveWorkerCount(): number;
+  getActiveJobCount(): number;
+}
+
+/**
+ * Fair round-robin global worker pool capped at `maxConcurrency` (default 12)
+ * across all simultaneously active word-audio Surah tasks (up to 3 Surahs -> 4/4/4 split,
+ * 2 Surahs -> 6/6 split, 1 Surah -> full 12 concurrency).
+ */
+export function createSharedWordDownloadPool(
+  maxConcurrency: number = WORD_AUDIO_CONCURRENCY
+): SharedWordDownloadPool {
+  const limit = Math.max(1, Math.floor(maxConcurrency || WORD_AUDIO_CONCURRENCY));
+
+  interface InternalJob {
+    id: string;
+    urls: readonly string[];
+    cursor: number;
+    inFlight: number;
+    processed: number;
+    cancelled: boolean;
+    isStopped: () => boolean;
+    processUrl: (url: string) => Promise<unknown>;
+    onResult?: (url: string, result: unknown) => void;
+    resolve: (summary: { processed: number; stopped: boolean }) => void;
+  }
+
+  const jobs: InternalJob[] = [];
+  let activeWorkers = 0;
+  let rrIndex = 0;
+  let pumpScheduled = false;
+
+  function schedulePump(): void {
+    if (pumpScheduled) return;
+    pumpScheduled = true;
+    queueMicrotask(() => {
+      pumpScheduled = false;
+      pump();
+    });
+  }
+
+  function isJobStopped(job: InternalJob): boolean {
+    return job.cancelled || job.isStopped();
+  }
+
+  function trySettleJob(job: InternalJob): void {
+    const exhausted = job.cursor >= job.urls.length;
+    const stopped = isJobStopped(job);
+    if ((exhausted || stopped) && job.inFlight === 0) {
+      const idx = jobs.indexOf(job);
+      if (idx !== -1) {
+        jobs.splice(idx, 1);
+        if (rrIndex >= jobs.length) rrIndex = 0;
+      }
+      job.resolve({ processed: job.processed, stopped: stopped && !exhausted });
+    }
+  }
+
+  function pickNextWork(): { job: InternalJob; url: string } | null {
+    // First settle any already-stopped empty jobs
+    for (let i = jobs.length - 1; i >= 0; i--) {
+      if (isJobStopped(jobs[i]) && jobs[i].inFlight === 0) {
+        trySettleJob(jobs[i]);
+      }
+    }
+    if (jobs.length === 0) return null;
+
+    const count = jobs.length;
+    for (let attempt = 0; attempt < count; attempt++) {
+      const idx = (rrIndex + attempt) % jobs.length;
+      const candidate = jobs[idx];
+      if (!isJobStopped(candidate) && candidate.cursor < candidate.urls.length) {
+        const url = candidate.urls[candidate.cursor++];
+        rrIndex = (idx + 1) % jobs.length;
+        return { job: candidate, url };
+      }
+    }
+    return null;
+  }
+
+  function pump(): void {
+    while (activeWorkers < limit) {
+      const next = pickNextWork();
+      if (!next) break;
+      activeWorkers++;
+      next.job.inFlight++;
+      runWorkerLoop(next.job, next.url);
+    }
+  }
+
+  async function runWorkerLoop(initialJob: InternalJob, initialUrl: string): Promise<void> {
+    let currentJob: InternalJob | null = initialJob;
+    let currentUrl: string | null = initialUrl;
+
+    try {
+      while (currentJob && currentUrl !== null) {
+        try {
+          const result = await currentJob.processUrl(currentUrl);
+          if (!isJobStopped(currentJob)) {
+            currentJob.processed++;
+            if (currentJob.onResult) {
+              currentJob.onResult(currentUrl, result);
+            }
+          }
+        } finally {
+          currentJob.inFlight--;
+          trySettleJob(currentJob);
+        }
+
+        const next = pickNextWork();
+        if (next) {
+          currentJob = next.job;
+          currentUrl = next.url;
+          currentJob.inFlight++;
+        } else {
+          currentJob = null;
+          currentUrl = null;
+        }
+      }
+    } finally {
+      activeWorkers--;
+      pump();
+    }
+  }
+
+  return {
+    runJob<TResult>(job: SharedWordPoolJob<TResult>): Promise<{ processed: number; stopped: boolean }> {
+      return new Promise((resolve) => {
+        const internal: InternalJob = {
+          id: job.id,
+          urls: job.urls,
+          cursor: 0,
+          inFlight: 0,
+          processed: 0,
+          cancelled: false,
+          isStopped: job.isStopped || (() => false),
+          processUrl: job.processUrl as (url: string) => Promise<unknown>,
+          onResult: job.onResult as ((url: string, result: unknown) => void) | undefined,
+          resolve
+        };
+        if (internal.urls.length === 0 || isJobStopped(internal)) {
+          resolve({ processed: 0, stopped: isJobStopped(internal) });
+          return;
+        }
+        jobs.push(internal);
+        schedulePump();
+      });
+    },
+    cancelJob(id: string): void {
+      const target = jobs.find((j) => j.id === id);
+      if (!target) return;
+      target.cancelled = true;
+      trySettleJob(target);
+      pump();
+    },
+    getActiveWorkerCount(): number {
+      return activeWorkers;
+    },
+    getActiveJobCount(): number {
+      return jobs.length;
+    }
+  };
+}
+

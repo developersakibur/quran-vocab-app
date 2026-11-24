@@ -20,8 +20,8 @@
   const DEFAULT_WORD_AUDIO_BYTES = 16 * 1024;
   const DEFAULT_SURAH_AUDIO_FALLBACK_BYTES = 2400000;
   const MAX_PARALLEL_SURAH_DOWNLOADS = 3;
-  const MAX_PARALLEL_WORD_SURAH_TASKS = 1;
-  const WORD_AUDIO_CONCURRENCY = 10;
+  const MAX_PARALLEL_WORD_SURAH_TASKS = 3;
+  const WORD_AUDIO_CONCURRENCY = 12;
   const RING_CIRCUMFERENCE = 2 * Math.PI * 16; // r=16 => ~100.53
 
   // Optional registry of permanently missing (HTTP 404/410) CDN files if any arise in the future.
@@ -535,6 +535,7 @@
   async function getWordUrlsForSurah(sNum) {
     if (!global.QuranDB || typeof global.QuranDB.loadSurah !== 'function') return [];
     const content = await global.QuranDB.loadSurah(sNum);
+    const seen = new Set();
     const urls = [];
     (content && content.ayahs ? content.ayahs : []).forEach((ayah) => {
       (ayah.words || []).forEach((w) => {
@@ -542,7 +543,11 @@
         const parts = String(w.key).split(':');
         if (parts.length !== 3) return;
         const [ws, wa, wp] = parts.map((n) => String(n).padStart(3, '0'));
-        urls.push(`${WORD_AUDIO_BASE}/${ws}_${wa}_${wp}.mp3`);
+        const url = `${WORD_AUDIO_BASE}/${ws}_${wa}_${wp}.mp3`;
+        if (!seen.has(url)) {
+          seen.add(url);
+          urls.push(url);
+        }
       });
     });
     return urls;
@@ -550,6 +555,158 @@
 
   function getWordConcurrency() {
     return WORD_AUDIO_CONCURRENCY;
+  }
+
+  // Fair round-robin global worker pool capped strictly at 12 concurrent word downloads
+  // across all active word-audio Surahs (1 surah => 12, 2 surahs => 6+6, 3 surahs => 4+4+4).
+  function createSharedWordDownloadPool(maxConcurrency) {
+    const limit = Math.max(1, Math.floor(maxConcurrency || WORD_AUDIO_CONCURRENCY));
+    const jobs = [];
+    let activeWorkers = 0;
+    let rrIndex = 0;
+    let pumpScheduled = false;
+
+    function schedulePump() {
+      if (pumpScheduled) return;
+      pumpScheduled = true;
+      queueMicrotask(() => {
+        pumpScheduled = false;
+        pump();
+      });
+    }
+
+    function isJobStopped(job) {
+      return job.cancelled || job.isStopped();
+    }
+
+    function trySettleJob(job) {
+      const exhausted = job.cursor >= job.urls.length;
+      const stopped = isJobStopped(job);
+      if ((exhausted || stopped) && job.inFlight === 0) {
+        const idx = jobs.indexOf(job);
+        if (idx !== -1) {
+          jobs.splice(idx, 1);
+          if (rrIndex >= jobs.length) rrIndex = 0;
+        }
+        job.resolve({ processed: job.processed, stopped: stopped && !exhausted });
+      }
+    }
+
+    function pickNextWork() {
+      for (let i = jobs.length - 1; i >= 0; i--) {
+        if (isJobStopped(jobs[i]) && jobs[i].inFlight === 0) {
+          trySettleJob(jobs[i]);
+        }
+      }
+      if (jobs.length === 0) return null;
+
+      const count = jobs.length;
+      for (let attempt = 0; attempt < count; attempt++) {
+        const idx = (rrIndex + attempt) % jobs.length;
+        const candidate = jobs[idx];
+        if (!isJobStopped(candidate) && candidate.cursor < candidate.urls.length) {
+          const url = candidate.urls[candidate.cursor++];
+          rrIndex = (idx + 1) % jobs.length;
+          return { job: candidate, url };
+        }
+      }
+      return null;
+    }
+
+    function pump() {
+      while (activeWorkers < limit) {
+        const next = pickNextWork();
+        if (!next) break;
+        activeWorkers++;
+        next.job.inFlight++;
+        runWorkerLoop(next.job, next.url);
+      }
+    }
+
+    async function runWorkerLoop(initialJob, initialUrl) {
+      let currentJob = initialJob;
+      let currentUrl = initialUrl;
+
+      try {
+        while (currentJob && currentUrl !== null) {
+          try {
+            const result = await currentJob.processUrl(currentUrl);
+            if (!isJobStopped(currentJob)) {
+              currentJob.processed++;
+              if (currentJob.onResult) {
+                currentJob.onResult(currentUrl, result);
+              }
+            }
+          } finally {
+            currentJob.inFlight--;
+            trySettleJob(currentJob);
+          }
+
+          const next = pickNextWork();
+          if (next) {
+            currentJob = next.job;
+            currentUrl = next.url;
+            currentJob.inFlight++;
+          } else {
+            currentJob = null;
+            currentUrl = null;
+          }
+        }
+      } finally {
+        activeWorkers--;
+        pump();
+      }
+    }
+
+    return {
+      runJob(job) {
+        return new Promise((resolve) => {
+          const internal = {
+            id: job.id,
+            urls: job.urls,
+            cursor: 0,
+            inFlight: 0,
+            processed: 0,
+            cancelled: false,
+            isStopped: job.isStopped || (() => false),
+            processUrl: job.processUrl,
+            onResult: job.onResult,
+            resolve
+          };
+          if (!internal.urls || internal.urls.length === 0 || isJobStopped(internal)) {
+            resolve({ processed: 0, stopped: isJobStopped(internal) });
+            return;
+          }
+          jobs.push(internal);
+          schedulePump();
+        });
+      },
+      cancelJob(id) {
+        const target = jobs.find((j) => j.id === id);
+        if (!target) return;
+        target.cancelled = true;
+        trySettleJob(target);
+        pump();
+      },
+      getActiveWorkerCount() {
+        return activeWorkers;
+      }
+    };
+  }
+
+  const sharedWordPool = createSharedWordDownloadPool(WORD_AUDIO_CONCURRENCY);
+  const inFlightWordFetches = new Map(); // url -> Promise<result> (prevents duplicate concurrent fetches)
+
+  function prefetchNextQueuedWordSurahs() {
+    if (!global.QuranDB || typeof global.QuranDB.loadSurah !== 'function') return;
+    let prefetched = 0;
+    for (let i = 0; i < queue.length && prefetched < 2; i++) {
+      const t = queue[i];
+      if (t && t.type === 'word') {
+        global.QuranDB.loadSurah(t.surah).catch(() => {});
+        prefetched++;
+      }
+    }
   }
 
   function showToastSafe(message, type) {
@@ -699,74 +856,115 @@
   }
 
   async function downloadSingleWordAudio(cache, url, signal) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
-      const attemptController = new AbortController();
-      const onParentAbort = () => attemptController.abort();
-      signal.addEventListener('abort', onParentAbort, { once: true });
-      const timer = setTimeout(() => attemptController.abort(), 14000);
+    if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
 
+    // Fast O(1) indexed point-lookup in CacheStorage: prevents duplicate downloads & eliminates O(N) cache.keys() startup lag
+    try {
+      const existing = await cache.match(url);
+      if (existing) {
+        let existingBytes = 0;
+        if (existing.type !== 'opaque') {
+          existingBytes = parseInt(existing.headers.get('content-length') || '0', 10) || 0;
+        }
+        return {
+          ok: true,
+          alreadyCached: true,
+          bytes: existingBytes > 0 ? existingBytes : DEFAULT_WORD_AUDIO_BYTES
+        };
+      }
+    } catch (e) {}
+
+    if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
+
+    // Deduplicate identical URL if another worker/task is already fetching it
+    if (inFlightWordFetches.has(url)) {
       try {
+        return await inFlightWordFetches.get(url);
+      } catch (e) {
+        return { ok: false, aborted: signal.aborted, bytes: 0 };
+      }
+    }
+
+    const runFetch = async () => {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
+        const attemptController = new AbortController();
+        const onParentAbort = () => attemptController.abort();
+        signal.addEventListener('abort', onParentAbort, { once: true });
+        const timer = setTimeout(() => attemptController.abort(), 14000);
+
         try {
-          const res = await fetch(url, { mode: 'cors', signal: attemptController.signal });
-          clearTimeout(timer);
-          if (res && (res.status === 404 || res.status === 410)) {
+          try {
+            const res = await fetch(url, { mode: 'cors', signal: attemptController.signal });
+            clearTimeout(timer);
+            if (res && (res.status === 404 || res.status === 410)) {
+              signal.removeEventListener('abort', onParentAbort);
+              return { ok: false, notFound: true, aborted: false, bytes: 0 };
+            }
+            if (res && res.ok) {
+              const blob = await res.blob();
+              if (signal.aborted) {
+                signal.removeEventListener('abort', onParentAbort);
+                return { ok: false, aborted: true, bytes: 0 };
+              }
+              const cachedRes = new Response(blob, {
+                status: 200,
+                statusText: 'OK',
+                headers: {
+                  'Content-Type': res.headers.get('content-type') || 'audio/mpeg',
+                  'Content-Length': String(blob.size)
+                }
+              });
+              await cache.put(url, cachedRes);
+              if (global.QuranDB && global.QuranDB.invalidateAudioCacheSizeMemo) {
+                global.QuranDB.invalidateAudioCacheSizeMemo(url);
+              }
+              signal.removeEventListener('abort', onParentAbort);
+              return { ok: true, alreadyCached: false, bytes: blob.size || DEFAULT_WORD_AUDIO_BYTES };
+            }
+            // Transient HTTP error (e.g. 429/5xx): retry on next attempt instead of caching error response
             signal.removeEventListener('abort', onParentAbort);
-            return { ok: false, notFound: true, aborted: false, bytes: 0 };
-          }
-          if (res && res.ok) {
-            const blob = await res.blob();
+            if (attempt === 2) return { ok: false, aborted: false, bytes: 0 };
+            await new Promise((r) => setTimeout(r, 250));
+            continue;
+          } catch (corsErr) {
             if (signal.aborted) {
+              clearTimeout(timer);
               signal.removeEventListener('abort', onParentAbort);
               return { ok: false, aborted: true, bytes: 0 };
             }
-            const cachedRes = new Response(blob, {
-              status: 200,
-              statusText: 'OK',
-              headers: {
-                'Content-Type': res.headers.get('content-type') || 'audio/mpeg',
-                'Content-Length': String(blob.size)
-              }
-            });
-            await cache.put(url, cachedRes);
-            if (global.QuranDB && global.QuranDB.invalidateAudioCacheSizeMemo) {
-              global.QuranDB.invalidateAudioCacheSizeMemo(url);
-            }
-            signal.removeEventListener('abort', onParentAbort);
-            return { ok: true, bytes: blob.size || DEFAULT_WORD_AUDIO_BYTES };
-          }
-          // Transient HTTP error (e.g. 429/5xx): retry on next attempt instead of caching error response
-          signal.removeEventListener('abort', onParentAbort);
-          if (attempt === 2) return { ok: false, aborted: false, bytes: 0 };
-          await new Promise((r) => setTimeout(r, 250));
-          continue;
-        } catch (corsErr) {
-          if (signal.aborted) {
+            const fallbackRes = await fetch(url, { mode: 'no-cors', signal: attemptController.signal });
             clearTimeout(timer);
             signal.removeEventListener('abort', onParentAbort);
-            return { ok: false, aborted: true, bytes: 0 };
+            if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
+            if (fallbackRes && (fallbackRes.ok || fallbackRes.type === 'opaque')) {
+              await cache.put(url, fallbackRes.clone());
+              if (global.QuranDB && global.QuranDB.invalidateAudioCacheSizeMemo) {
+                global.QuranDB.invalidateAudioCacheSizeMemo(url);
+              }
+              return { ok: true, alreadyCached: false, bytes: DEFAULT_WORD_AUDIO_BYTES };
+            }
           }
-          const fallbackRes = await fetch(url, { mode: 'no-cors', signal: attemptController.signal });
+        } catch (err) {
           clearTimeout(timer);
           signal.removeEventListener('abort', onParentAbort);
           if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
-          if (fallbackRes && (fallbackRes.ok || fallbackRes.type === 'opaque')) {
-            await cache.put(url, fallbackRes.clone());
-            if (global.QuranDB && global.QuranDB.invalidateAudioCacheSizeMemo) {
-              global.QuranDB.invalidateAudioCacheSizeMemo(url);
-            }
-            return { ok: true, bytes: DEFAULT_WORD_AUDIO_BYTES };
-          }
+          if (attempt === 2) return { ok: false, aborted: false, bytes: 0 };
+          await new Promise((r) => setTimeout(r, 200));
         }
-      } catch (err) {
-        clearTimeout(timer);
-        signal.removeEventListener('abort', onParentAbort);
-        if (signal.aborted) return { ok: false, aborted: true, bytes: 0 };
-        if (attempt === 2) return { ok: false, aborted: false, bytes: 0 };
-        await new Promise((r) => setTimeout(r, 200));
+      }
+      return { ok: false, aborted: false, bytes: 0 };
+    };
+
+    const promise = runFetch();
+    inFlightWordFetches.set(url, promise);
+    try {
+      return await promise;
+    } finally {
+      if (inFlightWordFetches.get(url) === promise) {
+        inFlightWordFetches.delete(url);
       }
     }
-    return { ok: false, aborted: false, bytes: 0 };
   }
 
   // ============================================================
@@ -818,6 +1016,7 @@
     }
 
     if (launchedAny) {
+      prefetchNextQueuedWordSurahs();
       patchAllQueuedRows();
       renderOverviewAndActiveBar(true);
       patchTabActionButtons();
@@ -861,7 +1060,8 @@
           showToastSafe(`সূরা ${getSurahName(task.surah)} ডাউনলোডে সমস্যা হয়েছে, ইন্টারনেট যাচাই করুন।`, 'error');
         }
       } else {
-        // Word-by-word audio download for this Surah (10 parallel word fetches, resumable!)
+        // Word-by-word audio download for this Surah
+        // Instant start (zero upfront O(N) cache.keys() scan!) + shared global 12-worker pool across up to 3 active Surahs
         let urls = [];
         try {
           urls = await getWordUrlsForSurah(task.surah);
@@ -876,19 +1076,10 @@
         const totalWords = Math.max(urls.length, surahMeta.total_words || 1);
         state.totalUnits = totalWords;
 
-        // Build set of already-cached URLs for this surah so resuming skips done words cleanly
-        const sPad = String(task.surah).padStart(3, '0');
-        const prefixRegex = new RegExp(`/${sPad}_\\d{3}_\\d{3}\\.mp3`);
-        const cachedSet = new Set();
-        try {
-          const keys = await cache.keys();
-          for (let i = 0; i < keys.length; i++) {
-            const u = keys[i].url;
-            if (prefixRegex.test(u)) cachedSet.add(u);
-          }
-        } catch (e) {}
-
         const prevEntryAtStart = manifest.wordAudio[task.surah];
+        const prevSavedCount = prevEntryAtStart ? Math.min(Math.max(0, prevEntryAtStart.count || 0), totalWords) : 0;
+        const prevSavedBytes = prevEntryAtStart && prevEntryAtStart.bytes > 0 ? prevEntryAtStart.bytes : 0;
+
         const unavailableSet = new Set(
           prevEntryAtStart && Array.isArray(prevEntryAtStart.unavailableUrls)
             ? prevEntryAtStart.unavailableUrls
@@ -897,80 +1088,70 @@
         const knownForSurah = KNOWN_UNAVAILABLE_WBW_BY_SURAH[task.surah];
         if (knownForSurah) {
           for (let j = 0; j < knownForSurah.length; j++) {
-            if (!cachedSet.has(knownForSurah[j])) unavailableSet.add(knownForSurah[j]);
+            unavailableSet.add(knownForSurah[j]);
           }
         }
 
-        const pendingUrls = urls.filter((u) => !cachedSet.has(u) && !unavailableSet.has(u));
-        let doneCount = urls.length - pendingUrls.length;
-        state.completedUnits = doneCount;
-        state.percent = totalWords > 0 ? Math.min(99, Math.round((doneCount / totalWords) * 100)) : 0;
+        const pendingUrls = urls.filter((u) => !unavailableSet.has(u));
+        let doneCount = urls.length - pendingUrls.length; // Known permanent-404s already accounted for
+        let accumulatedBytes = 0;
+        let failedCount = 0;
 
-        // Sync existing partial count into manifest before downloading remainder
-        if (doneCount > 0) {
-          const prev = manifest.wordAudio[task.surah];
-          const prevBytes = prev && prev.bytes > 0 ? prev.bytes : Math.max(0, doneCount - unavailableSet.size) * DEFAULT_WORD_AUDIO_BYTES;
-          const unavailList = Array.from(unavailableSet);
-          manifest.wordAudio[task.surah] = {
-            count: Math.min(doneCount, totalWords),
-            bytes: prevBytes,
-            savedAt: Date.now(),
-            ...(unavailList.length > 0 ? { unavailableUrls: unavailList } : {})
-          };
-        }
+        // Keep partial progress monotonic (never visually dips to 0% while O(1) cache.match skips saved words)
+        state.completedUnits = Math.max(doneCount, prevSavedCount);
+        state.percent = totalWords > 0 ? Math.min(99, Math.round((state.completedUnits / totalWords) * 100)) : 0;
         emitLiveProgress('word', task.surah, true);
 
         if (pendingUrls.length > 0 && !controller.signal.aborted && !state.stopped) {
-          const concurrency = Math.min(getWordConcurrency(), pendingUrls.length);
-          let cursor = 0;
-          let failedCount = 0;
-
-          const worker = async () => {
-            while (cursor < pendingUrls.length) {
-              if (controller.signal.aborted || state.stopped) break;
-              const url = pendingUrls[cursor++];
-              const result = await downloadSingleWordAudio(cache, url, controller.signal);
-              if (controller.signal.aborted || state.stopped) break;
-
-              if (result.ok || result.notFound) {
+          await sharedWordPool.runJob({
+            id: task.id,
+            urls: pendingUrls,
+            isStopped: () => controller.signal.aborted || state.stopped,
+            processUrl: (url) => downloadSingleWordAudio(cache, url, controller.signal),
+            onResult: (url, result) => {
+              if (controller.signal.aborted || state.stopped) return;
+              if (result && (result.ok || result.notFound)) {
                 if (result.notFound) unavailableSet.add(url);
                 doneCount++;
-                const prevEntry = manifest.wordAudio[task.surah];
-                const addedBytes = result.ok ? (result.bytes || DEFAULT_WORD_AUDIO_BYTES) : 0;
-                const nextBytes = (prevEntry ? prevEntry.bytes : 0) + addedBytes;
+                if (result.ok) {
+                  accumulatedBytes += result.bytes || DEFAULT_WORD_AUDIO_BYTES;
+                }
+                const displayDone = Math.min(Math.max(doneCount, prevSavedCount), totalWords);
+                const displayBytes = Math.max(accumulatedBytes, prevSavedBytes);
                 const unavailList = Array.from(unavailableSet);
                 manifest.wordAudio[task.surah] = {
-                  count: Math.min(doneCount, totalWords),
-                  bytes: nextBytes,
+                  count: displayDone,
+                  bytes: displayBytes,
                   savedAt: Date.now(),
                   ...(unavailList.length > 0 ? { unavailableUrls: unavailList } : {})
                 };
                 saveManifestToStorage(false);
                 if (activeTasks.get(task.id) === state) {
-                  state.completedUnits = doneCount;
-                  state.percent = Math.min(99, Math.round((doneCount / totalWords) * 100));
+                  state.completedUnits = displayDone;
+                  state.percent = Math.min(99, Math.round((displayDone / totalWords) * 100));
                   emitLiveProgress('word', task.surah, false);
                 }
-              } else if (!result.aborted) {
+              } else if (!result || !result.aborted) {
                 failedCount++;
               }
             }
-          };
-
-          const workers = [];
-          for (let w = 0; w < concurrency; w++) workers.push(worker());
-          await Promise.all(workers);
+          });
 
           const wasStopped = state.stopped || controller.signal.aborted;
-          saveManifestToStorage(true);
-
           if (!wasStopped && doneCount >= urls.length && urls.length > 0) {
+            const unavailList = Array.from(unavailableSet);
+            manifest.wordAudio[task.surah] = {
+              count: Math.max(urls.length, totalWords),
+              bytes: accumulatedBytes > 0 ? accumulatedBytes : prevSavedBytes,
+              savedAt: Date.now(),
+              ...(unavailList.length > 0 ? { unavailableUrls: unavailList } : {})
+            };
             completedOk = true;
           } else if (!wasStopped && failedCount > 0) {
             showToastSafe(`সূরা ${getSurahName(task.surah)}-এর কিছু শব্দ ডাউনলোড হয়নি—আবার ট্যাপ করে বাকিটা সম্পন্ন করুন।`, 'warning');
           }
+          saveManifestToStorage(true);
         } else if (!controller.signal.aborted && !state.stopped) {
-          // Already 100% cached (including any permanently unavailable CDN files)
           if (urls.length > 0) {
             const prev = manifest.wordAudio[task.surah];
             const unavailList = Array.from(unavailableSet);
@@ -1082,6 +1263,9 @@
 
     state.stopped = true;
     activeTasks.delete(id);
+    if (type === 'word') {
+      sharedWordPool.cancelJob(id);
+    }
     try {
       state.controller.abort();
     } catch (e) {}
@@ -1122,6 +1306,7 @@
         if (state.task.type === tabTypeOnly) {
           state.stopped = true;
           activeTasks.delete(id);
+          if (state.task.type === 'word') sharedWordPool.cancelJob(id);
           try { state.controller.abort(); } catch (e) {}
           rowsToPatch.push(state.task);
           stoppedSomething = true;
@@ -1136,6 +1321,7 @@
       for (const [id, state] of Array.from(activeTasks.entries())) {
         state.stopped = true;
         activeTasks.delete(id);
+        if (state.task.type === 'word') sharedWordPool.cancelJob(id);
         try { state.controller.abort(); } catch (e) {}
         rowsToPatch.push(state.task);
         stoppedSomething = true;
@@ -1707,7 +1893,7 @@
 
         let labelText = '';
         if (ayahActive.length > 0 && wordActive.length > 0) {
-          labelText = `তিলাওয়াত (${toBn(ayahActive.length)}টি) ও শব্দ অডিও: ${getSurahName(wordActive[0].task.surah)}${queueSuffix}`;
+          labelText = `তিলাওয়াত (${toBn(ayahActive.length)}টি) ও শব্দ অডিও (${toBn(wordActive.length)}টি)${queueSuffix}`;
         } else if (ayahActive.length > 1) {
           const names = ayahActive
             .slice(0, 2)
@@ -1715,6 +1901,13 @@
             .join(', ');
           const extra = ayahActive.length > 2 ? ` +${toBn(ayahActive.length - 2)}` : '';
           labelText = `${toBn(ayahActive.length)}টি সূরা ডাউনলোড হচ্ছে (${names}${extra})${queueSuffix}`;
+        } else if (wordActive.length > 1) {
+          const names = wordActive
+            .slice(0, 2)
+            .map((a) => getSurahName(a.task.surah))
+            .join(', ');
+          const extra = wordActive.length > 2 ? ` +${toBn(wordActive.length - 2)}` : '';
+          labelText = `${toBn(wordActive.length)}টি সূরার শব্দ অডিও (${names}${extra})${queueSuffix}`;
         } else {
           const t = activeList[0].task;
           const kindLabel = t.type === 'ayah' ? 'তিলাওয়াত' : 'শব্দ অডিও';
@@ -1877,7 +2070,9 @@
       queue: queue.map((t) => ({ ...t })),
       concurrency: {
         surahs: MAX_PARALLEL_SURAH_DOWNLOADS,
-        words: WORD_AUDIO_CONCURRENCY
+        wordSurahs: MAX_PARALLEL_WORD_SURAH_TASKS,
+        words: WORD_AUDIO_CONCURRENCY,
+        activeWordWorkers: sharedWordPool.getActiveWorkerCount()
       }
     };
   }
@@ -1886,6 +2081,7 @@
     MAX_PARALLEL_SURAH_DOWNLOADS,
     MAX_PARALLEL_WORD_SURAH_TASKS,
     WORD_AUDIO_CONCURRENCY,
+    createSharedWordDownloadPool,
     makeTaskId,
     getParallelTaskLimit,
     canStartTaskType,
