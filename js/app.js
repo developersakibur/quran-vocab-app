@@ -166,7 +166,9 @@
   }
 
   // Audio Playback Helpers
-  async function playAudioUrl(url, triggerBtn) {
+  async function playAudioUrl(url, triggerBtn, options = {}) {
+    const playbackRate = Number(options && options.playbackRate) || 1.0;
+    const forceRestart = Boolean(options && options.forceRestart);
     ayahClipPlaySeq++;
     clearAyahClipWatcher();
     if (currentPlayingBtn && currentPlayingBtn !== triggerBtn) {
@@ -175,7 +177,7 @@
 
     const resolvedSrc = await resolveAudioSrcWithOfflineCache(url);
 
-    if (!audioPlayer.paused && (audioPlayer.src === resolvedSrc || audioPlayer.dataset.rawUrl === url)) {
+    if (!forceRestart && !audioPlayer.paused && (audioPlayer.src === resolvedSrc || audioPlayer.dataset.rawUrl === url)) {
       audioPlayer.pause();
       if (triggerBtn) triggerBtn.classList.remove('playing');
       currentPlayingBtn = null;
@@ -191,12 +193,15 @@
     audioPlayer.dataset.clipKey = '';
     audioPlayer.dataset.rawUrl = url;
     audioPlayer.src = resolvedSrc;
+    audioPlayer.playbackRate = playbackRate;
+    try { audioPlayer.currentTime = 0; } catch (_) {}
     audioPlayer.play().catch((err) => {
       console.warn('Audio play notice:', err);
     });
 
     audioPlayer.onended = () => {
       clearAyahClipWatcher();
+      audioPlayer.playbackRate = 1.0;
       if (currentPlayingBtn) currentPlayingBtn.classList.remove('playing');
       currentPlayingBtn = null;
     };
@@ -371,7 +376,7 @@
     }
   }
 
-  function playWordAudio(wordKey, triggerBtn) {
+  function playWordAudio(wordKey, triggerBtn, options = {}) {
     const parts = String(wordKey || '').split(':');
     const [s, a, w] = parts.map((n) => String(n).padStart(3, '0'));
     const surahNum = parseInt(parts[0], 10);
@@ -379,7 +384,7 @@
     const url = `${WORD_AUDIO_BASE}/${s}_${a}_${w}.mp3`;
 
     const wasPlayingSame = !audioPlayer.paused && audioPlayer.dataset.rawUrl === url;
-    playAudioUrl(url, triggerBtn);
+    playAudioUrl(url, triggerBtn, options);
 
     if (!wasPlayingSame && surahNum >= 1 && surahNum <= 114 && window.ReadingHistory) {
       let durationCredited = false;
@@ -542,7 +547,15 @@
     autoScroll: true,
     lastAutoScrollAt: 0,
     isSeeking: false,
-    barEl: null
+    barEl: null,
+    loop: {
+      enabled: false,
+      mode: 'ayah', // 'ayah' | 'range'
+      startAyah: 1,
+      endAyah: 1,
+      repeatLimit: 1, // 1 = off, 3, 5, 0 = infinite
+      completedLoops: 0
+    }
   };
 
   function computeAutoScrollTargetTop(input) {
@@ -694,9 +707,47 @@
     return toBnNumber(`${mm}:${ss}`);
   }
 
+  function syncRecitationLoopUI() {
+    if (!recitation.barEl) return;
+    const loopBtn = recitation.barEl.querySelector('#player-loop-btn');
+    const rangeBtn = recitation.barEl.querySelector('#player-range-btn');
+    const statusChip = recitation.barEl.querySelector('#player-loop-status-chip');
+    const l = recitation.loop;
+
+    if (loopBtn) {
+      let label = '১×';
+      if (l.enabled) {
+        if (l.repeatLimit === 0) label = '∞';
+        else label = `${toBnNumber(l.repeatLimit)}×`;
+      }
+      loopBtn.textContent = label;
+      loopBtn.classList.toggle('active', Boolean(l.enabled));
+      loopBtn.setAttribute('aria-pressed', l.enabled ? 'true' : 'false');
+    }
+
+    if (rangeBtn) {
+      const isRangeActive = Boolean(l.enabled && l.mode === 'range');
+      rangeBtn.classList.toggle('active', isRangeActive);
+      rangeBtn.setAttribute('aria-pressed', isRangeActive ? 'true' : 'false');
+    }
+
+    if (statusChip) {
+      if (l.enabled) {
+        const repText = l.repeatLimit === 0 ? '∞' : `${toBnNumber(l.completedLoops + 1)}/${toBnNumber(l.repeatLimit)}`;
+        statusChip.textContent = l.mode === 'range'
+          ? `আয়াত ${toBnNumber(l.startAyah)}–${toBnNumber(l.endAyah)} (${repText})`
+          : `আয়াত ${toBnNumber(l.startAyah)} (${repText})`;
+        statusChip.style.display = 'inline-flex';
+      } else {
+        statusChip.style.display = 'none';
+      }
+    }
+  }
+
   function ensureRecitationPlayerBar() {
     if (recitation.barEl) {
       syncAutoScrollBtnUI();
+      syncRecitationLoopUI();
       return recitation.barEl;
     }
 
@@ -704,9 +755,33 @@
     bar.className = 'recitation-player-bar';
     bar.id = 'recitation-player-bar';
     bar.innerHTML = `
+      <div class="player-range-popover" id="player-range-popover" style="display:none" role="dialog" aria-label="আয়াত রেঞ্জ লুপ সেটিংস">
+        <div class="player-range-row">
+          <label class="player-range-field">
+            <span>শুরু আয়াত</span>
+            <input type="number" id="player-range-start" min="1" max="286" value="1">
+          </label>
+          <span class="player-range-sep" aria-hidden="true">–</span>
+          <label class="player-range-field">
+            <span>শেষ আয়াত</span>
+            <input type="number" id="player-range-end" min="1" max="286" value="3">
+          </label>
+          <select id="player-range-repeat" class="player-range-select" aria-label="কতবার পুনরাবৃত্তি">
+            <option value="3">৩× বার</option>
+            <option value="5">৫× বার</option>
+            <option value="0">∞ অবিরাম</option>
+          </select>
+        </div>
+        <div class="player-range-actions">
+          <button type="button" class="player-range-apply-btn" id="player-range-apply">রেঞ্জ লুপ চালু</button>
+          <button type="button" class="player-range-clear-btn" id="player-range-clear">লুপ বন্ধ</button>
+        </div>
+      </div>
+
       <div class="player-meta-row">
         <div class="player-info-cluster">
           <span class="player-reciter-name" id="player-surah-title">কারী মিশারি রাশিদ • তিলাওয়াত</span>
+          <span class="player-loop-status-chip tabular-nums" id="player-loop-status-chip" style="display:none"></span>
           <span class="player-live-word-pill" id="player-live-word-pill" style="display:none">
             <span class="ar" id="player-live-word-ar"></span>
           </span>
@@ -725,7 +800,10 @@
       </div>
 
       <div class="player-controls-row">
-        <button type="button" class="player-speed-btn" id="player-speed-btn" title="তিলাওয়াতের গতি">1x</button>
+        <div class="player-left-tools">
+          <button type="button" class="player-speed-btn" id="player-speed-btn" title="তিলাওয়াতের গতি">1x</button>
+          <button type="button" class="player-loop-btn tabular-nums" id="player-loop-btn" title="আয়াত পুনরাবৃত্তি (১× / ৩× / ৫× / ∞)" aria-label="আয়াত পুনরাবৃত্তি" aria-pressed="false">১×</button>
+        </div>
         <div class="player-transport-center">
           <button type="button" class="player-nav-btn" id="player-prev-ayah-btn" title="পূর্ববর্তী আয়াত" aria-label="পূর্ববর্তী আয়াত">
             ${Icons.skipBack}
@@ -737,9 +815,14 @@
             ${Icons.skipForward}
           </button>
         </div>
-        <button type="button" class="player-autoscroll-btn active" id="player-autoscroll-btn" title="অটো-স্ক্রোল অন/অফ" aria-label="অটো-স্ক্রোল চালু বা বন্ধ করুন" aria-pressed="true">
-          <span class="icon">${Icons.autoScroll || Icons.repeat}</span>
-        </button>
+        <div class="player-right-tools">
+          <button type="button" class="player-range-btn" id="player-range-btn" title="আয়াত রেঞ্জ লুপ (হিফজ মোড)" aria-label="আয়াত রেঞ্জ লুপ" aria-pressed="false">
+            <span class="icon">${Icons.repeat}</span>
+          </button>
+          <button type="button" class="player-autoscroll-btn active" id="player-autoscroll-btn" title="অটো-স্ক্রোল অন/অফ" aria-label="অটো-স্ক্রোল চালু বা বন্ধ করুন" aria-pressed="true">
+            <span class="icon">${Icons.autoScroll || Icons.repeat}</span>
+          </button>
+        </div>
       </div>
     `;
 
@@ -749,6 +832,14 @@
     const playBtn = bar.querySelector('#player-play-btn');
     const scrubber = bar.querySelector('#player-scrubber');
     const speedBtn = bar.querySelector('#player-speed-btn');
+    const loopBtn = bar.querySelector('#player-loop-btn');
+    const rangeBtn = bar.querySelector('#player-range-btn');
+    const rangePopover = bar.querySelector('#player-range-popover');
+    const rangeStartInput = bar.querySelector('#player-range-start');
+    const rangeEndInput = bar.querySelector('#player-range-end');
+    const rangeRepeatSelect = bar.querySelector('#player-range-repeat');
+    const rangeApplyBtn = bar.querySelector('#player-range-apply');
+    const rangeClearBtn = bar.querySelector('#player-range-clear');
     const autoScrollBtn = bar.querySelector('#player-autoscroll-btn');
     const closeBtn = bar.querySelector('#player-close-btn');
     const prevAyahBtn = bar.querySelector('#player-prev-ayah-btn');
@@ -759,6 +850,7 @@
     };
 
     closeBtn.onclick = () => {
+      if (rangePopover) rangePopover.style.display = 'none';
       stopRecitation();
     };
 
@@ -770,6 +862,96 @@
       recitation.audio.playbackRate = recitation.playbackRate;
       speedBtn.textContent = `${recitation.playbackRate}x`;
     };
+
+    if (loopBtn) {
+      loopBtn.onclick = () => {
+        const cycle = [1, 3, 5, 0];
+        const cur = recitation.loop.enabled ? recitation.loop.repeatLimit : 1;
+        const nextLimit = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+        const curAyah = recitation.activeAyah || recitation.startAyahNumber || 1;
+        if (nextLimit === 1) {
+          recitation.loop.enabled = false;
+          recitation.loop.repeatLimit = 1;
+          recitation.loop.completedLoops = 0;
+          showToast('আয়াত পুনরাবৃত্তি বন্ধ', 1200);
+        } else {
+          recitation.loop.enabled = true;
+          recitation.loop.mode = 'ayah';
+          recitation.loop.startAyah = curAyah;
+          recitation.loop.endAyah = curAyah;
+          recitation.loop.repeatLimit = nextLimit;
+          recitation.loop.completedLoops = 0;
+          const label = nextLimit === 0 ? 'অবিরাম (∞)' : `${toBnNumber(nextLimit)} বার`;
+          showToast(`আয়াত ${toBnNumber(curAyah)} পুনরাবৃত্তি: ${label}`, 1500);
+        }
+        syncRecitationLoopUI();
+      };
+    }
+
+    if (rangeBtn && rangePopover) {
+      rangeBtn.onclick = () => {
+        const isOpen = rangePopover.style.display !== 'none';
+        if (isOpen) {
+          rangePopover.style.display = 'none';
+          return;
+        }
+        const totalInSurah = recitation.segmentsData && recitation.segmentsData.ayahs
+          ? Object.keys(recitation.segmentsData.ayahs).length
+          : 286;
+        const curAyah = recitation.activeAyah || recitation.startAyahNumber || 1;
+        if (rangeStartInput) {
+          rangeStartInput.max = String(totalInSurah);
+          rangeStartInput.value = String(recitation.loop.enabled && recitation.loop.mode === 'range' ? recitation.loop.startAyah : curAyah);
+        }
+        if (rangeEndInput) {
+          rangeEndInput.max = String(totalInSurah);
+          rangeEndInput.value = String(recitation.loop.enabled && recitation.loop.mode === 'range' ? recitation.loop.endAyah : Math.min(totalInSurah, curAyah + 2));
+        }
+        rangePopover.style.display = 'block';
+      };
+    }
+
+    if (rangeApplyBtn) {
+      rangeApplyBtn.onclick = () => {
+        const totalInSurah = recitation.segmentsData && recitation.segmentsData.ayahs
+          ? Object.keys(recitation.segmentsData.ayahs).length
+          : 286;
+        const startVal = Math.max(1, Math.min(totalInSurah, parseInt(rangeStartInput.value, 10) || 1));
+        const endVal = Math.max(startVal, Math.min(totalInSurah, parseInt(rangeEndInput.value, 10) || startVal));
+        const repeatVal = parseInt(rangeRepeatSelect.value, 10);
+        recitation.loop.enabled = true;
+        recitation.loop.mode = 'range';
+        recitation.loop.startAyah = startVal;
+        recitation.loop.endAyah = endVal;
+        recitation.loop.repeatLimit = Number.isFinite(repeatVal) ? repeatVal : 3;
+        recitation.loop.completedLoops = 0;
+
+        if (recitation.segmentsData && recitation.segmentsData.ayahs && recitation.segmentsData.ayahs[String(startVal)]) {
+          const seekSec = recitation.segmentsData.ayahs[String(startVal)].timestamp_from / 1000;
+          recitation.audio.currentTime = seekSec;
+          if (!recitation.isPlaying) {
+            recitation.audio.play().then(() => {
+              recitation.isPlaying = true;
+              updatePlayBtnState();
+              startRecitationSyncLoop();
+            }).catch(() => {});
+          }
+        }
+        if (rangePopover) rangePopover.style.display = 'none';
+        syncRecitationLoopUI();
+        showToast(`আয়াত ${toBnNumber(startVal)}–${toBnNumber(endVal)} লুপ চালু হয়েছে`, 1800);
+      };
+    }
+
+    if (rangeClearBtn) {
+      rangeClearBtn.onclick = () => {
+        recitation.loop.enabled = false;
+        recitation.loop.completedLoops = 0;
+        if (rangePopover) rangePopover.style.display = 'none';
+        syncRecitationLoopUI();
+        showToast('আয়াত লুপ বন্ধ করা হয়েছে', 1200);
+      };
+    }
 
     autoScrollBtn.onclick = () => {
       recitation.autoScroll = !recitation.autoScroll;
@@ -783,6 +965,7 @@
       }
     };
     syncAutoScrollBtnUI();
+    syncRecitationLoopUI();
 
     scrubber.addEventListener('input', () => {
       recitation.isSeeking = true;
@@ -801,10 +984,12 @@
     });
 
     prevAyahBtn.onclick = () => {
+      recitation.loop.completedLoops = 0;
       jumpToAyahRel(-1);
     };
 
     nextAyahBtn.onclick = () => {
+      recitation.loop.completedLoops = 0;
       jumpToAyahRel(1);
     };
 
@@ -920,6 +1105,40 @@
     const ayahsData = recitation.segmentsData.ayahs || {};
     const surahNum = recitation.surahNumber;
     const startAyah = recitation.startAyahNumber || 1;
+
+    // Evaluate Ayah Repeat / Range Loop transition when playing live
+    if (
+      overrideMs === null &&
+      recitation.isPlaying &&
+      !recitation.isSeeking &&
+      recitation.loop &&
+      recitation.loop.enabled &&
+      window.QuranStudyFeatures &&
+      typeof window.QuranStudyFeatures.evaluateAyahLoopTransition === 'function'
+    ) {
+      const loopDecision = window.QuranStudyFeatures.evaluateAyahLoopTransition(curMs, ayahsData, recitation.loop);
+      if (loopDecision.action === 'seek') {
+        recitation.loop.completedLoops = loopDecision.nextCompletedLoops;
+        recitation.audio.currentTime = loopDecision.targetMs / 1000;
+        syncRecitationLoopUI();
+        return;
+      } else if (loopDecision.action === 'complete') {
+        recitation.loop.completedLoops = 0;
+        if (recitation.loop.mode === 'ayah') {
+          const nextNum = (recitation.loop.startAyah || 1) + 1;
+          if (ayahsData[String(nextNum)]) {
+            recitation.loop.startAyah = nextNum;
+            recitation.loop.endAyah = nextNum;
+          } else {
+            recitation.loop.enabled = false;
+          }
+        } else {
+          recitation.loop.enabled = false;
+          showToast('আয়াত রেঞ্জ লুপ সম্পন্ন হয়েছে', 1600);
+        }
+        syncRecitationLoopUI();
+      }
+    }
 
     let curAyahNum = null;
     let curWordKey = null;
@@ -1042,6 +1261,9 @@
         }
       }
       recitation.activeAyah = curAyahNum;
+      if (curAyahNum && window.QuranStudyFeatures && window.QuranStudyFeatures.sideScrubber) {
+        window.QuranStudyFeatures.sideScrubber.syncAyah(curAyahNum);
+      }
     }
 
     if (overrideMs === null && recitation.isPlaying && !recitation.isSeeking && window.ReadingHistory) {
@@ -1264,7 +1486,13 @@
     learnedVisibleLimit: 60,
     frequentQuery: '',
     frequentChapterFilter: 'all', // 'all' | 'g1' | 'g2' | 'g3' | 'g4' | 'g5'
-    frequentVisibleLimit: 60
+    frequentVisibleLimit: 60,
+    directoryMode: 'surah', // 'surah' | 'juz'
+    hideMeaningsMode: false,
+    searchInitialQuery: '',
+    selectedRoot: null,
+    activeSurahEnsureRendered: null,
+    activeSurahTotalAyahs: 0
   };
 
   // ============================================================
@@ -1292,11 +1520,15 @@
       state.practiceGroup = params.group || null;
       state.practiceSubGroup = params.sub || null;
       state.practiceList = params.list ? parseInt(params.list, 10) : null;
+    } else if (viewName === 'search') {
+      state.searchInitialQuery = typeof params.query === 'string' ? params.query : '';
+    } else if (viewName === 'roots') {
+      state.selectedRoot = typeof params.root === 'string' ? params.root : null;
     }
 
     // Build URL hash
     let hash = '';
-    if (viewName === 'ayahs') hash = `#surah=${state.selectedSurah}`;
+    if (viewName === 'ayahs') hash = state.scrollToAyah ? `#surah=${state.selectedSurah}:${state.scrollToAyah}` : `#surah=${state.selectedSurah}`;
     else if (viewName === 'word') hash = `#word=${state.selectedWordKey}`;
     else if (viewName === 'practice') {
       const qp = [];
@@ -1307,6 +1539,10 @@
       if (state.practiceSubGroup) qp.push(`sub=${encodeURIComponent(state.practiceSubGroup)}`);
       if (state.practiceList) qp.push(`list=${state.practiceList}`);
       hash = qp.length > 0 ? `#practice?${qp.join('&')}` : '#practice';
+    } else if (viewName === 'search') {
+      hash = state.searchInitialQuery ? `#search=${encodeURIComponent(state.searchInitialQuery)}` : '#search';
+    } else if (viewName === 'roots') {
+      hash = state.selectedRoot ? `#roots=${encodeURIComponent(state.selectedRoot)}` : '#roots';
     } else if (viewName === 'learned') hash = '#learned';
     else if (viewName === 'frequent') hash = '#frequent';
     else if (viewName === 'bookmarks') hash = '#bookmarks';
@@ -1386,8 +1622,17 @@
       const wordId = hash.replace('#word=', '');
       navigateTo('word', { wordId }, pushState);
     } else if (hash.startsWith('#surah=')) {
-      const surah = parseInt(hash.replace('#surah=', ''), 10);
-      navigateTo('ayahs', { surah }, pushState);
+      const rawSurah = hash.replace('#surah=', '');
+      const parts = rawSurah.split(':');
+      const surah = parseInt(parts[0], 10);
+      const scrollToAyah = parts[1] ? parseInt(parts[1], 10) : null;
+      navigateTo('ayahs', scrollToAyah ? { surah, scrollToAyah } : { surah }, pushState);
+    } else if (hash === '#search' || hash.startsWith('#search=')) {
+      const query = hash.startsWith('#search=') ? decodeURIComponent(hash.slice('#search='.length)) : '';
+      navigateTo('search', { query }, pushState);
+    } else if (hash === '#roots' || hash.startsWith('#roots=')) {
+      const root = hash.startsWith('#roots=') ? decodeURIComponent(hash.slice('#roots='.length)) : null;
+      navigateTo('roots', { root }, pushState);
     } else if (hash.startsWith('#practice')) {
       const queryStr = hash.split('?')[1] || '';
       const urlParams = new URLSearchParams(queryStr);
@@ -1464,6 +1709,11 @@
       }
     });
 
+    // Hide custom side ayah scrollbar whenever leaving ayahs view
+    if (state.currentView !== 'ayahs' && window.QuranStudyFeatures && window.QuranStudyFeatures.sideScrubber) {
+      window.QuranStudyFeatures.sideScrubber.hide();
+    }
+
     // Pause recitation if leaving ayahs view
     if (state.currentView !== 'ayahs' && typeof recitation !== 'undefined' && recitation.isPlaying) {
       recitation.audio.pause();
@@ -1537,6 +1787,22 @@
         renderFrequentWordsView();
         break;
 
+      case 'search':
+        if (backBtn) backBtn.style.display = 'grid';
+        if (titleEl) titleEl.textContent = 'গ্লোবাল শব্দ সার্চ';
+        if (eyebrowEl) eyebrowEl.textContent = '১৯,১২৩টি কুরআনিক শব্দ · বাংলা, আরবি ও রুট';
+        document.getElementById('view-search').classList.add('active');
+        renderGlobalSearchPageView();
+        break;
+
+      case 'roots':
+        if (backBtn) backBtn.style.display = 'grid';
+        if (titleEl) titleEl.textContent = 'মূল অক্ষর অভিধান';
+        if (eyebrowEl) eyebrowEl.textContent = '১,৬৫১টি আরবি রুট ও ক্রিয়ার রূপ';
+        document.getElementById('view-roots').classList.add('active');
+        renderRootExplorerPageView();
+        break;
+
       case 'bookmarks':
         if (backBtn) backBtn.style.display = 'grid';
         if (titleEl) titleEl.textContent = 'সংরক্ষিত শব্দ';
@@ -1588,9 +1854,83 @@
       if (loadingStage) loadingStage.style.display = 'none';
     }
 
-    // Filter Chips & Search setup (wired once to avoid event listener thrashing)
+    // Mount compact Live Quran Coverage % & Daily Goal strip
+    const covMount = document.getElementById('surah-coverage-strip-mount');
+    if (covMount && window.QuranStudyFeatures && typeof window.QuranStudyFeatures.renderCoverageAndDailyGoalWidget === 'function') {
+      window.QuranStudyFeatures.renderCoverageAndDailyGoalWidget(covMount, { compact: true });
+    }
+
+    function syncDirectoryModeUI() {
+      const isJuz = state.directoryMode === 'juz';
+      const tabSurah = document.getElementById('dir-tab-surah');
+      const tabJuz = document.getElementById('dir-tab-juz');
+      const summaryBar = document.getElementById('surah-summary-bar');
+      const filterBar = document.getElementById('surah-filter-bar');
+      const juzListEl = document.getElementById('juz-list');
+      const noResults = document.getElementById('no-results');
+
+      if (tabSurah) {
+        tabSurah.classList.toggle('active', !isJuz);
+        tabSurah.setAttribute('aria-selected', !isJuz ? 'true' : 'false');
+      }
+      if (tabJuz) {
+        tabJuz.classList.toggle('active', isJuz);
+        tabJuz.setAttribute('aria-selected', isJuz ? 'true' : 'false');
+      }
+      if (summaryBar) summaryBar.style.display = isJuz ? 'none' : '';
+      if (filterBar) filterBar.style.display = isJuz ? 'none' : '';
+
+      if (isJuz) {
+        if (listEl) listEl.style.display = 'none';
+        if (noResults) noResults.style.display = 'none';
+        if (juzListEl) {
+          juzListEl.style.display = 'block';
+          if (window.QuranStudyFeatures && typeof window.QuranStudyFeatures.renderJuzDirectoryList === 'function') {
+            window.QuranStudyFeatures.renderJuzDirectoryList(juzListEl, state.allSurahs, (startSurah, startAyah) => {
+              navigateTo('ayahs', { surah: startSurah, scrollToAyah: startAyah });
+            });
+          }
+        }
+      } else {
+        if (juzListEl) juzListEl.style.display = 'none';
+        applySurahFilters();
+      }
+    }
+
+    // Filter Chips, Juz Switcher & Search setup (wired once to avoid event listener thrashing)
     if (!state.surahListWired) {
       state.surahListWired = true;
+
+      const tabSurah = document.getElementById('dir-tab-surah');
+      const tabJuz = document.getElementById('dir-tab-juz');
+      if (tabSurah) {
+        tabSurah.onclick = () => {
+          state.directoryMode = 'surah';
+          syncDirectoryModeUI();
+        };
+      }
+      if (tabJuz) {
+        tabJuz.onclick = () => {
+          state.directoryMode = 'juz';
+          syncDirectoryModeUI();
+        };
+      }
+
+      const openGlobalSearchBtn = document.getElementById('btn-open-global-search');
+      if (openGlobalSearchBtn) {
+        openGlobalSearchBtn.onclick = () => {
+          const rawQ = (document.getElementById('search-box') || {}).value || '';
+          navigateTo('search', { query: rawQ.trim() });
+        };
+      }
+
+      const emptyGlobalSearchBtn = document.getElementById('empty-global-search-btn');
+      if (emptyGlobalSearchBtn) {
+        emptyGlobalSearchBtn.onclick = () => {
+          const rawQ = (document.getElementById('search-box') || {}).value || '';
+          navigateTo('search', { query: rawQ.trim() });
+        };
+      }
 
       const filterChips = document.querySelectorAll('.filter-chip');
       filterChips.forEach((chip) => {
@@ -1612,7 +1952,22 @@
           if (clearBtn) {
             clearBtn.style.display = state.surahQuery ? 'flex' : 'none';
           }
+          if (state.directoryMode === 'juz' && state.surahQuery) {
+            state.directoryMode = 'surah';
+            syncDirectoryModeUI();
+            return;
+          }
           applySurahFilters();
+        };
+        searchInput.onkeydown = (e) => {
+          if (e.key === 'Enter' && window.QuranStudyFeatures) {
+            const totals = new Map(state.allSurahs.map((s) => [s.surah, s.total_ayahs]));
+            const jump = window.QuranStudyFeatures.parseSurahAyahJump(searchInput.value, totals);
+            if (jump) {
+              e.preventDefault();
+              navigateTo('ayahs', { surah: jump.surah, scrollToAyah: jump.ayah });
+            }
+          }
         };
       }
 
@@ -1640,13 +1995,52 @@
       }
     }
 
-    // Only rebuild list if empty or filtered
-    if (!listEl.children.length || state.surahQuery || state.surahFilter !== 'all') {
-      applySurahFilters();
-    }
+    syncDirectoryModeUI();
   }
 
   function applySurahFilters() {
+    const quickJumpMount = document.getElementById('surah-quick-jump-mount');
+    const rawSearchVal = ((document.getElementById('search-box') || {}).value || '').trim();
+
+    if (quickJumpMount) {
+      quickJumpMount.innerHTML = '';
+      if (rawSearchVal && window.QuranStudyFeatures) {
+        const totals = new Map(state.allSurahs.map((s) => [s.surah, s.total_ayahs]));
+        const jump = window.QuranStudyFeatures.parseSurahAyahJump(rawSearchVal, totals);
+        if (jump) {
+          const targetSurahMeta = state.allSurahs.find((s) => s.surah === jump.surah);
+          const sName = targetSurahMeta
+            ? (targetSurahMeta.name_bn_script || targetSurahMeta.name_transliteration)
+            : `সূরা ${toBnNumber(jump.surah)}`;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'surah-quick-jump-banner';
+          btn.id = 'btn-surah-quick-jump';
+          btn.innerHTML = `
+            <span class="sqj-badge tabular-nums">${toBnNumber(jump.surah)}:${toBnNumber(jump.ayah)}</span>
+            <span class="sqj-text">
+              <strong>সরাসরি আয়াতে যান · ${sName}</strong>
+              <small>আয়াত ${toBnNumber(jump.ayah)} খুলতে ট্যাপ করুন</small>
+            </span>
+            <span class="sqj-arrow icon" aria-hidden="true">${Icons.chevronRight || ''}</span>
+          `;
+          btn.onclick = () => navigateTo('ayahs', { surah: jump.surah, scrollToAyah: jump.ayah });
+          quickJumpMount.appendChild(btn);
+        } else if (rawSearchVal.length >= 2) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'surah-word-search-prompt';
+          btn.id = 'btn-surah-word-search-prompt';
+          btn.innerHTML = `
+            <span class="icon" aria-hidden="true">${Icons.search || ''}</span>
+            <span>পূর্ণ কুরআনের শব্দভাণ্ডারে <strong>“${rawSearchVal.replace(/[<>]/g, '')}”</strong> খুঁজুন</span>
+          `;
+          btn.onclick = () => navigateTo('search', { query: rawSearchVal });
+          quickJumpMount.appendChild(btn);
+        }
+      }
+    }
+
     let result = state.allSurahs;
 
     // 1. Revelation Type Filter
@@ -1659,6 +2053,9 @@
     // 2. Search Query Filter
     const query = state.surahQuery;
     if (query) {
+      const normalizedAscii = window.QuranStudyFeatures
+        ? window.QuranStudyFeatures.normalizeDigitsToAscii(query)
+        : query;
       result = result.filter((s) => {
         const num = String(s.surah);
         const bnScript = (s.name_bn_script || '').toLowerCase();
@@ -1667,6 +2064,7 @@
         const arName = (s.name_arabic || '').toLowerCase();
         return (
           num.includes(query) ||
+          num.includes(normalizedAscii) ||
           bnScript.includes(query) ||
           bnMeaning.includes(query) ||
           enName.includes(query) ||
@@ -1737,10 +2135,15 @@
   // ============================================================
 
   async function renderAyahsView(surahNumber) {
+    const viewEl = document.getElementById('view-ayahs');
     const container = document.getElementById('ayahs-container');
     const banner = document.getElementById('surah-hero-banner');
     const titleEl = document.getElementById('topbar-title');
     const eyebrowEl = document.getElementById('topbar-eyebrow');
+
+    if (viewEl) {
+      viewEl.classList.toggle('hide-meanings-mode', Boolean(state.hideMeaningsMode));
+    }
 
     const surahMeta = await QuranDB.getSurahMeta(surahNumber);
     if (surahMeta) {
@@ -1749,9 +2152,34 @@
       if (eyebrowEl) eyebrowEl.textContent = `সূরা • ${surahMeta.name_translation_bn || surahMeta.name_bn || ''}`;
     }
 
+    function syncHideMeaningsBtnUI() {
+      const hideBtn = document.getElementById('cta-hide-meanings-surah');
+      if (viewEl) viewEl.classList.toggle('hide-meanings-mode', Boolean(state.hideMeaningsMode));
+      if (!hideBtn) return;
+      hideBtn.classList.toggle('active', Boolean(state.hideMeaningsMode));
+      hideBtn.setAttribute('aria-pressed', state.hideMeaningsMode ? 'true' : 'false');
+      hideBtn.innerHTML = `
+        <span class="icon">${state.hideMeaningsMode ? (Icons.eye || Icons.book) : (Icons.eyeOff || Icons.book)}</span>
+        <span>${state.hideMeaningsMode ? 'অর্থ দেখান' : 'অর্থ লুকান'}</span>
+      `;
+    }
+
     // 1. Instant Cache: If already rendered for this surah, do not wipe out or reload
     if (state.currentlyRenderedSurahId === surahNumber && container.children.length > 0) {
+      syncHideMeaningsBtnUI();
+      if (window.QuranStudyFeatures && window.QuranStudyFeatures.sideScrubber) {
+        window.QuranStudyFeatures.sideScrubber.attach(
+          surahNumber,
+          state.activeSurahTotalAyahs || (surahMeta ? surahMeta.total_ayahs : 0),
+          state.activeSurahEnsureRendered
+        );
+      }
       if (state.highlightWordKey) {
+        const wParts = String(state.highlightWordKey).split(':');
+        const wAyah = parseInt(wParts[1], 10);
+        if (wAyah && typeof state.activeSurahEnsureRendered === 'function') {
+          state.activeSurahEnsureRendered(wAyah);
+        }
         setTimeout(() => {
           const tokenEl = document.getElementById(`word-token-${state.highlightWordKey.replace(/:/g, '-')}`);
           if (tokenEl) {
@@ -1764,12 +2192,18 @@
       } else if (state.scrollToAyah) {
         const targetAyah = state.scrollToAyah;
         state.scrollToAyah = null;
+        if (typeof state.activeSurahEnsureRendered === 'function') {
+          state.activeSurahEnsureRendered(targetAyah);
+        }
         setTimeout(() => {
           const cardEl = document.getElementById(`ayah-card-${surahNumber}-${targetAyah}`);
           if (cardEl) {
             cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             cardEl.classList.add('rh-resume-highlight');
             setTimeout(() => cardEl.classList.remove('rh-resume-highlight'), 2200);
+          }
+          if (window.QuranStudyFeatures && window.QuranStudyFeatures.sideScrubber) {
+            window.QuranStudyFeatures.sideScrubber.syncAyah(targetAyah);
           }
         }, 80);
       }
@@ -1809,6 +2243,10 @@
             <span class="icon">${Icons.target}</span>
             <span>অনুশীলন</span>
           </button>
+          <button type="button" class="surah-hide-meanings-cta ${state.hideMeaningsMode ? 'active' : ''}" id="cta-hide-meanings-surah" aria-pressed="${state.hideMeaningsMode ? 'true' : 'false'}" title="নিজেকে যাচাই করতে বাংলা অর্থ লুকান">
+            <span class="icon">${state.hideMeaningsMode ? (Icons.eye || Icons.book) : (Icons.eyeOff || Icons.book)}</span>
+            <span>${state.hideMeaningsMode ? 'অর্থ দেখান' : 'অর্থ লুকান'}</span>
+          </button>
         </div>
         <div class="surah-hold-tip">
           <span class="icon">${Icons.speaker}</span>
@@ -1831,6 +2269,21 @@
       if (pracBtn) {
         pracBtn.onclick = () => {
           navigateTo('practice', { surah: surahNumber });
+        };
+      }
+
+      const hideBtn = document.getElementById('cta-hide-meanings-surah');
+      if (hideBtn) {
+        hideBtn.onclick = () => {
+          state.hideMeaningsMode = !state.hideMeaningsMode;
+          if (state.hideMeaningsMode) {
+            container.querySelectorAll('.word-token.meaning-revealed').forEach((el) => el.classList.remove('meaning-revealed'));
+            container.querySelectorAll('.ayah-translation-box.translation-revealed').forEach((el) => el.classList.remove('translation-revealed'));
+            showToast('অর্থ লুকানো হয়েছে — শব্দে ট্যাপ করলে অর্থ দেখা যাবে', 1800);
+          } else {
+            showToast('সব বাংলা অর্থ দেখানো হচ্ছে', 1200);
+          }
+          syncHideMeaningsBtnUI();
         };
       }
     }
@@ -1898,8 +2351,12 @@
             <span class="word-token-bn">${w.meaning_bn || ''}</span>
           `;
 
-          // Long press to hear audio, quick tap to view detail
+          // Long press to hear audio; quick tap reveals meaning in self-test mode or opens word detail
           attachWordTokenHoldAndClick(token, w.key, () => {
+            if (state.hideMeaningsMode && !token.classList.contains('meaning-revealed')) {
+              token.classList.add('meaning-revealed');
+              return;
+            }
             state.highlightWordKey = w.key;
             navigateTo('word', { wordId: w.key });
           });
@@ -1907,10 +2364,15 @@
           wordsFlow.appendChild(token);
         });
 
-        // Bengali Ayah Translation
+        // Bengali Ayah Translation (tap-to-reveal in Hide Meanings self-test mode)
         const transBox = document.createElement('div');
         transBox.className = 'ayah-translation-box';
         transBox.textContent = ayah.translation_bn;
+        transBox.onclick = () => {
+          if (state.hideMeaningsMode) {
+            transBox.classList.toggle('translation-revealed');
+          }
+        };
 
         card.appendChild(header);
         card.appendChild(wordsFlow);
@@ -1918,32 +2380,55 @@
         return card;
       }
 
-      // Batch DOM Insertion with DocumentFragment
+      // Batch DOM Insertion with synchronous flush helper for instant side-scrollbar & quick-jump
       const totalAyahs = surahData.ayahs.length;
+      const highlightAyahNum = state.highlightWordKey ? parseInt(String(state.highlightWordKey).split(':')[1], 10) : null;
       const targetResumeAyah = state.scrollToAyah ? parseInt(state.scrollToAyah, 10) : null;
-      const CHUNK_SIZE = targetResumeAyah && targetResumeAyah > 25
-        ? Math.min(totalAyahs, targetResumeAyah + 5)
+      const initialTargetAyah = Math.max(highlightAyahNum || 0, targetResumeAyah || 0);
+      const CHUNK_SIZE = initialTargetAyah > 25
+        ? Math.min(totalAyahs, initialTargetAyah + 5)
         : 25;
 
+      let currentIdx = Math.min(totalAyahs, CHUNK_SIZE);
+
       const firstFrag = document.createDocumentFragment();
-      const firstBatch = surahData.ayahs.slice(0, CHUNK_SIZE);
+      const firstBatch = surahData.ayahs.slice(0, currentIdx);
       firstBatch.forEach((ayah) => {
         firstFrag.appendChild(createAyahCard(ayah));
       });
       container.appendChild(firstFrag);
 
+      function ensureAyahsRenderedUpTo(targetAyahNum) {
+        if (state.currentlyRenderedSurahId !== surahNumber) return;
+        const neededCount = Math.min(totalAyahs, Math.max(currentIdx, Math.floor(Number(targetAyahNum) || 1) + 4));
+        if (neededCount <= currentIdx) return;
+        const flushFrag = document.createDocumentFragment();
+        for (let idx = currentIdx; idx < neededCount; idx++) {
+          flushFrag.appendChild(createAyahCard(surahData.ayahs[idx]));
+        }
+        container.appendChild(flushFrag);
+        currentIdx = neededCount;
+      }
+
+      state.activeSurahTotalAyahs = totalAyahs;
+      state.activeSurahEnsureRendered = ensureAyahsRenderedUpTo;
+
+      // Attach sleek right-edge draggable Ayah Scrubber for long Surahs (e.g. Al-Baqarah 286 ayahs)
+      if (window.QuranStudyFeatures && window.QuranStudyFeatures.sideScrubber) {
+        window.QuranStudyFeatures.sideScrubber.attach(surahNumber, totalAyahs, ensureAyahsRenderedUpTo);
+      }
+
       // Smooth progressive load for remaining ayahs in background
-      if (totalAyahs > CHUNK_SIZE) {
-        let currentIdx = CHUNK_SIZE;
+      if (currentIdx < totalAyahs) {
         function renderNextChunk() {
           if (currentIdx >= totalAyahs || state.currentlyRenderedSurahId !== surahNumber) return;
           const nextFrag = document.createDocumentFragment();
-          const nextBatch = surahData.ayahs.slice(currentIdx, currentIdx + 25);
-          nextBatch.forEach((ayah) => {
-            nextFrag.appendChild(createAyahCard(ayah));
-          });
+          const endIdx = Math.min(totalAyahs, currentIdx + 25);
+          for (let i = currentIdx; i < endIdx; i++) {
+            nextFrag.appendChild(createAyahCard(surahData.ayahs[i]));
+          }
           container.appendChild(nextFrag);
-          currentIdx += 25;
+          currentIdx = endIdx;
           if (currentIdx < totalAyahs) {
             requestAnimationFrame(renderNextChunk);
           }
@@ -1964,12 +2449,16 @@
         }, 120);
       } else if (targetResumeAyah) {
         state.scrollToAyah = null;
+        ensureAyahsRenderedUpTo(targetResumeAyah);
         setTimeout(() => {
           const cardEl = document.getElementById(`ayah-card-${surahNumber}-${targetResumeAyah}`);
           if (cardEl) {
             cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             cardEl.classList.add('rh-resume-highlight');
             setTimeout(() => cardEl.classList.remove('rh-resume-highlight'), 2200);
+          }
+          if (window.QuranStudyFeatures && window.QuranStudyFeatures.sideScrubber) {
+            window.QuranStudyFeatures.sideScrubber.syncAyah(targetResumeAyah);
           }
         }, 120);
       }
@@ -2404,9 +2893,10 @@
     if (word.root) {
       const rootJump = heroCard.querySelector('#pill-root-jump');
       if (rootJump) {
+        rootJump.style.cursor = 'pointer';
+        rootJump.title = 'মূল অক্ষর (রুট) অভিধানে খুলুন';
         rootJump.onclick = () => {
-          const sec = document.getElementById('card-root-family');
-          if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          navigateTo('roots', { root: word.root });
         };
       }
     }
@@ -2850,6 +3340,8 @@
       : 'কোনো দুর্বল শব্দ নেই · সব ঠিক আছে';
 
     container.innerHTML = `
+      <div id="practice-coverage-mount"></div>
+
       <div class="detail-card practice-scope-bar">
         <div>
           <div class="practice-scope-label">অনুশীলন পরিসর</div>
@@ -2882,7 +3374,17 @@
           </div>
         </button>
 
-        <!-- Engine 3: Smart 10-Card Learned-Words Flashcards -->
+        <!-- Engine 3: Listening Quiz (Audio-Only MCQ) -->
+        <button type="button" class="practice-engine-card" id="card-engine-listening" data-engine="listening">
+          <div class="engine-icon-wrap engine-icon-listening"><span class="icon">${Icons.headphones || Icons.speaker}</span></div>
+          <div class="engine-info">
+            <h3>লিসেনিং কুইজ</h3>
+            <p>আরবি না দেখে শুধু শব্দের উচ্চারণ শুনে সঠিক বাংলা অর্থ বাছাই করুন।</p>
+            <div class="engine-meta-line tabular-nums">শুনে চেনার অনুশীলন · ০.৭৫x ধীর গতিসহ</div>
+          </div>
+        </button>
+
+        <!-- Engine 4: Smart 10-Card Learned-Words Flashcards -->
         <button type="button" class="practice-engine-card" id="card-engine-flashcard" data-engine="flashcard">
           <div class="engine-icon-wrap engine-icon-3"><span class="icon">${Icons.repeat}</span></div>
           <div class="engine-info">
@@ -2892,7 +3394,7 @@
           </div>
         </button>
 
-        <!-- Engine 4: Weak Words MCQ -->
+        <!-- Engine 5: Weak Words MCQ -->
         <button type="button" class="practice-engine-card" id="card-engine-weak" data-engine="weak">
           <div class="engine-icon-wrap engine-icon-4"><span class="icon">${Icons.warning}</span></div>
           <div class="engine-info">
@@ -2901,8 +3403,23 @@
             <div class="engine-meta-line tabular-nums">${weakMeta}</div>
           </div>
         </button>
+
+        <!-- Engine 6: Root Family & Verb Forms Explorer -->
+        <button type="button" class="practice-engine-card" id="card-engine-roots">
+          <div class="engine-icon-wrap engine-icon-roots"><span class="icon">${Icons.roots || Icons.layers}</span></div>
+          <div class="engine-info">
+            <h3>মূল অক্ষর (রুট) অভিধান</h3>
+            <p>একই আরবি রুট থেকে তৈরি সব শব্দ, ক্রিয়ার ৬টি রূপ ও রুট কুইজ খেলুন।</p>
+            <div class="engine-meta-line tabular-nums">১,৬৫১টি কুরআনিক রুট · রুটভিত্তিক কুইজ</div>
+          </div>
+        </button>
       </div>
     `;
+
+    const covMount = container.querySelector('#practice-coverage-mount');
+    if (covMount && window.QuranStudyFeatures && typeof window.QuranStudyFeatures.renderCoverageAndDailyGoalWidget === 'function') {
+      window.QuranStudyFeatures.renderCoverageAndDailyGoalWidget(covMount, { compact: false });
+    }
 
     const gotoAccBtn = container.querySelector('#btn-goto-account-progress');
     if (gotoAccBtn) {
@@ -2920,6 +3437,11 @@
       };
     }
 
+    const rootsCard = container.querySelector('#card-engine-roots');
+    if (rootsCard) {
+      rootsCard.onclick = () => navigateTo('roots', { root: null });
+    }
+
     container.querySelectorAll('.practice-engine-card[data-engine]').forEach((card) => {
       card.onclick = () => {
         const engine = card.dataset.engine;
@@ -2934,6 +3456,10 @@
         }
         if (engine === 'weak') {
           navigateTo('practice', { engine: 'weak' });
+          return;
+        }
+        if (engine === 'listening') {
+          navigateTo('practice', { surah: state.practiceSurah, engine: 'listening' });
           return;
         }
         navigateTo('practice', { surah: state.practiceSurah, engine });
@@ -5427,7 +5953,7 @@
   }
 
   // Active Drill Execution
-  async function startPracticeDrill(engine, surahNumber, ayahNumber = null, customDeckWords = null, mcqListMeta = null, customDistractorPool = null, ayahQuizMeta = null) {
+  async function startPracticeDrill(engine, surahNumber, ayahNumber = null, customDeckWords = null, mcqListMeta = null, customDistractorPool = null, ayahQuizMeta = null, rootQuizMeta = null) {
     const stage = document.getElementById('practice-drill-stage');
     stage.innerHTML = '<div class="loading-spinner" style="margin:40px auto"></div>';
 
@@ -5440,6 +5966,7 @@
     let drillHeaderTitle = '';
     const isFlashcardMode = engine === 'flashcard' || engine === 'saved-flashcard';
     const isWeakMode = engine === 'weak';
+    const isListeningMode = engine === 'listening';
     const isGlobalFrequencyMode = !surahNumber && !ayahNumber && !Array.isArray(customDeckWords) && !mcqListMeta && !ayahQuizMeta
       && engine === 'mcq';
     let flashcardPoolTotal = 0;
@@ -5447,11 +5974,71 @@
 
     if (Array.isArray(customDeckWords) && customDeckWords.length > 0) {
       words = customDeckWords.slice();
-      drillHeaderTitle = mcqListMeta
-        ? `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • ${mcqListMeta.isDirectGroup ? mcqListMeta.groupTitleBn : mcqListMeta.subGroupTitleBn}`
-        : ayahQuizMeta
-          ? `${ayahQuizMeta.surahNameBn} • আয়াত ${toBnNumber(ayahQuizMeta.ayah)}`
-          : (isFlashcardMode ? 'স্মার্ট ফ্ল্যাশকার্ড রিভিশন' : 'অনুশীলন');
+      drillHeaderTitle = rootQuizMeta
+        ? `মূল অক্ষর কুইজ • ${rootQuizMeta.spacedRoot}`
+        : mcqListMeta
+          ? `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • ${mcqListMeta.isDirectGroup ? mcqListMeta.groupTitleBn : mcqListMeta.subGroupTitleBn}`
+          : ayahQuizMeta
+            ? `${ayahQuizMeta.surahNameBn} • আয়াত ${toBnNumber(ayahQuizMeta.ayah)}`
+            : (isFlashcardMode ? 'স্মার্ট ফ্ল্যাশকার্ড রিভিশন' : 'অনুশীলন');
+    } else if (isListeningMode) {
+      drillHeaderTitle = surahNumber ? `লিসেনিং কুইজ • সূরা ${toBnNumber(surahNumber)}` : 'লিসেনিং কুইজ (শুনে অর্থ)';
+      if (surahNumber) {
+        const sData = await QuranDB.loadSurah(surahNumber);
+        (sData.ayahs || []).forEach((a) => {
+          (a.words || []).forEach((w) => {
+            if (w.meaning_bn && w.meaning_bn.trim()) {
+              words.push({
+                ...w,
+                surah: surahNumber,
+                ayah: a.ayah,
+                verse_key: a.verse_key || `${surahNumber}:${a.ayah}`,
+                ayah_arabic: a.arabic,
+                ayah_translation_bn: a.translation_bn
+              });
+            }
+          });
+        });
+      } else {
+        // Prefer learned words first, supplement with top-frequency Quranic words
+        try {
+          if (window.QuranStudyFeatures && typeof window.QuranStudyFeatures.loadFrequencyIndex === 'function') {
+            const freqData = await window.QuranStudyFeatures.loadFrequencyIndex();
+            const entries = (freqData && freqData.entries) || [];
+            const topPool = entries
+              .filter((e) => Array.isArray(e) && e[0] && e[1] && e[2] && String(e[2]).trim())
+              .slice(0, 120)
+              .map(([key, arabic, meaning_bn, count, juz, root]) => {
+                const p = String(key).split(':');
+                return {
+                  key,
+                  arabic,
+                  meaning_bn,
+                  occurrenceCount: Number(count) || 1,
+                  juz: Number(juz) || 1,
+                  root: root || '',
+                  surah: parseInt(p[0], 10) || 1,
+                  ayah: parseInt(p[1], 10) || 1,
+                  verse_key: `${p[0]}:${p[1]}`
+                };
+              });
+            globalDistractorPool = topPool.slice();
+            const shuffled = topPool.slice().sort(() => Math.random() - 0.5);
+            words = shuffled.slice(0, 10);
+          }
+        } catch (_) {}
+
+        if (words.length === 0) {
+          const fallbackSurah = await QuranDB.loadSurah(1);
+          fallbackSurah.ayahs.forEach((a) => {
+            (a.words || []).forEach((w) => {
+              if (w.meaning_bn && w.meaning_bn.trim()) {
+                words.push({ ...w, surah: 1, ayah: a.ayah, verse_key: `1:${a.ayah}` });
+              }
+            });
+          });
+        }
+      }
     } else if (isFlashcardMode) {
       // Smart 10-Card Learned-Words Flashcard Rotation across ALL learned words (no surah filter)
       const progressMap = typeof QuranDB.getAllWordProgressMap === 'function'
@@ -5786,7 +6373,11 @@
       const progressPercent = Math.round((currentIndex / drillSet.length) * 100);
 
       let titleText;
-      if (mcqListMeta) {
+      if (rootQuizMeta) {
+        titleText = `রুট (${rootQuizMeta.spacedRoot}) • প্রশ্ন ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
+      } else if (isListeningMode) {
+        titleText = `লিসেনিং কুইজ • প্রশ্ন ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
+      } else if (mcqListMeta) {
         titleText = `লিস্ট ${toBnNumber(mcqListMeta.listNumber)} • প্রশ্ন ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
       } else if (ayahQuizMeta) {
         titleText = `আয়াত ${toBnNumber(ayahQuizMeta.surah)}:${toBnNumber(ayahQuizMeta.ayah)} • শব্দ ${toBnNumber(currentIndex + 1)} / ${toBnNumber(drillSet.length)}`;
@@ -5815,6 +6406,10 @@
       `;
 
       stage.querySelector('#drill-exit-btn').onclick = () => {
+        if (rootQuizMeta && rootQuizMeta.root) {
+          navigateTo('roots', { root: rootQuizMeta.root });
+          return;
+        }
         if (mcqListMeta) {
           navigateTo('practice', {
             engine: 'mcq-lists',
@@ -6042,6 +6637,9 @@
 
           // Source: 'flashcard' — Medium/Easy updates 4-tier rotation; Hard/Forgot demotes from Learned Words into Weak Words
           await QuranDB.recordSpacedRepetition(q.key, grade, q, { source: 'flashcard' });
+          if (window.QuranStudyFeatures && typeof window.QuranStudyFeatures.incrementTodayWordCount === 'function') {
+            window.QuranStudyFeatures.incrementTodayWordCount(1);
+          }
           currentIndex++;
           renderQuestion();
         };
@@ -6050,7 +6648,7 @@
       area.appendChild(wrapper);
     }
 
-    // MCQ Question Render (Ayah Word Quiz, Frequency MCQ & Weak Words MCQ)
+    // MCQ Question Render (Ayah Word Quiz, Frequency MCQ, Weak Words MCQ, Listening Quiz & Root Quiz)
     function renderMcqQuestion(area, q) {
       const card = document.createElement('div');
 
@@ -6059,48 +6657,99 @@
 
       const occurrenceCount = Math.max(1, Number(q.occurrenceCount || 1));
 
-      card.innerHTML = `
-        <div class="drill-word-card">
-          ${q.verse_key ? `
+      if (isListeningMode) {
+        card.innerHTML = `
+          <div class="drill-word-card listening-drill-card">
             <div class="drill-card-topbar drill-card-topbar-clean">
-              <span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>
+              <span class="drill-verse-pill">লিসেনিং চ্যালেঞ্জ</span>
+              ${q.verse_key ? `<span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>` : ''}
             </div>
-          ` : ''}
-          <div class="drill-occurrence-bar" id="drill-mcq-occurrence-counter" aria-label="পূর্ণ কুরআনে শব্দের মোট সংখ্যা">
-            <span class="drill-occurrence-label">পূর্ণ কুরআনে এসেছে:</span>
-            <strong class="drill-occurrence-count tabular-nums">${toBnNumber(occurrenceCount)} বার</strong>
-          </div>
-          <div class="drill-arabic-word">${q.arabic}</div>
-          ${q.root ? `<div class="drill-word-root">মূল ধাতু: <strong>${q.root}</strong></div>` : ''}
-          <div class="drill-question-prompt">নিচের কোনটি সঠিক বাংলা অর্থ?</div>
-          <div class="flashcard-bottom-audio-bar drill-bottom-audio-bar" role="group" aria-label="অডিও উচ্চারণ ও তিলাওয়াত">
-            <button type="button" class="flashcard-audio-full-btn word-audio" id="drill-mcq-word-audio" aria-label="শব্দের উচ্চারণ শুনুন" title="শব্দটির অডিও শুনুন">
-              <span class="icon" aria-hidden="true">${Icons.volume2 || Icons.speaker}</span>
-              <span>শব্দের অডিও</span>
-            </button>
-            <button type="button" class="flashcard-audio-full-btn ayah-audio" id="drill-mcq-ayah-audio" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন" title="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
-              <span class="icon" aria-hidden="true">${Icons.speaker}</span>
-              <span>আয়াতের অডিও</span>
-            </button>
-          </div>
-        </div>
-        <div class="options-grid" id="drill-options"></div>
-      `;
 
-      const wordAudioBtn = card.querySelector('#drill-mcq-word-audio');
-      if (wordAudioBtn) {
-        wordAudioBtn.onclick = (e) => {
-          e.stopPropagation();
-          playWordAudio(q.key, wordAudioBtn);
-        };
-      }
+            <div class="listening-audio-stage" id="listening-audio-stage">
+              <button type="button" class="listening-play-hero-btn" id="drill-listening-play" aria-label="শব্দটি শুনুন">
+                <span class="icon">${Icons.headphones || Icons.speaker}</span>
+                <span>শব্দটি শুনুন</span>
+              </button>
+              <button type="button" class="listening-slow-btn" id="drill-listening-slow" aria-label="ধীর গতিতে (০.৭৫x) শুনুন">
+                ০.৭৫x ধীর গতি
+              </button>
+            </div>
 
-      const ayahAudioBtn = card.querySelector('#drill-mcq-ayah-audio');
-      if (ayahAudioBtn) {
-        ayahAudioBtn.onclick = (e) => {
-          e.stopPropagation();
-          playAyahAudio(sNum, aNum, ayahAudioBtn);
-        };
+            <div class="listening-word-reveal" id="listening-word-reveal" style="display:none">
+              <div class="drill-arabic-word">${q.arabic}</div>
+              ${q.root ? `<div class="drill-word-root">মূল ধাতু: <strong>${q.root}</strong></div>` : ''}
+            </div>
+
+            <div class="drill-question-prompt">শুনে সঠিক বাংলা অর্থ নির্বাচন করুন</div>
+          </div>
+          <div class="options-grid" id="drill-options"></div>
+        `;
+
+        const listenPlayBtn = card.querySelector('#drill-listening-play');
+        const listenSlowBtn = card.querySelector('#drill-listening-slow');
+        if (listenPlayBtn) {
+          listenPlayBtn.onclick = (e) => {
+            e.stopPropagation();
+            playWordAudio(q.key, listenPlayBtn, { playbackRate: 1.0, forceRestart: true });
+          };
+        }
+        if (listenSlowBtn) {
+          listenSlowBtn.onclick = (e) => {
+            e.stopPropagation();
+            playWordAudio(q.key, listenSlowBtn, { playbackRate: 0.75, forceRestart: true });
+          };
+        }
+
+        // Auto-play word pronunciation once when the listening question appears
+        setTimeout(() => {
+          if (document.body.contains(card) && listenPlayBtn) {
+            playWordAudio(q.key, listenPlayBtn, { playbackRate: 1.0, forceRestart: true });
+          }
+        }, 180);
+      } else {
+        card.innerHTML = `
+          <div class="drill-word-card">
+            ${q.verse_key ? `
+              <div class="drill-card-topbar drill-card-topbar-clean">
+                <span class="drill-verse-pill">আয়াত ${toBnNumber(q.verse_key)}</span>
+              </div>
+            ` : ''}
+            <div class="drill-occurrence-bar" id="drill-mcq-occurrence-counter" aria-label="পূর্ণ কুরআনে শব্দের মোট সংখ্যা">
+              <span class="drill-occurrence-label">পূর্ণ কুরআনে এসেছে:</span>
+              <strong class="drill-occurrence-count tabular-nums">${toBnNumber(occurrenceCount)} বার</strong>
+            </div>
+            <div class="drill-arabic-word">${q.arabic}</div>
+            ${q.root ? `<div class="drill-word-root">মূল ধাতু: <strong>${q.root}</strong></div>` : ''}
+            <div class="drill-question-prompt">নিচের কোনটি সঠিক বাংলা অর্থ?</div>
+            <div class="flashcard-bottom-audio-bar drill-bottom-audio-bar" role="group" aria-label="অডিও উচ্চারণ ও তিলাওয়াত">
+              <button type="button" class="flashcard-audio-full-btn word-audio" id="drill-mcq-word-audio" aria-label="শব্দের উচ্চারণ শুনুন" title="শব্দটির অডিও শুনুন">
+                <span class="icon" aria-hidden="true">${Icons.volume2 || Icons.speaker}</span>
+                <span>শব্দের অডিও</span>
+              </button>
+              <button type="button" class="flashcard-audio-full-btn ayah-audio" id="drill-mcq-ayah-audio" aria-label="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন" title="সম্পূর্ণ আয়াতের তিলাওয়াত শুনুন">
+                <span class="icon" aria-hidden="true">${Icons.speaker}</span>
+                <span>আয়াতের অডিও</span>
+              </button>
+            </div>
+          </div>
+          <div class="options-grid" id="drill-options"></div>
+        `;
+
+        const wordAudioBtn = card.querySelector('#drill-mcq-word-audio');
+        if (wordAudioBtn) {
+          wordAudioBtn.onclick = (e) => {
+            e.stopPropagation();
+            playWordAudio(q.key, wordAudioBtn);
+          };
+        }
+
+        const ayahAudioBtn = card.querySelector('#drill-mcq-ayah-audio');
+        if (ayahAudioBtn) {
+          ayahAudioBtn.onclick = (e) => {
+            e.stopPropagation();
+            playAyahAudio(sNum, aNum, ayahAudioBtn);
+          };
+        }
       }
 
       const optionsGrid = card.querySelector('#drill-options');
@@ -6120,6 +6769,12 @@
         btn.onclick = async () => {
           const allBtns = optionsGrid.querySelectorAll('.option-btn');
           allBtns.forEach((b) => (b.disabled = true));
+
+          // In Listening Quiz, reveal the hidden Arabic word & root immediately upon answering
+          if (isListeningMode) {
+            const revealBox = card.querySelector('#listening-word-reveal');
+            if (revealBox) revealBox.style.display = 'block';
+          }
 
           const isCorrect = opt.key === q.key;
           if (window.QuizSoundEffects) {
@@ -6152,10 +6807,14 @@
             await QuranDB.recordSpacedRepetition(q.key, 1, q, { source: recordSource });
           }
 
+          if (window.QuranStudyFeatures && typeof window.QuranStudyFeatures.incrementTodayWordCount === 'function') {
+            window.QuranStudyFeatures.incrementTodayWordCount(1);
+          }
+
           setTimeout(() => {
             currentIndex++;
             renderQuestion();
-          }, isCorrect ? 750 : 1300);
+          }, isListeningMode ? 1400 : (isCorrect ? 750 : 1300));
         };
 
         optionsGrid.appendChild(btn);
@@ -6632,6 +7291,7 @@
     }
 
     container.innerHTML = `
+      <div id="learned-coverage-mount"></div>
       <div class="detail-card learned-summary-strip">
         <div class="learned-summary-info">
           <div class="learned-summary-meta tabular-nums">
@@ -6672,6 +7332,11 @@
 
       <div id="learned-table-mount"></div>
     `;
+
+    const learnedCovMount = container.querySelector('#learned-coverage-mount');
+    if (learnedCovMount && window.QuranStudyFeatures && typeof window.QuranStudyFeatures.renderCoverageAndDailyGoalWidget === 'function') {
+      window.QuranStudyFeatures.renderCoverageAndDailyGoalWidget(learnedCovMount, { compact: true });
+    }
 
     const flashBtn = container.querySelector('#btn-learned-launch-flashcards');
     if (flashBtn) {
@@ -7189,6 +7854,112 @@
   }
 
   // ============================================================
+  // GLOBAL SEARCH & ROOT EXPLORER VIEW WRAPPERS
+  // ============================================================
+
+  async function renderGlobalSearchPageView() {
+    const container = document.getElementById('global-search-container');
+    if (!container || !window.QuranStudyFeatures) return;
+    if (state.allSurahs.length === 0) {
+      state.allSurahs = await QuranDB.getSurahsMeta();
+    }
+    const initQ = state.searchInitialQuery || '';
+    state.searchInitialQuery = '';
+    await window.QuranStudyFeatures.renderGlobalSearchView(container, {
+      initialQuery: initQ,
+      allSurahs: state.allSurahs,
+      onJumpAyah: (surah, ayah) => navigateTo('ayahs', { surah, scrollToAyah: ayah }),
+      onOpenWord: (wordKey) => navigateTo('word', { wordId: wordKey }),
+      onPlayWordAudio: (wordKey, btn) => playWordAudio(wordKey, btn),
+      onOpenRoot: (rootVal) => navigateTo('roots', { root: rootVal })
+    });
+  }
+
+  async function startRootFamilyQuiz(family) {
+    if (!family || !Array.isArray(family.topWords) || family.topWords.length === 0) {
+      showToast('এই রুটে কুইজের জন্য পর্যাপ্ত শব্দ পাওয়া যায়নি', 1800);
+      return;
+    }
+
+    const deckWords = family.topWords
+      .filter((w) => {
+        const m = w && (w.meaningBn || w.meaning_bn);
+        return w && w.key && w.arabic && m && String(m).trim();
+      })
+      .slice(0, 10)
+      .map((w) => {
+        const p = String(w.key).split(':');
+        return {
+          key: w.key,
+          arabic: w.arabic,
+          meaning_bn: String(w.meaningBn || w.meaning_bn).trim(),
+          root: family.root,
+          occurrenceCount: w.count || 1,
+          surah: parseInt(p[0], 10) || 1,
+          ayah: parseInt(p[1], 10) || 1,
+          verse_key: `${p[0]}:${p[1]}`
+        };
+      });
+
+    if (deckWords.length === 0) {
+      showToast('এই রুটে বাংলা অর্থসহ শব্দ পাওয়া যায়নি', 1800);
+      return;
+    }
+
+    let distractorPool = [];
+    try {
+      if (window.QuranStudyFeatures && typeof window.QuranStudyFeatures.loadFrequencyIndex === 'function') {
+        const freq = await window.QuranStudyFeatures.loadFrequencyIndex();
+        distractorPool = ((freq && freq.entries) || [])
+          .filter((e) => Array.isArray(e) && e[0] && e[2] && e[5] !== family.root)
+          .slice(0, 80)
+          .map(([key, arabic, meaning_bn, count, _j, root]) => ({
+            key,
+            arabic,
+            meaning_bn,
+            root: root || '',
+            occurrenceCount: Number(count) || 1
+          }));
+      }
+    } catch (_) {}
+
+    // Switch directly to practice drill stage
+    document.querySelectorAll('.app-view').forEach((el) => el.classList.remove('active'));
+    state.currentView = 'practice';
+    state.practiceEngine = 'mcq';
+    const practiceView = document.getElementById('view-practice');
+    if (practiceView) practiceView.classList.add('active');
+    const hub = document.getElementById('practice-hub-container');
+    const stage = document.getElementById('practice-drill-stage');
+    if (hub) hub.style.display = 'none';
+    if (stage) stage.style.display = 'flex';
+    const backBtn = document.getElementById('topbar-back-btn');
+    if (backBtn) backBtn.style.display = 'grid';
+    setPracticeTopbar(`মূল অক্ষর কুইজ`, `রুট: ${family.spacedRoot}`);
+    await startPracticeDrill('mcq', null, null, deckWords, null, distractorPool, null, {
+      root: family.root,
+      spacedRoot: family.spacedRoot
+    });
+  }
+
+  async function renderRootExplorerPageView() {
+    const container = document.getElementById('root-explorer-container');
+    if (!container || !window.QuranStudyFeatures) return;
+    if (state.allSurahs.length === 0) {
+      state.allSurahs = await QuranDB.getSurahsMeta();
+    }
+    const initRoot = state.selectedRoot || null;
+    await window.QuranStudyFeatures.renderRootExplorerView(container, {
+      initialRoot: initRoot,
+      resetSelection: !initRoot,
+      allSurahs: state.allSurahs,
+      onStartRootQuiz: (fam) => startRootFamilyQuiz(fam),
+      onOpenWord: (wordKey) => navigateTo('word', { wordId: wordKey }),
+      onPlayWordAudio: (wordKey, btn) => playWordAudio(wordKey, btn)
+    });
+  }
+
+  // ============================================================
   // APP INITIALIZATION
   // ============================================================
 
@@ -7381,6 +8152,8 @@
     refreshAccountDashboard: renderAccountDashboardView,
     startSurahRecitation,
     stopRecitation,
+    playWordAudio,
+    startRootFamilyQuiz,
     syncRecitationAtMs: async (surahNum, ms, startAyah = 1) => {
       const num = parseInt(surahNum, 10);
       if (!recitation.segmentsData || recitation.surahNumber !== num) {

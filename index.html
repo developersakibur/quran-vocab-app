@@ -17,7 +17,7 @@
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/fonts.css">
-  <link rel="stylesheet" href="css/style.css?v=50">
+  <link rel="stylesheet" href="css/style.css?v=52">
 </head>
 <body>
 
@@ -83,11 +83,27 @@
           </span>
         </button>
 
+        <button type="button" class="sidebar-menu-item" id="sidebar-nav-search" data-nav="search">
+          <span class="sidebar-item-icon" id="sidebar-icon-search"></span>
+          <span class="sidebar-item-text">
+            <strong>গ্লোবাল শব্দ সার্চ</strong>
+            <small>বাংলা অর্থ, আরবি শব্দ ও মূল অক্ষর খুঁজুন</small>
+          </span>
+        </button>
+
+        <button type="button" class="sidebar-menu-item" id="sidebar-nav-roots" data-nav="roots">
+          <span class="sidebar-item-icon" id="sidebar-icon-roots"></span>
+          <span class="sidebar-item-text">
+            <strong>মূল অক্ষর অভিধান</strong>
+            <small>১,৬৫১টি আরবি রুট ও ক্রিয়ার রূপ</small>
+          </span>
+        </button>
+
         <button type="button" class="sidebar-menu-item" id="sidebar-nav-practice" data-nav="practice">
           <span class="sidebar-item-icon" id="sidebar-icon-practice"></span>
           <span class="sidebar-item-text">
             <strong>অনুশীলন ও কুইজ</strong>
-            <small>আয়াত কুইজ, এমসিকিউ ও ফ্ল্যাশকার্ড</small>
+            <small>আয়াত কুইজ, লিসেনিং, এমসিকিউ ও ফ্ল্যাশকার্ড</small>
           </span>
         </button>
 
@@ -238,19 +254,41 @@
        VIEW 1: LEVEL 1 - SURAH DIRECTORY (সূরা তালিকা)
        ============================================================ -->
   <main class="app-view active" id="view-surahs">
-    <!-- Search Bar with Search Icon and Clear Button -->
+    <!-- Search Bar with Search Icon, Clear Button & Global Word Search Shortcut -->
     <div class="search-box-wrap">
       <div class="search-box-inner">
         <span class="search-box-icon" id="search-icon-slot"></span>
-        <input type="text" class="search-box" id="search-box" placeholder="সূরা খুঁজুন (বাংলা, আরবী বা নম্বর)…" autocomplete="off" aria-label="সূরা খুঁজুন">
+        <input type="text" class="search-box" id="search-box" placeholder="সূরা খুঁজুন বা আয়াত (২:২৫৫) লিখুন…" autocomplete="off" aria-label="সূরা খুঁজুন বা আয়াত নম্বরে যান">
         <button type="button" class="search-clear-btn" id="search-clear-btn" style="display:none" aria-label="অনুসন্ধান মুছুন">
           <span class="icon" id="search-clear-icon"></span>
         </button>
       </div>
     </div>
 
+    <!-- Dynamic Quick-Jump (e.g. 2:255) & Global Search Shortcut Mount -->
+    <div id="surah-quick-jump-mount"></div>
+
+    <!-- Live Quran Understanding % & Daily Goal Compact Strip -->
+    <div id="surah-coverage-strip-mount"></div>
+
+    <!-- Directory Mode Switcher: Surah (114) | Juz / Para (30) + Global Word Search -->
+    <div class="directory-switcher-row">
+      <div class="directory-mode-tabs" role="tablist" aria-label="সূরা বা পারা তালিকা নির্বাচন">
+        <button type="button" class="dir-mode-tab active" id="dir-tab-surah" data-dir-mode="surah" role="tab" aria-selected="true">
+          সূরা (১১৪)
+        </button>
+        <button type="button" class="dir-mode-tab" id="dir-tab-juz" data-dir-mode="juz" role="tab" aria-selected="false">
+          পারা / জুজ (৩০)
+        </button>
+      </div>
+      <button type="button" class="dir-global-search-btn" id="btn-open-global-search" aria-label="গ্লোবাল শব্দ ও অর্থ সার্চ খুলুন">
+        <span class="icon" id="icon-dir-word-search"></span>
+        <span>শব্দ সার্চ</span>
+      </button>
+    </div>
+
     <!-- Surah Directory Summary Stats Bar -->
-    <div class="surah-summary-bar">
+    <div class="surah-summary-bar" id="surah-summary-bar">
       <div class="surah-summary-counts">
         <span>১১৪টি সূরা</span>
         <span>•</span>
@@ -293,12 +331,18 @@
     <!-- Surah List Container -->
     <ul class="surah-list" id="surah-list" style="display:none"></ul>
 
+    <!-- 30-Juz (Para) List Container -->
+    <ul class="juz-list" id="juz-list" style="display:none"></ul>
+
     <!-- Empty Search State -->
     <div class="surah-empty-state" id="no-results" style="display:none">
       <div class="empty-state-icon" id="empty-search-icon"></div>
       <h3 class="empty-state-title">কোনো সূরা পাওয়া যায়নি</h3>
-      <p class="empty-state-text">আপনার সার্চ শব্দের সাথে মিল রেখে কোনো সূরা পাওয়া যায়নি। অন্য বানান বা নম্বর দিয়ে চেষ্টা করুন।</p>
-      <button type="button" class="empty-reset-btn" id="empty-reset-btn">সব সূরা দেখুন</button>
+      <p class="empty-state-text">আপনার সার্চ শব্দের সাথে মিল রেখে কোনো সূরা পাওয়া যায়নি। অন্য বানান বা নম্বর দিয়ে চেষ্টা করুন, অথবা সম্পূর্ণ কুরআনের শব্দভাণ্ডারে খুঁজুন।</p>
+      <div class="empty-state-actions">
+        <button type="button" class="empty-reset-btn" id="empty-reset-btn">সব সূরা দেখুন</button>
+        <button type="button" class="empty-global-search-btn" id="empty-global-search-btn">শব্দ ও অর্থে খুঁজুন</button>
+      </div>
     </div>
   </main>
 
@@ -349,6 +393,24 @@
   <main class="app-view" id="view-frequent">
     <div class="practice-container">
       <div id="frequent-words-container"></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       VIEW 5D: GLOBAL ARABIC + BANGLA + ROOT SEARCH (গ্লোবাল সার্চ)
+       ============================================================ -->
+  <main class="app-view" id="view-search">
+    <div class="practice-container">
+      <div id="global-search-container"></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       VIEW 5E: ROOT FAMILY & VERB FORMS EXPLORER (মূল অক্ষর অভিধান)
+       ============================================================ -->
+  <main class="app-view" id="view-roots">
+    <div class="practice-container">
+      <div id="root-explorer-container"></div>
     </div>
   </main>
 
@@ -460,7 +522,7 @@
   <div class="toast" id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/icons.js?v=44"></script>
+  <script src="js/icons.js?v=52"></script>
   <script src="js/lib/d3.min.js?v=35"></script>
   <script src="js/lib/supabase-bundle.js?v=35"></script>
   <script src="js/supabase-config.js?v=35"></script>
@@ -482,7 +544,8 @@
   <script src="js/ayah-quiz-roadmap.js?v=45"></script>
   <script src="js/audio-download-manager.js?v=51"></script>
   <script charset="UTF-8" src="js/word-share-card.js?v=49"></script>
-  <script charset="UTF-8" src="js/app.js?v=50"></script>
+  <script charset="UTF-8" src="js/quran-study-features.js?v=52"></script>
+  <script charset="UTF-8" src="js/app.js?v=52"></script>
 
   <script>
     // Initialize UI Icons safely (100% solid SVG icons, zero text/emoji icons)
@@ -502,6 +565,8 @@
     setIcon('sidebar-close-icon', Icons.close);
     setIcon('sidebar-user-icon', Icons.user);
     setIcon('sidebar-icon-surahs', Icons.book);
+    setIcon('sidebar-icon-search', Icons.search);
+    setIcon('sidebar-icon-roots', Icons.roots || Icons.layers);
     setIcon('sidebar-icon-practice', Icons.target);
     setIcon('sidebar-icon-learned', Icons.bookCheck);
     setIcon('sidebar-icon-frequent', Icons.flame);
@@ -523,6 +588,7 @@
 
     // Search & Filter Icons
     setIcon('search-icon-slot', Icons.search);
+    setIcon('icon-dir-word-search', Icons.search);
     setIcon('empty-search-icon', Icons.search);
     setIcon('icon-filter-makki', Icons.kaaba);
     setIcon('icon-filter-madani', Icons.mosque);
@@ -574,7 +640,7 @@
     if (sidebarBackdrop) sidebarBackdrop.onclick = closeSidebar;
 
     // Sidebar Navigation Items
-    ['surahs', 'practice', 'learned', 'frequent', 'bookmarks', 'account'].forEach((navTarget) => {
+    ['surahs', 'search', 'roots', 'practice', 'learned', 'frequent', 'bookmarks', 'account'].forEach((navTarget) => {
       const btn = document.getElementById(`sidebar-nav-${navTarget}`);
       if (btn) {
         btn.onclick = () => {

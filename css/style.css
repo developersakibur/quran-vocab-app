@@ -10171,3 +10171,1481 @@ button.practice-engine-card {
     font-size: 0.85rem;
   }
 }
+
+/* ============================================================
+   STUDY FEATURES SUITE (v52)
+   1. Directory Mode Switcher (Surah / 30-Juz) & Quick-Jump
+   2. Live Quran Coverage % & Daily Goal Widget
+   3. Global Arabic + Bangla + Root Search View (#view-search)
+   4. Root Family & Verb Forms Explorer (#view-roots)
+   5. Reader Hide Meaning / Self-Test Mode
+   6. Listening Quiz Audio-Only Stage
+   7. Recitation Ayah Repeat & Range Loop Controls
+   8. Custom Draggable Side Ayah Scrubber for Long Surahs
+   ============================================================ */
+
+/* ---- 1. Directory Switcher, Quick-Jump & 30-Juz List ---- */
+.directory-switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.directory-mode-tabs {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.dir-mode-tab {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 4px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.dir-mode-tab.active {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+  box-shadow: 0 1px 3px hsl(200 20% 10% / 0.08);
+}
+
+.dir-global-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--color-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.dir-global-search-btn:hover,
+.dir-global-search-btn:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.dir-global-search-btn .icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dir-global-search-btn .icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+#surah-quick-jump-mount {
+  padding: 0 var(--space-4);
+}
+
+.surah-quick-jump-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: var(--space-2);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.surah-quick-jump-banner:active {
+  transform: scale(0.99);
+}
+
+.sqj-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-family: var(--font-bangla);
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.sqj-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-bangla);
+}
+
+.sqj-text strong {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.sqj-text small {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.sqj-arrow {
+  width: 18px;
+  height: 18px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.surah-word-search-prompt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: var(--space-2);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.surah-word-search-prompt:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.surah-word-search-prompt .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.empty-global-search-btn {
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 30-Juz List */
+.juz-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4) calc(var(--space-7) + 36px);
+  flex: 1;
+}
+
+.juz-row {
+  margin-bottom: var(--space-2);
+}
+
+.juz-row-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px 14px;
+  min-height: 64px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.juz-row-btn:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.juz-row-btn:active {
+  transform: scale(0.99);
+}
+
+.juz-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.juz-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.juz-name-bn {
+  font-family: var(--font-bangla);
+  font-weight: 700;
+  font-size: 0.94rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.juz-name-ar {
+  font-family: var(--font-arabic);
+  font-size: 1.15rem;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.juz-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.juz-arrow {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* ---- 2. Live Quran Coverage % & Daily Goal Widget ---- */
+#surah-coverage-strip-mount {
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.study-coverage-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 2px;
+}
+
+.study-coverage-strip-left {
+  min-width: 0;
+}
+
+.study-coverage-strip-title {
+  font-family: var(--font-bangla);
+  font-size: 0.86rem;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.study-coverage-strip-title strong {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.study-coverage-strip-sub {
+  font-family: var(--font-bangla);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.study-goal-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.study-goal-chip.achieved {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+#learned-coverage-mount {
+  margin-bottom: var(--space-3);
+}
+
+#practice-coverage-mount {
+  width: 100%;
+}
+
+.study-coverage-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+.study-coverage-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.study-kicker {
+  font-family: var(--font-bangla);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.study-coverage-hero-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.study-coverage-pct {
+  font-family: var(--font-bangla);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+
+.study-coverage-sub {
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.study-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.study-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width 280ms ease;
+}
+
+.study-coverage-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.study-coverage-meta strong {
+  color: var(--text-primary);
+}
+
+.study-goal-col {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.study-goal-ring-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.study-goal-svg {
+  width: 64px;
+  height: 64px;
+  transform: rotate(-90deg);
+}
+
+.study-goal-track {
+  fill: none;
+  stroke: var(--bg-muted);
+  stroke-width: 6;
+}
+
+.study-goal-arc {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 280ms ease;
+}
+
+.study-goal-arc.achieved {
+  stroke: var(--color-success);
+}
+
+.study-goal-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding-top: 21px;
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.study-goal-ring-label strong {
+  font-size: 0.98rem;
+  color: var(--text-primary);
+}
+
+.study-goal-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.study-goal-status {
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.study-goal-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.study-goal-preset-btn {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.study-goal-preset-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+/* ---- 3. Global Arabic + Bangla + Root Search View (#view-search) ---- */
+.study-view-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding-bottom: 32px;
+}
+
+.study-search-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.study-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.study-search-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 42px 10px 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.94rem;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.study-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.study-search-clear-btn {
+  position: absolute;
+  right: 6px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.study-segmented-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-muted);
+  border-radius: var(--radius-sm);
+}
+
+.study-seg-btn {
+  min-height: 38px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.study-seg-btn.active {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+  box-shadow: 0 1px 2px hsl(200 20% 10% / 0.08);
+}
+
+.quick-jump-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-jump-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-bangla);
+}
+
+.quick-jump-kicker {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.quick-jump-go {
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.study-results-meta {
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: 0 2px;
+}
+
+.study-word-results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-word-result-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  transition: border-color var(--transition-fast);
+}
+
+.study-word-result-row:hover {
+  border-color: var(--color-primary);
+}
+
+.study-word-result-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.study-word-ar {
+  font-family: var(--font-arabic);
+  font-size: calc(1.42rem * var(--arabic-scale, 1));
+  color: var(--text-primary);
+  min-width: 74px;
+  text-align: right;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.study-word-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.study-word-bn {
+  font-family: var(--font-bangla);
+  font-size: calc(0.92rem * var(--bangla-scale, 1));
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.study-word-meta {
+  font-family: var(--font-bangla);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.study-word-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.study-mini-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.study-mini-icon-btn:hover,
+.study-mini-icon-btn.playing {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+.study-mini-icon-btn .icon,
+.study-mini-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.study-empty-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.study-empty-title {
+  margin: 0 0 6px;
+  font-family: var(--font-bangla);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.study-empty-desc {
+  margin: 0 0 14px;
+  font-family: var(--font-bangla);
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.study-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.study-quick-chip {
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  color: var(--color-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.study-quick-chip:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+/* ---- 4. Root Family & Verb Forms Explorer (#view-roots) ---- */
+.root-family-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.root-family-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 66px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.root-family-btn:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.root-letters-box {
+  min-width: 72px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-arabic);
+  font-size: 1.18rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.root-family-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.root-family-meanings {
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.root-family-meta {
+  font-family: var(--font-bangla);
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+}
+
+.root-chevron {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.root-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.root-detail-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.root-detail-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.root-detail-ar {
+  font-family: var(--font-arabic);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.3;
+}
+
+.root-detail-stats {
+  display: flex;
+  gap: 14px;
+  text-align: right;
+}
+
+.root-detail-stats > div {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-bangla);
+}
+
+.root-detail-stats strong {
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.root-detail-stats span {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.root-detail-summary-bn {
+  font-family: var(--font-bangla);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.root-quiz-cta {
+  width: 100%;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.root-quiz-cta .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.root-section-heading {
+  font-family: var(--font-bangla);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.root-verb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.root-verb-cell {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.root-verb-lbl {
+  font-family: var(--font-bangla);
+  font-size: 0.73rem;
+  color: var(--text-secondary);
+}
+
+.root-verb-cell strong {
+  font-family: var(--font-arabic);
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+/* ---- 5. Reader Hide Meaning / Self-Test Mode ---- */
+.surah-hide-meanings-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.surah-hide-meanings-cta .icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.surah-hide-meanings-cta.active {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--color-primary);
+}
+
+#view-ayahs.hide-meanings-mode .word-token:not(.meaning-revealed) .word-token-bn {
+  color: transparent;
+  background: var(--bg-muted);
+  border-radius: 6px;
+  min-width: 30px;
+  min-height: 20px;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+#view-ayahs.hide-meanings-mode .word-token:not(.meaning-revealed) .word-token-bn::after {
+  content: '•••';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+#view-ayahs.hide-meanings-mode .word-token.meaning-revealed {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+#view-ayahs.hide-meanings-mode .ayah-translation-box:not(.translation-revealed) {
+  color: transparent;
+  background: var(--bg-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+
+#view-ayahs.hide-meanings-mode .ayah-translation-box:not(.translation-revealed)::after {
+  content: 'আয়াতের বাংলা অনুবাদ দেখতে এখানে ট্যাপ করুন';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+#view-ayahs.hide-meanings-mode .ayah-translation-box.translation-revealed {
+  cursor: pointer;
+}
+
+/* ---- 6. Listening Quiz Mode & Practice Hub Engine Accents ---- */
+.engine-icon-listening {
+  background: hsl(204 75% 92%);
+  color: hsl(204 75% 34%);
+}
+
+[data-theme='dark'] .engine-icon-listening {
+  background: hsl(204 45% 20%);
+  color: hsl(204 82% 72%);
+}
+
+.engine-icon-roots {
+  background: var(--color-accent-soft);
+  color: hsl(38 80% 34%);
+}
+
+[data-theme='dark'] .engine-icon-roots {
+  background: hsl(42 40% 20%);
+  color: hsl(45 85% 70%);
+}
+
+.listening-drill-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.listening-audio-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 4px;
+  width: 100%;
+}
+
+.listening-play-hero-btn {
+  min-width: 196px;
+  min-height: 54px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-bangla);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.listening-play-hero-btn:active {
+  transform: scale(0.97);
+}
+
+.listening-play-hero-btn .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.listening-slow-btn {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.listening-slow-btn:hover,
+.listening-slow-btn.playing {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.listening-word-reveal {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary);
+  text-align: center;
+}
+
+/* ---- 7. Recitation Player Ayah Repeat & Range Loop Controls ---- */
+.player-left-tools,
+.player-right-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.player-loop-btn,
+.player-range-btn {
+  min-width: 38px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.player-loop-btn.active,
+.player-range-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+.player-range-btn .icon,
+.player-range-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.player-loop-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.player-range-popover {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+}
+
+.player-range-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.player-range-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-bangla);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.player-range-field input,
+.player-range-select {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.player-range-sep {
+  padding-bottom: 8px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.player-range-select {
+  width: auto;
+  min-width: 88px;
+}
+
+.player-range-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.player-range-apply-btn,
+.player-range-clear-btn {
+  flex: 1;
+  min-height: 38px;
+  border-radius: 8px;
+  font-family: var(--font-bangla);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.player-range-apply-btn {
+  border: 0;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+.player-range-clear-btn {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+/* ---- 8. Custom Draggable Side Ayah Scrubber (Long Surahs like Al-Baqarah) ---- */
+.ayah-side-scrubber {
+  position: fixed;
+  top: 86px;
+  bottom: 92px;
+  right: max(4px, calc((100vw - 600px) / 2 - 20px));
+  z-index: 42;
+  display: flex;
+  align-items: flex-start;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.ayah-side-scrubber.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.ayah-scrubber-rail {
+  position: relative;
+  width: 30px;
+  height: 100%;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: ns-resize;
+  display: flex;
+  justify-content: center;
+  outline: none;
+}
+
+.ayah-scrubber-track {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: 999px;
+  background: hsl(var(--color-primary-h) 25% 50% / 0.2);
+  transition: width 150ms ease, background 150ms ease;
+}
+
+.ayah-side-scrubber.dragging .ayah-scrubber-track,
+.ayah-scrubber-rail:hover .ayah-scrubber-track {
+  width: 6px;
+  background: hsl(var(--color-primary-h) 38% 45% / 0.32);
+}
+
+.ayah-scrubber-thumb {
+  position: absolute;
+  top: 0;
+  width: 22px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  border: 2px solid var(--bg-surface);
+  box-shadow: 0 2px 10px hsl(200 20% 10% / 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  transition: width 140ms ease, background 140ms ease;
+}
+
+.ayah-side-scrubber.dragging .ayah-scrubber-thumb {
+  width: 26px;
+  background: var(--color-primary-strong);
+}
+
+.ayah-scrubber-grip {
+  width: 8px;
+  height: 14px;
+  border-top: 2px solid rgba(255, 255, 255, 0.85);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.85);
+  position: relative;
+}
+
+.ayah-scrubber-grip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.ayah-scrubber-bubble {
+  position: absolute;
+  right: 36px;
+  top: 4px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-family: var(--font-bangla);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: var(--shadow-raised);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  will-change: transform;
+}
+
+.ayah-scrubber-bubble.visible {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .ayah-side-scrubber {
+    right: 2px;
+  }
+
+  #view-ayahs .ayahs-container {
+    padding-right: 22px;
+  }
+}
+
+@media (min-width: 520px) {
+  .study-coverage-grid {
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+  }
+
+  .study-goal-col {
+    padding-top: 0;
+    padding-left: 16px;
+    border-top: 0;
+    border-left: 1px solid var(--border-subtle);
+  }
+}
+
